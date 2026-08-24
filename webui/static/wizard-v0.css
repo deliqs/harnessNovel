@@ -499,10 +499,10 @@ button:disabled { cursor: not-allowed; }
   .review-actions button { width: 100%; }
 }
 
-/* 设计步骤：执行进度面板 */
+/* Design step: run-progress panel */
 .progress-panel-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: var(--primary); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 
-/* 设计步骤：模式选择器 */
+/* Design step: mode selector */
 .design-extension-mode { max-width: 680px; margin: 0 0 12px; padding: 0; border: 0; }
 .design-extension-mode legend { margin-bottom: 6px; color: #46564e; font-size: 12px; font-weight: 700; }
 .design-mode-options { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
@@ -512,12 +512,12 @@ button:disabled { cursor: not-allowed; }
 fieldset[hidden] { display: none; }
 .inline-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 
-/* 设计步骤：创作方向历史 */
+/* Design step: creative-direction history */
 .design-side-panel { margin-top: 16px; padding-top: 13px; border-top: 1px dashed #d6e5dc; }
 
-/* 设计步骤：多轮微调对话 */
+/* Design step: multi-round refine chat */
 
-/* ===== Design-chat steps (ChatGPT/豆包 style) ===== */
+/* ===== Design-chat steps (ChatGPT-style) ===== */
 .step-view-chat { display: flex; flex-direction: column; gap: 0; }
 .chat-step-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 4px; }
 .chat-step-header .step-eyebrow { margin: 0 0 6px; }

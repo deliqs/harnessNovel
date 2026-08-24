@@ -83,7 +83,7 @@ async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(options.headers || {}) } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data.detail || "请求失败，请稍后重试。");
+    const error = new Error(data.detail || "Request failed. Please retry shortly.");
     error.status = response.status;
     throw error;
   }
@@ -98,18 +98,18 @@ function closeSettings() {
 
 function modelConfigFields(groupId, group) {
   const prefix = CONFIG_PREFIXES[groupId];
-  const configured = group.api_key_configured ? "API Key 已配置" : "未配置 API Key";
+  const configured = group.api_key_configured ? "API key configured" : "API key not configured";
   return `<section class="model-config-group">
     <header><h3>${escapeHtml(group.label)}</h3><span class="config-status ${group.api_key_configured ? "ready" : "missing"}">${configured}</span></header>
-    <label>模型名称<input name="${prefix}_MODEL" value="${escapeHtml(group.model || "")}" placeholder="例如：deepseek-v4-pro" autocomplete="off" /></label>
+    <label>Model name<input name="${prefix}_MODEL" value="${escapeHtml(group.model || "")}" placeholder="e.g. deepseek-v4-pro" autocomplete="off" /></label>
     <label>Base URL<input name="${prefix}_BASE_URL" value="${escapeHtml(group.base_url || "")}" placeholder="https://api.example.com" autocomplete="off" /></label>
-    <label>API Key<input name="${prefix}_API_KEY" type="password" placeholder="${group.api_key_configured ? "已配置，留空保持不变" : "请输入 API Key"}" autocomplete="new-password" /></label>
+    <label>API Key<input name="${prefix}_API_KEY" type="password" placeholder="${group.api_key_configured ? "Configured; leave blank to keep it" : "Enter API key"}" autocomplete="new-password" /></label>
   </section>`;
 }
 
 async function openSettings() {
   const content = $("#settings-content");
-  content.innerHTML = '<p class="settings-loading">正在读取本地配置…</p>';
+  content.innerHTML = '<p class="settings-loading">Reading local settings…</p>';
   $("#settings-panel").classList.add("open");
   $("#settings-panel").setAttribute("aria-hidden", "false");
   $("#settings-scrim").classList.add("open");
@@ -119,12 +119,12 @@ async function openSettings() {
     content.innerHTML = `<form id="model-config-form" class="model-config-form">
       <p class="config-path">${escapeHtml(config.config_path || "")}</p>
       ${groups.map(([id, group]) => modelConfigFields(id, group)).join("")}
-      <div class="settings-actions"><button id="cancel-settings" class="secondary-button" type="button">取消</button><button class="primary-button" type="submit">保存配置</button></div>
+      <div class="settings-actions"><button id="cancel-settings" class="secondary-button" type="button">Cancel</button><button class="primary-button" type="submit">Save settings</button></div>
     </form>`;
     $("#cancel-settings").addEventListener("click", closeSettings);
     $("#model-config-form").addEventListener("submit", saveModelConfig);
   } catch (error) {
-    content.innerHTML = `<p class="settings-error">${escapeHtml(error.message || "无法读取配置。")}</p>`;
+    content.innerHTML = `<p class="settings-error">${escapeHtml(error.message || "Could not read settings.")}</p>`;
   }
 }
 
@@ -141,9 +141,9 @@ async function saveModelConfig(event) {
   try {
     await api("/api/config", { method: "PUT", body: JSON.stringify({ values }) });
     closeSettings();
-    showToast("大模型配置已保存。");
+    showToast("LLM settings saved.");
   } catch (error) {
-    showToast(error.message || "保存配置失败。", true);
+    showToast(error.message || "Failed to save settings.", true);
   } finally {
     submit.disabled = false;
   }
@@ -290,7 +290,7 @@ function inferredDone(step) {
   if (step.id === "world") return Boolean(summary.world_knowledge.ready);
   if (step.id === "design") return Boolean(summary.story_design?.concept_ready);
   if (step.id === "stage") return Boolean(summary.story_design?.stage_ready);
-  if (step.id === "mechanics") return summary.mechanics.mode !== "未初始化";
+  if (step.id === "mechanics") return summary.mechanics.mode !== "Not initialized";
   if (step.id === "arcs") return summary.writing.story_arc_count > 0;
   if (step.id === "chapters") return summary.writing.chapter_outline_count > 0;
   if (step.id === "draft") return summary.writing.chapter_count > 0;
@@ -323,7 +323,7 @@ function renderRail() {
     const state = statusForStep(step);
     const active = step.id === wizardState.activeStep;
     const disabled = state === "locked" ? "disabled" : "";
-    const meta = state === "done" ? "已有内容" : state === "locked" ? "等待上一步" : step.optional ? "可选" : active ? "当前步骤" : "待处理";
+    const meta = state === "done" ? "Has content" : state === "locked" ? "Waiting for previous step" : step.optional ? "Optional" : active ? "Current step" : "Pending";
     return `<button class="workflow-step ${state} ${active ? "active" : ""}" data-step="${step.id}" ${disabled} type="button"><span class="workflow-step-number">${state === "done" ? "✓" : index + 1}</span><span><span class="workflow-step-title">${step.title}</span><span class="workflow-step-meta">${meta}</span></span></button>`;
   }).join("");
   $$('[data-step]').forEach((button) => button.addEventListener("click", () => {
@@ -345,10 +345,10 @@ function referenceStatus() {
 
 function referenceScopeControls(defaultTarget, disabled = false) {
   return `<fieldset class="reference-scope" id="reference-scope" ${disabled ? "disabled" : ""}>
-    <legend>拆解范围</legend>
+    <legend>Deconstruction range</legend>
     <div class="reference-scope-options">
-      <label class="reference-scope-option"><input name="reference-scope" value="all" type="radio" ${wizardState.referenceScope === "all" ? "checked" : ""} /><span>整本书</span></label>
-      <label class="reference-scope-option"><input name="reference-scope" value="prefix" type="radio" ${wizardState.referenceScope === "prefix" ? "checked" : ""} /><span>只拆前</span><input id="reference-max-chapters" type="number" min="1" value="${defaultTarget}" ${wizardState.referenceScope === "prefix" && !disabled ? "" : "disabled"} /><span>章</span></label>
+      <label class="reference-scope-option"><input name="reference-scope" value="all" type="radio" ${wizardState.referenceScope === "all" ? "checked" : ""} /><span>Whole book</span></label>
+      <label class="reference-scope-option"><input name="reference-scope" value="prefix" type="radio" ${wizardState.referenceScope === "prefix" ? "checked" : ""} /><span>First</span><input id="reference-max-chapters" type="number" min="1" value="${defaultTarget}" ${wizardState.referenceScope === "prefix" && !disabled ? "" : "disabled"} /><span>chapters</span></label>
     </div>
   </fieldset>`;
 }
@@ -380,10 +380,10 @@ function arcsJobMarkup(job) {
       <div class="chat-job-progress-main">
         <span class="chat-job-status-dot" aria-hidden="true"></span>
         <div class="chat-job-progress-copy">
-          <strong>上次生成在情节单元 ${Number(job.next_arc || completed + 1)} 前中断</strong>
-          <span>已保留 ${completed} / ${total} 个情节单元</span>
+          <strong>Last run stopped before Arc ${Number(job.next_arc || completed + 1)}</strong>
+          <span>Kept ${completed} / ${total} story arcs</span>
         </div>
-        <button id="continue-arcs-job" class="chat-job-action resume continue" type="button"><span aria-hidden="true">▶</span>继续生成</button>
+        <button id="continue-arcs-job" class="chat-job-action resume continue" type="button"><span aria-hidden="true">▶</span>Continue generating</button>
       </div>
       <div class="chat-job-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><i style="width:${percent}%"></i></div>
     </div>`;
@@ -398,33 +398,33 @@ function arcsJobMarkup(job) {
   const pausing = job.status === "pausing";
   const stopping = job.status === "stopping";
   const pauseAction = paused
-    ? '<button id="resume-arcs-job" class="chat-job-action resume" type="button"><span aria-hidden="true">▶</span>继续</button>'
-    : `<button id="pause-arcs-job" class="chat-job-action" type="button" ${(pausing || stopping) ? "disabled" : ""}><span aria-hidden="true">${pausing ? "…" : "Ⅱ"}</span>${pausing ? "暂停中" : "暂停"}</button>`;
-  const stopAction = `<button id="stop-arcs-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}><span aria-hidden="true">■</span>${stopping ? "结束中" : "结束"}</button>`;
+    ? '<button id="resume-arcs-job" class="chat-job-action resume" type="button"><span aria-hidden="true">▶</span>Resume</button>'
+    : `<button id="pause-arcs-job" class="chat-job-action" type="button" ${(pausing || stopping) ? "disabled" : ""}><span aria-hidden="true">${pausing ? "…" : "Ⅱ"}</span>${pausing ? "Pausing" : "Pause"}</button>`;
+  const stopAction = `<button id="stop-arcs-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}><span aria-hidden="true">■</span>${stopping ? "Stopping" : "Stop"}</button>`;
   const promptAction = Number(job.prompt_count || 0) > 0 ? `<button id="show-arcs-prompt" class="chat-job-action prompt" type="button">Prompt · ${Number(job.prompt_count)}</button>` : "";
   const meta = stopping
-    ? (serialRefine ? `正在结束调整 · 已完成 ${completed} 个` : `正在保留已完成的 ${completed} 个情节单元`)
+    ? (serialRefine ? `Ending adjustment · completed ${completed}` : `Keeping ${completed} completed story arcs`)
     : paused
-    ? (serialRefine ? `串行调整已暂停 · 已完成 ${completed} / ${total || "—"}` : `停在 ${completed} / ${total || "—"} · 已完成内容已保存`)
+    ? (serialRefine ? `Serial adjustment paused · completed ${completed} / ${total || "—"}` : `Stopped at ${completed} / ${total || "—"} · completed content saved`)
     : pausing
-      ? (serialRefine ? `正在暂停当前调整请求 · ${completed} / ${total || "—"}` : `当前单元保存后暂停 · ${completed} / ${total || "—"}`)
+      ? (serialRefine ? `Pausing the current adjustment request · ${completed} / ${total || "—"}` : `Paused after saving the current unit · ${completed} / ${total || "—"}`)
       : routing
-        ? "正在判断最早受影响的情节单元"
+        ? "Finding the earliest affected story arc"
       : serialRefine
-        ? `${completed} / ${total || "—"} 个待调整单元 · ${percent}%`
+        ? `${completed} / ${total || "—"} units to adjust · ${percent}%`
       : total > 0
-        ? `${completed} / ${total} 个情节单元 · ${percent}%`
-        : "正在分析生成范围";
+        ? `${completed} / ${total} story arcs · ${percent}%`
+        : "Analyzing generation range";
   return `<div class="chat-job-progress ${paused ? "is-paused" : pausing ? "is-pausing" : stopping ? "is-stopping" : ""} ${routing ? "is-refining" : ""}" id="arcs-job-progress">
     <div class="chat-job-progress-main">
       <span class="chat-job-status-dot" aria-hidden="true"></span>
       <div class="chat-job-progress-copy">
-        <strong>${escapeHtml(job.message || "正在生成")}</strong>
+        <strong>${escapeHtml(job.message || "Generating")}</strong>
         <span>${meta}</span>
       </div>
       <div class="chat-job-actions">${promptAction}${pauseAction}${stopAction}</div>
     </div>
-    <div class="chat-job-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" ${routing ? 'aria-label="正在分析调整范围"' : `aria-valuenow="${percent}"`}><i style="width:${Math.max(2, Math.min(100, percent))}%"></i></div>
+    <div class="chat-job-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" ${routing ? 'aria-label="Analyzing adjustment range"' : `aria-valuenow="${percent}"`}><i style="width:${Math.max(2, Math.min(100, percent))}%"></i></div>
   </div>`;
 }
 
@@ -433,22 +433,22 @@ function arcsChatPanelMarkup(volume, conversation, job = null) {
   const sd = wizardState.summary?.story_design || {};
   const stageCount = Math.max(0, Number(sd.stage_count || 0));
   const selector = stageCount
-    ? `<select id="arcs-volume-select">${Array.from({ length: stageCount }, (_, i) => `<option value="${i + 1}" ${Number(volume) === i + 1 ? "selected" : ""}>第 ${i + 1} 舞台</option>`).join("")}</select>`
+    ? `<select id="arcs-volume-select">${Array.from({ length: stageCount }, (_, i) => `<option value="${i + 1}" ${Number(volume) === i + 1 ? "selected" : ""}>Stage ${i + 1}</option>`).join("")}</select>`
     : `<input id="arcs-volume-select" type="number" min="1" value="${volume}" />`;
   const volumeInfo = (wizardState.summary?.volumes || []).find((item) => Number(item.volume) === Number(volume));
   const arcsExist = Boolean(conversation?.has_arcs) || Boolean(volumeInfo?.arcs?.length);
-  const placeholder = "描述对情节单元的调整要求，例如「情节单元1增加一个反转」「主角在情节单元3中实力突破」…";
+  const placeholder = "Describe story-arc changes, for example “add a reversal in Arc 1” or “the protagonist breaks through in Arc 3”…";
   const messages = turns.map(chatMessageMarkup).join("");
-  const resetBtn = (turns.length || arcsExist) ? '<button id="reset-arcs-chat" class="chat-icon-btn" type="button" title="删除本卷情节单元并重新开始">⟳ 重置</button>' : "";
-  const emptyHint = arcsExist ? "选择舞台后在下方输入调整要求。首次进入请先选择舞台并描述需求。" : "选择舞台后，输入关于情节设计的灵感或需求，开始生成故事情节单元。";
+  const resetBtn = (turns.length || arcsExist) ? '<button id="reset-arcs-chat" class="chat-icon-btn" type="button" title="Delete story arcs for this volume and start over">⟳ Reset</button>' : "";
+  const emptyHint = arcsExist ? "Choose a stage, then enter adjustment requests below. On first visit, pick a stage and describe what you need." : "After choosing a stage, enter plot inspiration or requirements to generate story arcs.";
   return `<section class="chat-panel" id="arcs-chat" data-volume="${volume}">
-    <header class="chat-panel-bar"><span class="chat-panel-bar-label">舞台 / 卷号</span>${selector}</header>
+    <header class="chat-panel-bar"><span class="chat-panel-bar-label">Stage / volume</span>${selector}</header>
     <div class="chat-scroll" id="chat-message-list">${messages || `<div class="chat-empty"><div class="chat-empty-icon">📖</div><p>${emptyHint}</p></div>`}</div>
     ${arcsJobMarkup(job)}
     <div class="chat-composer">
       <div class="chat-input-row">
         <textarea id="arcs-chat-input" class="chat-input" placeholder="${placeholder}" rows="1"></textarea>
-        <button id="send-arcs-chat" class="chat-send-btn" type="button" title="发送（Ctrl/⌘+Enter）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        <button id="send-arcs-chat" class="chat-send-btn" type="button" title="Send (Ctrl/⌘+Enter)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
       </div>
       <div class="chat-composer-meta">${resetBtn}</div>
     </div>
@@ -483,14 +483,14 @@ function renderArcsChat(volume, conversation, job = null) {
   });
   $$("[data-artifact-path]").forEach((btn) => btn.addEventListener("click", () => openReviewFile(btn.dataset.artifactPath)));
   $("#reset-arcs-chat")?.addEventListener("click", async () => {
-    if (!confirm(`将删除第 ${volume} 舞台的所有故事情节单元并清空对话。确认重置？`)) return;
+    if (!confirm(`This will delete all story arcs for stage ${volume} and clear the conversation. Reset?`)) return;
     try {
       await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/arcs/${volume}/reset`, { method: "POST", body: JSON.stringify({}) });
       await refreshWorkspaceArtifacts();
       const data = await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/arcs/${volume}/conversation`);
       renderArcsChat(volume, data);
-      showToast("已重置，下一条消息将重新生成。");
-    } catch (error) { showToast(error.message || "无法重置。", true); }
+      showToast("Reset. The next message will generate again.");
+    } catch (error) { showToast(error.message || "Could not reset.", true); }
   });
 }
 
@@ -515,9 +515,9 @@ async function controlArcsJob(volume, action) {
     pollArcsJob(volume);
   } catch (error) {
     if (action === "stop" && error.status === 404) {
-      showToast("后端仍是旧版本，请重启 novel web 后再点击结束。已生成内容不会丢失。", true);
+      showToast("The backend is still an old version. Restart novel web, then click Stop. Generated content will not be lost.", true);
     } else {
-      showToast(error.message || "无法控制生成任务。", true);
+      showToast(error.message || "Could not control the generation task.", true);
     }
   }
 }
@@ -554,9 +554,9 @@ function pollArcsJob(volume) {
       const conversation = await api(`${base}/conversation`);
       await refreshWorkspaceArtifacts();
       renderArcsChat(volume, conversation, job);
-      if (job.status === "failed") showToast(job.error || "生成失败，请重试。", true);
-      else if (job.status === "stopped") showToast("已结束本轮生成，已完成内容均已保留。");
-      else if (job.status === "completed") showToast("故事情节生成完成。");
+      if (job.status === "failed") showToast(job.error || "Generation failed. Please retry.", true);
+      else if (job.status === "stopped") showToast("This generation round has ended. Completed content was kept.");
+      else if (job.status === "completed") showToast("Story-arc generation completed.");
     } catch (error) {
       arcsJobPollTimer = setTimeout(poll, 1500);
     }
@@ -598,7 +598,7 @@ async function sendArcsMessage(volume) {
     renderArcsChat(volume, conversation, job);
     pollArcsJob(volume);
   } catch (error) {
-    showToast(error.message || "生成失败，请重试。", true);
+    showToast(error.message || "Generation failed. Please retry.", true);
     loadArcsChat(volume);
   } finally {}
 }
@@ -616,8 +616,8 @@ function chaptersJobMarkup(job) {
     const percent = total ? Math.round(completed * 100 / total) : 0;
     return `<div class="chat-job-progress is-interrupted" id="chapters-job-progress">
       <div class="chat-job-progress-main"><span class="chat-job-status-dot"></span>
-        <div class="chat-job-progress-copy"><strong>上次生成在第 ${Number(job.next_chapter || completed + 1)} 章前中断</strong><span>已保留 ${completed} / ${total} 章</span></div>
-        <button id="continue-chapters-job" class="chat-job-action resume continue" type="button"><span>▶</span>继续生成</button>
+        <div class="chat-job-progress-copy"><strong>Last run stopped before chapter ${Number(job.next_chapter || completed + 1)}</strong><span>Kept ${completed} / ${total} chapters</span></div>
+        <button id="continue-chapters-job" class="chat-job-action resume continue" type="button"><span>▶</span>Continue generating</button>
       </div><div class="chat-job-progress-track"><i style="width:${percent}%"></i></div>
     </div>`;
   }
@@ -628,19 +628,19 @@ function chaptersJobMarkup(job) {
   const percent = total ? Math.round(completed * 100 / total) : 4;
   const paused = job.status === "paused", pausing = job.status === "pausing", stopping = job.status === "stopping";
   const pauseAction = paused
-    ? '<button id="resume-chapters-job" class="chat-job-action resume" type="button"><span>▶</span>继续</button>'
-    : `<button id="pause-chapters-job" class="chat-job-action" type="button" ${(pausing || stopping) ? "disabled" : ""}><span>${pausing ? "…" : "Ⅱ"}</span>${pausing ? "暂停中" : "暂停"}</button>`;
-  const stopAction = `<button id="stop-chapters-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}><span>■</span>${stopping ? "结束中" : "结束"}</button>`;
+    ? '<button id="resume-chapters-job" class="chat-job-action resume" type="button"><span>▶</span>Resume</button>'
+    : `<button id="pause-chapters-job" class="chat-job-action" type="button" ${(pausing || stopping) ? "disabled" : ""}><span>${pausing ? "…" : "Ⅱ"}</span>${pausing ? "Pausing" : "Pause"}</button>`;
+  const stopAction = `<button id="stop-chapters-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}><span>■</span>${stopping ? "Stopping" : "Stop"}</button>`;
   const promptAction = Number(job.prompt_count || 0) > 0 ? `<button id="show-chapters-prompt" class="chat-job-action prompt" type="button">Prompt · ${Number(job.prompt_count)}</button>` : "";
-  const meta = stopping ? `正在结束 · 已完成 ${completed} 章`
-    : paused ? `已暂停 · ${completed} / ${total || "—"} 章`
-    : pausing ? `正在暂停当前请求 · ${completed} / ${total || "—"}`
-    : routing ? "正在判断最早受影响章节"
-    : refining ? `${completed} / ${total || "—"} 个待调整章节 · ${percent}%`
-    : `${completed} / ${total || "—"} 章 · ${percent}%`;
+  const meta = stopping ? `Ending · completed ${completed} chapters`
+    : paused ? `Paused · ${completed} / ${total || "—"} chapters`
+    : pausing ? `Pausing the current request · ${completed} / ${total || "—"}`
+    : routing ? "Finding the earliest affected chapter"
+    : refining ? `${completed} / ${total || "—"} chapters to adjust · ${percent}%`
+    : `${completed} / ${total || "—"} chapters · ${percent}%`;
   return `<div class="chat-job-progress ${paused ? "is-paused" : pausing ? "is-pausing" : stopping ? "is-stopping" : ""} ${routing ? "is-refining" : ""}" id="chapters-job-progress">
     <div class="chat-job-progress-main"><span class="chat-job-status-dot"></span>
-      <div class="chat-job-progress-copy"><strong>${escapeHtml(job.message || "正在生成章纲")}</strong><span>${meta}</span></div>
+      <div class="chat-job-progress-copy"><strong>${escapeHtml(job.message || "Generating chapter outlines")}</strong><span>${meta}</span></div>
       <div class="chat-job-actions">${promptAction}${pauseAction}${stopAction}</div>
     </div><div class="chat-job-progress-track"><i style="width:${Math.max(2, Math.min(100, percent))}%"></i></div>
   </div>`;
@@ -651,33 +651,33 @@ function chaptersChatPanelMarkup(volume, arcIdx, conversation, job = null) {
   const volDetail = volumes.find((v) => v.volume === Number(volume)) || { arcs: [] };
   const arcs = volDetail.arcs || [];
   const volumeSelector = volumes.length
-    ? `<select id="chapters-volume-select">${volumes.map((v) => `<option value="${v.volume}" ${Number(volume) === v.volume ? "selected" : ""}>第 ${v.volume} 舞台</option>`).join("")}</select>`
+    ? `<select id="chapters-volume-select">${volumes.map((v) => `<option value="${v.volume}" ${Number(volume) === v.volume ? "selected" : ""}>Stage ${v.volume}</option>`).join("")}</select>`
     : `<input id="chapters-volume-select" type="number" min="1" value="${volume}" />`;
   const arcSelector = arcs.length
-    ? `<select id="chapters-arc-select">${arcs.map((a) => `<option value="${a.idx}" ${Number(arcIdx) === a.idx ? "selected" : ""}>情节单元${a.idx}${a.title ? ` · ${escapeHtml(a.title)}` : ""}（第${a.start_ch}-${a.end_ch}章）</option>`).join("")}</select>`
-    : `<select id="chapters-arc-select" disabled><option>该舞台暂无情节单元</option></select>`;
+    ? `<select id="chapters-arc-select">${arcs.map((a) => `<option value="${a.idx}" ${Number(arcIdx) === a.idx ? "selected" : ""}>Arc ${a.idx}${a.title ? ` · ${escapeHtml(a.title)}` : ""} (chapters ${a.start_ch}-${a.end_ch})</option>`).join("")}</select>`
+    : `<select id="chapters-arc-select" disabled><option>No story arcs on this stage</option></select>`;
   const turns = (conversation && Array.isArray(conversation.turns)) ? conversation.turns : [];
-  const placeholder = "描述对本批章纲的调整要求，例如「第1章情绪基调更压抑」「第3章单章简介加强反转」…";
+  const placeholder = "Describe chapter-outline changes, for example “make Chapter 1 more oppressive” or “strengthen the reversal in the Chapter 3 synopsis”…";
   const messages = turns.map(chatMessageMarkup).join("");
-  const resetBtn = (turns.length || conversation?.has_outlines) ? '<button id="reset-chapters-chat" class="chat-icon-btn" type="button" title="删除本批章纲和系统面板并重新开始">⟳ 重置</button>' : "";
-  const emptyHint = arcs.length ? "选择舞台和情节单元后，输入描述开始生成逐章章纲。" : "该舞台还没有故事情节单元，请先在「故事情节」步骤中生成。";
+  const resetBtn = (turns.length || conversation?.has_outlines) ? '<button id="reset-chapters-chat" class="chat-icon-btn" type="button" title="Delete this batch of chapter outlines and system panels and start over">⟳ Reset</button>' : "";
+  const emptyHint = arcs.length ? "Choose a stage and story arc, then enter a description to generate chapter outlines." : "This stage has no story arcs yet. Generate them in the Story arcs step first.";
   const panel = wizardState.systemPanelStatus || { selection_mode: "auto", decided: false, enabled: false };
   const panelResult = panel.unavailable
-    ? "设置接口尚未加载，重启服务后可用"
+    ? "Settings API is not loaded yet; restart the server to use it"
     : panel.selection_mode === "auto"
-    ? (panel.decided ? `自动判断结果：${panel.enabled ? "需要系统面板" : "不需要系统面板"}` : "首次生成章纲时自动判断")
-    : (panel.enabled ? "已手动启用，将逐章更新主角状态" : "已关闭，不生成章节系统面板");
+    ? (panel.decided ? `Auto-detect result: ${panel.enabled ? "system panel needed" : "system panel not needed"}` : "Auto-detect on first chapter-outline generation")
+    : (panel.enabled ? "Manually enabled; protagonist state will update each chapter" : "Off; chapter system panels will not be generated");
   return `<section class="chat-panel" id="chapters-chat" data-volume="${volume}" data-arc="${arcIdx}">
     <header class="chat-panel-bar">
-      <span class="chat-panel-bar-label">舞台 / 卷号</span>${volumeSelector}
-      <span class="chat-panel-bar-label">情节单元</span>${arcSelector}
+      <span class="chat-panel-bar-label">Stage / volume</span>${volumeSelector}
+      <span class="chat-panel-bar-label">Story arc</span>${arcSelector}
     </header>
     <div class="system-panel-config-bar">
-      <div><strong>系统面板</strong><span>${escapeHtml(panelResult)}</span></div>
-      <select id="chapter-system-panel-mode" aria-label="系统面板模式" ${panel.unavailable ? "disabled" : ""}>
-        <option value="auto" ${panel.selection_mode === "auto" ? "selected" : ""}>自动判断</option>
-        <option value="enabled" ${panel.selection_mode === "enabled" ? "selected" : ""}>启用</option>
-        <option value="disabled" ${panel.selection_mode === "disabled" ? "selected" : ""}>不使用</option>
+      <div><strong>System panel</strong><span>${escapeHtml(panelResult)}</span></div>
+      <select id="chapter-system-panel-mode" aria-label="System-panel mode" ${panel.unavailable ? "disabled" : ""}>
+        <option value="auto" ${panel.selection_mode === "auto" ? "selected" : ""}>Auto-detect</option>
+        <option value="enabled" ${panel.selection_mode === "enabled" ? "selected" : ""}>Enable</option>
+        <option value="disabled" ${panel.selection_mode === "disabled" ? "selected" : ""}>Don't use</option>
       </select>
     </div>
     <div class="chat-scroll" id="chat-message-list">${messages || `<div class="chat-empty"><div class="chat-empty-icon">📝</div><p>${emptyHint}</p></div>`}</div>
@@ -685,7 +685,7 @@ function chaptersChatPanelMarkup(volume, arcIdx, conversation, job = null) {
     <div class="chat-composer">
       <div class="chat-input-row">
         <textarea id="chapters-chat-input" class="chat-input" placeholder="${placeholder}" rows="1"></textarea>
-        <button id="send-chapters-chat" class="chat-send-btn" type="button" title="发送（Ctrl/⌘+Enter）" ${arcs.length ? "" : "disabled"}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        <button id="send-chapters-chat" class="chat-send-btn" type="button" title="Send (Ctrl/⌘+Enter)" ${arcs.length ? "" : "disabled"}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
       </div>
       <div class="chat-composer-meta">${resetBtn}</div>
     </div>
@@ -729,9 +729,9 @@ function renderChaptersChat(volume, arcIdx, conversation, job = null) {
       wizardState.systemPanelStatus = await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/chapters/system-panel`, {
         method: "POST", body: JSON.stringify({ mode }),
       });
-      showToast(mode === "auto" ? "将在首次生成章纲时自动判断。" : mode === "enabled" ? "已启用系统面板。" : "已关闭系统面板，已有状态文件会保留。");
+      showToast(mode === "auto" ? "Will auto-detect when chapter outlines are first generated." : mode === "enabled" ? "System panel enabled." : "System panel disabled. Existing state files are kept.");
       loadChaptersChat(volume, arcIdx);
-    } catch (error) { showToast(error.message || "无法更新系统面板设置。", true); }
+    } catch (error) { showToast(error.message || "Could not update system-panel settings.", true); }
   });
   $("#pause-chapters-job")?.addEventListener("click", () => controlChaptersJob(volume, arcIdx, "pause"));
   $("#resume-chapters-job")?.addEventListener("click", () => controlChaptersJob(volume, arcIdx, "resume"));
@@ -745,14 +745,14 @@ function renderChaptersChat(volume, arcIdx, conversation, job = null) {
   });
   $$("[data-artifact-path]").forEach((btn) => btn.addEventListener("click", () => openReviewFile(btn.dataset.artifactPath)));
   $("#reset-chapters-chat")?.addEventListener("click", async () => {
-    if (!confirm(`将删除情节单元${arcIdx}（卷${volume}）的所有章纲、对应系统面板并清空对话。确认重置？`)) return;
+    if (!confirm(`This will delete all chapter outlines and matching system panels for Arc ${arcIdx} (volume ${volume}) and clear the conversation. Reset?`)) return;
     try {
       await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/chapters/${volume}/${arcIdx}/reset`, { method: "POST", body: JSON.stringify({}) });
       await refreshWorkspaceArtifacts();
       const data = await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/chapters/${volume}/${arcIdx}/conversation`);
       renderChaptersChat(volume, arcIdx, data);
-      showToast("已重置，下一条消息将重新生成。");
-    } catch (error) { showToast(error.message || "无法重置。", true); }
+      showToast("Reset. The next message will generate again.");
+    } catch (error) { showToast(error.message || "Could not reset.", true); }
   });
 }
 
@@ -774,7 +774,7 @@ async function loadChaptersChat(volume, arcIdx) {
     if (["running", "pausing", "paused", "stopping"].includes(job.status)) pollChaptersJob(volume, arcIdx);
   } catch (error) {
     renderChaptersChat(volume, arcIdx, { turns: [] }, { status: "idle" });
-    showToast(error.message || "无法加载章纲对话。", true);
+    showToast(error.message || "Could not load the chapter-outline chat.", true);
   }
 }
 
@@ -787,7 +787,7 @@ async function controlChaptersJob(volume, arcIdx, action) {
     const conversation = await api(`${base}/conversation`);
     renderChaptersChat(volume, arcIdx, conversation, job);
     pollChaptersJob(volume, arcIdx);
-  } catch (error) { showToast(error.message || "无法控制章纲任务。", true); }
+  } catch (error) { showToast(error.message || "Could not control the chapter-outline task.", true); }
 }
 
 function pollChaptersJob(volume, arcIdx) {
@@ -820,9 +820,9 @@ function pollChaptersJob(volume, arcIdx) {
       }
       await refreshWorkspaceArtifacts();
       renderChaptersChat(volume, arcIdx, await api(`${base}/conversation`), job);
-      if (job.status === "failed") showToast(job.error || "章纲生成失败。", true);
-      else if (job.status === "stopped") showToast("已结束本轮章纲生成，已完成内容均已保留。");
-      else if (job.status === "completed") showToast("章纲生成完成。");
+      if (job.status === "failed") showToast(job.error || "Chapter-outline generation failed.", true);
+      else if (job.status === "stopped") showToast("This chapter-outline round has ended. Completed content was kept.");
+      else if (job.status === "completed") showToast("Chapter outlines generated.");
     } catch (_) { chaptersJobPollTimer = setTimeout(poll, 1500); }
   };
   poll();
@@ -861,7 +861,7 @@ async function sendChaptersMessage(volume, arcIdx) {
     renderChaptersChat(volume, arcIdx, conversation, job);
     pollChaptersJob(volume, arcIdx);
   } catch (error) {
-    showToast(error.message || "生成失败，请重试。", true);
+    showToast(error.message || "Generation failed. Please retry.", true);
     loadChaptersChat(volume, arcIdx);
   } finally {}
 }
@@ -869,15 +869,15 @@ async function sendChaptersMessage(volume, arcIdx) {
 function draftJobMarkup(job) {
   if (!job) return "";
   if (job.status === "idle" && job.can_resume) {
-    return `<div class="chat-job-progress is-interrupted" id="draft-job-progress"><div class="chat-job-progress-main"><span class="chat-job-status-dot"></span><div class="chat-job-progress-copy"><strong>上次生成在第 ${Number(job.next_chapter)} 章前中断</strong><span>已保留 ${Number(job.completed || 0)} / ${Number(job.total || 0)} 章正文</span></div><button id="continue-draft-job" class="chat-job-action resume continue" type="button">▶ 继续生成</button></div></div>`;
+    return `<div class="chat-job-progress is-interrupted" id="draft-job-progress"><div class="chat-job-progress-main"><span class="chat-job-status-dot"></span><div class="chat-job-progress-copy"><strong>Last run stopped before chapter ${Number(job.next_chapter)}</strong><span>Kept ${Number(job.completed || 0)} / ${Number(job.total || 0)} draft chapters</span></div><button id="continue-draft-job" class="chat-job-action resume continue" type="button">▶ Continue generating</button></div></div>`;
   }
   if (["idle", "completed", "failed", "stopped"].includes(job.status)) return "";
   const total = Number(job.total || 0), completed = Number(job.completed || 0);
   const paused = job.status === "paused", stopping = job.status === "stopping";
   const routing = job.progress_kind === "serial_draft_refine" && job.phase === "routing";
-  const pause = paused ? '<button id="resume-draft-job" class="chat-job-action resume" type="button">▶ 继续</button>' : '<button id="pause-draft-job" class="chat-job-action" type="button">Ⅱ 暂停</button>';
+  const pause = paused ? '<button id="resume-draft-job" class="chat-job-action resume" type="button">▶ Resume</button>' : '<button id="pause-draft-job" class="chat-job-action" type="button">Ⅱ Pause</button>';
   const promptAction = Number(job.prompt_count || 0) > 0 ? `<button id="show-draft-prompt" class="chat-job-action prompt" type="button">Prompt · ${Number(job.prompt_count)}</button>` : "";
-  return `<div class="chat-job-progress ${paused ? "is-paused" : ""} ${routing ? "is-refining" : ""}" id="draft-job-progress"><div class="chat-job-progress-main"><span class="chat-job-status-dot"></span><div class="chat-job-progress-copy"><strong>${escapeHtml(job.message || "正在生成正文")}</strong><span>${routing ? "正在判断最早受影响章节" : `${completed} / ${total || "—"} 章`}</span></div><div class="chat-job-actions">${promptAction}${pause}<button id="stop-draft-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}>■ ${stopping ? "结束中" : "结束"}</button></div></div><div class="chat-job-progress-track"><i style="width:${total ? Math.round(completed * 100 / total) : 3}%"></i></div></div>`;
+  return `<div class="chat-job-progress ${paused ? "is-paused" : ""} ${routing ? "is-refining" : ""}" id="draft-job-progress"><div class="chat-job-progress-main"><span class="chat-job-status-dot"></span><div class="chat-job-progress-copy"><strong>${escapeHtml(job.message || "Generating draft")}</strong><span>${routing ? "Finding the earliest affected chapter" : `${completed} / ${total || "—"} chapters`}</span></div><div class="chat-job-actions">${promptAction}${pause}<button id="stop-draft-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}>■ ${stopping ? "Stopping" : "Stop"}</button></div></div><div class="chat-job-progress-track"><i style="width:${total ? Math.round(completed * 100 / total) : 3}%"></i></div></div>`;
 }
 
 function draftChatPanelMarkup(volume, arcIdx, conversation, job = null) {
@@ -886,14 +886,14 @@ function draftChatPanelMarkup(volume, arcIdx, conversation, job = null) {
   const arcs = detail.arcs || [], turns = Array.isArray(conversation?.turns) ? conversation.turns : [];
   const guide = conversation?.writing_guide || {};
   const resetBtn = (turns.length || conversation?.has_drafts)
-    ? '<button id="reset-draft-chat" class="chat-icon-btn" type="button" title="删除当前情节单元的全部正文并重新开始">⟳ 重置</button>'
+    ? '<button id="reset-draft-chat" class="chat-icon-btn" type="button" title="Delete all draft for the current story arc and start over">⟳ Reset</button>'
     : "";
-  const volumeSelector = `<select id="draft-chat-volume">${volumes.map((item) => `<option value="${item.volume}" ${Number(volume) === Number(item.volume) ? "selected" : ""}>第 ${item.volume} 舞台 / 卷</option>`).join("")}</select>`;
-  const arcSelector = arcs.length ? `<select id="draft-chat-arc">${arcs.map((arc) => `<option value="${arc.idx}" ${Number(arcIdx) === Number(arc.idx) ? "selected" : ""}>情节单元${arc.idx}${arc.title ? ` · ${escapeHtml(arc.title)}` : ""}（第${arc.start_ch}-${arc.end_ch}章）</option>`).join("")}</select>` : '<select id="draft-chat-arc" disabled><option>该舞台暂无故事情节</option></select>';
-  return `<section class="chat-panel draft-chat-panel"><header class="chat-panel-bar"><span class="chat-panel-bar-label">舞台 / 卷号</span>${volumeSelector}<span class="chat-panel-bar-label">故事情节</span>${arcSelector}</header>
-    <div class="writing-guide-bar"><div><strong>生文规范</strong><span>${guide.custom ? "当前使用自定义规范" : "当前使用项目默认 system_prompt.md"}</span></div><div class="writing-guide-actions"><input id="draft-guide-file" type="file" accept=".txt,.md" hidden><button id="upload-draft-guide" class="chat-icon-btn" type="button">上传规范</button>${guide.custom ? '<button id="reset-draft-guide" class="chat-icon-btn" type="button">恢复默认</button>' : ""}</div></div>
-    <div class="chat-scroll" id="chat-message-list">${turns.map(chatMessageMarkup).join("") || `<div class="chat-empty"><div class="chat-empty-icon">✍</div><p>${arcs.length ? "输入本情节正文的生成要求，开始逐章串行创作。" : "请先生成故事情节和逐章章纲。"}</p></div>`}</div>${draftJobMarkup(job)}
-    <div class="chat-composer"><div class="chat-input-row"><textarea id="draft-chat-input" class="chat-input" rows="1" placeholder="输入正文生成或调整要求"></textarea><button id="send-draft-chat" class="chat-send-btn" type="button" title="发送（Ctrl/⌘+Enter）" aria-label="发送" ${arcs.length ? "" : "disabled"}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button></div><div class="chat-composer-meta draft-chat-options"><label class="draft-humanize-option"><input id="draft-chat-humanize" type="checkbox" ${wizardState.draftChatHumanize === false ? "" : "checked"} /><span>生成后自动去 AI 味精修</span></label>${resetBtn}</div></div></section>`;
+  const volumeSelector = `<select id="draft-chat-volume">${volumes.map((item) => `<option value="${item.volume}" ${Number(volume) === Number(item.volume) ? "selected" : ""}>Stage / volume ${item.volume}</option>`).join("")}</select>`;
+  const arcSelector = arcs.length ? `<select id="draft-chat-arc">${arcs.map((arc) => `<option value="${arc.idx}" ${Number(arcIdx) === Number(arc.idx) ? "selected" : ""}>Arc ${arc.idx}${arc.title ? ` · ${escapeHtml(arc.title)}` : ""} (chapters ${arc.start_ch}-${arc.end_ch})</option>`).join("")}</select>` : '<select id="draft-chat-arc" disabled><option>No story arcs on this stage</option></select>';
+  return `<section class="chat-panel draft-chat-panel"><header class="chat-panel-bar"><span class="chat-panel-bar-label">Stage / volume</span>${volumeSelector}<span class="chat-panel-bar-label">Story arcs</span>${arcSelector}</header>
+    <div class="writing-guide-bar"><div><strong>Writing guide</strong><span>${guide.custom ? "Using a custom writing guide" : "Using the project default system_prompt.md"}</span></div><div class="writing-guide-actions"><input id="draft-guide-file" type="file" accept=".txt,.md" hidden><button id="upload-draft-guide" class="chat-icon-btn" type="button">Upload guide</button>${guide.custom ? '<button id="reset-draft-guide" class="chat-icon-btn" type="button">Restore default</button>' : ""}</div></div>
+    <div class="chat-scroll" id="chat-message-list">${turns.map(chatMessageMarkup).join("") || `<div class="chat-empty"><div class="chat-empty-icon">✍</div><p>${arcs.length ? "Enter draft requirements for this arc to start serial chapter writing." : "Generate story arcs and chapter outlines first."}</p></div>`}</div>${draftJobMarkup(job)}
+    <div class="chat-composer"><div class="chat-input-row"><textarea id="draft-chat-input" class="chat-input" rows="1" placeholder="Enter draft generation or adjustment requirements"></textarea><button id="send-draft-chat" class="chat-send-btn" type="button" title="Send (Ctrl/⌘+Enter)" aria-label="Send" ${arcs.length ? "" : "disabled"}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button></div><div class="chat-composer-meta draft-chat-options"><label class="draft-humanize-option"><input id="draft-chat-humanize" type="checkbox" ${wizardState.draftChatHumanize === false ? "" : "checked"} /><span>Humanize after generation</span></label>${resetBtn}</div></div></section>`;
 }
 
 function renderDraftChat(volume, arcIdx, conversation, job = null) {
@@ -908,8 +908,8 @@ function renderDraftChat(volume, arcIdx, conversation, job = null) {
   $("#draft-chat-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendDraftMessage(volume, arcIdx); } });
   for (const action of ["pause", "resume", "stop", "continue"]) $(`#${action}-draft-job`)?.addEventListener("click", () => controlDraftJob(volume, arcIdx, action));
   $("#upload-draft-guide")?.addEventListener("click", () => $("#draft-guide-file")?.click());
-  $("#draft-guide-file")?.addEventListener("change", async () => { const file = $("#draft-guide-file")?.files?.[0]; if (!file) return; try { const upload = await uploadFile(file); await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/writing-guide`, { method: "POST", body: JSON.stringify({ upload_id: upload.id }) }); showToast("自定义生文规范已保存。"); loadDraftChat(volume, arcIdx); } catch (e) { showToast(e.message || "无法保存生文规范。", true); } });
-  $("#reset-draft-guide")?.addEventListener("click", async () => { await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/writing-guide`, { method: "DELETE" }); showToast("已恢复项目默认 system_prompt.md。"); loadDraftChat(volume, arcIdx); });
+  $("#draft-guide-file")?.addEventListener("change", async () => { const file = $("#draft-guide-file")?.files?.[0]; if (!file) return; try { const upload = await uploadFile(file); await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/writing-guide`, { method: "POST", body: JSON.stringify({ upload_id: upload.id }) }); showToast("Custom writing guide saved."); loadDraftChat(volume, arcIdx); } catch (e) { showToast(e.message || "Could not save the writing guide.", true); } });
+  $("#reset-draft-guide")?.addEventListener("click", async () => { await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/writing-guide`, { method: "DELETE" }); showToast("Restored the project default system_prompt.md."); loadDraftChat(volume, arcIdx); });
   $("#reset-draft-chat")?.addEventListener("click", async () => {
     const volumeDetail = (wizardState.summary?.volumes || []).find(
       (item) => Number(item.volume) === Number(volume),
@@ -918,9 +918,9 @@ function renderDraftChat(volume, arcIdx, conversation, job = null) {
       (item) => Number(item.idx) === Number(arcIdx),
     );
     const chapterRange = selectedArc
-      ? `第 ${selectedArc.start_ch}-${selectedArc.end_ch} 章`
-      : "当前情节单元";
-    if (!confirm(`将删除${chapterRange}的原始正文、精修正文、历史版本和最终版标记。确认重置？`)) return;
+      ? `Chapters ${selectedArc.start_ch}-${selectedArc.end_ch}`
+      : "Current story arc";
+    if (!confirm(`This will delete raw draft, refined draft, history versions, and finalized markers for ${chapterRange}. Reset?`)) return;
     try {
       await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}/reset`, {
         method: "POST", body: JSON.stringify({}),
@@ -930,9 +930,9 @@ function renderDraftChat(volume, arcIdx, conversation, job = null) {
       delete wizardState.draftJobIds[progressKey];
       await refreshWorkspaceArtifacts();
       await loadDraftChat(volume, arcIdx);
-      showToast("当前故事情节单元的正文已重置。");
+      showToast("Draft for the current story arc has been reset.");
     } catch (error) {
-      showToast(error.message || "无法重置正文。", true);
+      showToast(error.message || "Could not reset the draft.", true);
     }
   });
   $$("[data-artifact-path]").forEach((button) => button.addEventListener("click", () => openReviewFile(button.dataset.artifactPath)));
@@ -947,24 +947,24 @@ async function loadDraftChat(volume, arcIdx) {
     } catch (_) { renderDraftChat(volume, 0, { turns: [], writing_guide: { custom: false } }); }
     return;
   }
-  try { const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; const [conversation, job] = await Promise.all([api(`${base}/conversation`), api(`${base}/job`)]); renderDraftChat(volume, arcIdx, conversation, job); if (["running", "pausing", "paused", "stopping"].includes(job.status)) pollDraftJob(volume, arcIdx); } catch (e) { showToast(e.message || "无法加载正文对话。", true); }
+  try { const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; const [conversation, job] = await Promise.all([api(`${base}/conversation`), api(`${base}/job`)]); renderDraftChat(volume, arcIdx, conversation, job); if (["running", "pausing", "paused", "stopping"].includes(job.status)) pollDraftJob(volume, arcIdx); } catch (e) { showToast(e.message || "Could not load the draft chat.", true); }
 }
 async function sendDraftMessage(volume, arcIdx) {
   const message = ($("#draft-chat-input")?.value || "").trim(); if (!message) return;
-  try { const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; const humanize = $("#draft-chat-humanize")?.checked !== false; wizardState.draftChatHumanize = humanize; const job = await api(`${base}/chat`, { method: "POST", body: JSON.stringify({ message, humanize }) }); const key = `${volume}:${arcIdx}`; wizardState.draftJobCompleted[key] = 0; wizardState.draftJobIds[key] = job.id || ""; renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); pollDraftJob(volume, arcIdx); } catch (e) { showToast(e.message || "无法开始正文生成。", true); }
+  try { const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; const humanize = $("#draft-chat-humanize")?.checked !== false; wizardState.draftChatHumanize = humanize; const job = await api(`${base}/chat`, { method: "POST", body: JSON.stringify({ message, humanize }) }); const key = `${volume}:${arcIdx}`; wizardState.draftJobCompleted[key] = 0; wizardState.draftJobIds[key] = job.id || ""; renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); pollDraftJob(volume, arcIdx); } catch (e) { showToast(e.message || "Could not start draft generation.", true); }
 }
 async function controlDraftJob(volume, arcIdx, action) {
-  try { const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; const job = await api(`${base}/${action}`, { method: "POST", body: JSON.stringify({}) }); renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); pollDraftJob(volume, arcIdx); } catch (e) { showToast(e.message || "无法控制正文任务。", true); }
+  try { const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; const job = await api(`${base}/${action}`, { method: "POST", body: JSON.stringify({}) }); renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); pollDraftJob(volume, arcIdx); } catch (e) { showToast(e.message || "Could not control the draft task.", true); }
 }
 function pollDraftJob(volume, arcIdx) {
   if (draftJobPollTimer) clearTimeout(draftJobPollTimer);
-  const poll = async () => { if (Number(wizardState.draftChatVolume) !== Number(volume) || Number(wizardState.draftChatArc) !== Number(arcIdx)) return; const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; try { const job = await api(`${base}/job`); if (["running", "pausing", "paused", "stopping"].includes(job.status)) { const key = `${volume}:${arcIdx}`, jobId = job.id || "", done = Number(job.completed || 0); if (jobId && wizardState.draftJobIds[key] !== jobId) { wizardState.draftJobIds[key] = jobId; wizardState.draftJobCompleted[key] = 0; } if (done > Number(wizardState.draftJobCompleted[key] || 0)) { wizardState.draftJobCompleted[key] = done; const refining = job.progress_kind === "serial_draft_refine"; await refreshReviewArtifactsOnly(refining, "draft", !refining); } const progress = $("#draft-job-progress"); if (progress) { const holder = document.createElement("div"); holder.innerHTML = draftJobMarkup(job); progress.replaceWith(holder.firstElementChild); for (const action of ["pause", "resume", "stop"]) $(`#${action}-draft-job`)?.addEventListener("click", () => controlDraftJob(volume, arcIdx, action)); } else { renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); } draftJobPollTimer = setTimeout(poll, 1000); return; } await refreshWorkspaceArtifacts(); renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); if (job.status === "failed") showToast(job.error || "正文生成失败。", true); else if (job.status === "stopped") showToast("已结束本轮正文生成。"); else if (job.status === "completed") showToast("正文生成完成。"); } catch (_) { draftJobPollTimer = setTimeout(poll, 1500); } }; poll();
+  const poll = async () => { if (Number(wizardState.draftChatVolume) !== Number(volume) || Number(wizardState.draftChatArc) !== Number(arcIdx)) return; const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/drafts/${volume}/${arcIdx}`; try { const job = await api(`${base}/job`); if (["running", "pausing", "paused", "stopping"].includes(job.status)) { const key = `${volume}:${arcIdx}`, jobId = job.id || "", done = Number(job.completed || 0); if (jobId && wizardState.draftJobIds[key] !== jobId) { wizardState.draftJobIds[key] = jobId; wizardState.draftJobCompleted[key] = 0; } if (done > Number(wizardState.draftJobCompleted[key] || 0)) { wizardState.draftJobCompleted[key] = done; const refining = job.progress_kind === "serial_draft_refine"; await refreshReviewArtifactsOnly(refining, "draft", !refining); } const progress = $("#draft-job-progress"); if (progress) { const holder = document.createElement("div"); holder.innerHTML = draftJobMarkup(job); progress.replaceWith(holder.firstElementChild); for (const action of ["pause", "resume", "stop"]) $(`#${action}-draft-job`)?.addEventListener("click", () => controlDraftJob(volume, arcIdx, action)); } else { renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); } draftJobPollTimer = setTimeout(poll, 1000); return; } await refreshWorkspaceArtifacts(); renderDraftChat(volume, arcIdx, await api(`${base}/conversation`), job); if (job.status === "failed") showToast(job.error || "Draft generation failed.", true); else if (job.status === "stopped") showToast("This draft round has ended."); else if (job.status === "completed") showToast("Draft generation completed."); } catch (_) { draftJobPollTimer = setTimeout(poll, 1500); } }; poll();
 }
 
 function chatArtifactCards(artifacts) {
   if (!Array.isArray(artifacts) || !artifacts.length) return "";
   const cards = artifacts.map((item) => {
-    const name = escapeHtml((item.path || "").split("/").pop() || "文件");
+    const name = escapeHtml((item.path || "").split("/").pop() || "file");
     const label = escapeHtml(item.label || name);
     const path = escapeHtml(item.path || "");
     return `<button class="chat-artifact-card" data-artifact-path="${path}" type="button"><span class="chat-artifact-card-icon">📄</span><span class="chat-artifact-card-label">${label}</span><span class="chat-artifact-card-name">${name}</span></button>`;
@@ -990,10 +990,10 @@ function designJobMarkup(job) {
       <div class="chat-job-progress-main">
         <span class="chat-job-status-dot" aria-hidden="true"></span>
         <div class="chat-job-progress-copy">
-          <strong>舞台设计尚未完成</strong>
-          <span>已保留 ${completed} / ${total} 个舞台</span>
+          <strong>Stage design is not finished</strong>
+          <span>Kept ${completed} / ${total} stages</span>
         </div>
-        <button id="continue-design-job" class="chat-job-action resume continue" type="button"><span>▶</span>继续生成</button>
+        <button id="continue-design-job" class="chat-job-action resume continue" type="button"><span>▶</span>Continue generating</button>
       </div>
       <div class="chat-job-progress-track"><i style="width:${percent}%"></i></div>
     </div>`;
@@ -1010,20 +1010,20 @@ function designJobMarkup(job) {
     : "";
   const stageActions = job.progress_kind === "stage_design"
     ? `<div class="chat-job-actions">${promptAction}${paused
-        ? '<button id="resume-design-job" class="chat-job-action resume" type="button"><span>▶</span>继续</button>'
-        : `<button id="pause-design-job" class="chat-job-action" type="button" ${(pausing || stopping) ? "disabled" : ""}><span>${pausing ? "…" : "Ⅱ"}</span>${pausing ? "暂停中" : "暂停"}</button>`}
-       <button id="stop-design-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}><span>■</span>${stopping ? "结束中" : "结束"}</button></div>`
+        ? '<button id="resume-design-job" class="chat-job-action resume" type="button"><span>▶</span>Resume</button>'
+        : `<button id="pause-design-job" class="chat-job-action" type="button" ${(pausing || stopping) ? "disabled" : ""}><span>${pausing ? "…" : "Ⅱ"}</span>${pausing ? "Pausing" : "Pause"}</button>`}
+       <button id="stop-design-job" class="chat-job-action stop" type="button" ${stopping ? "disabled" : ""}><span>■</span>${stopping ? "Stopping" : "Stop"}</button></div>`
     : (promptAction ? `<div class="chat-job-actions">${promptAction}</div>` : "");
   const progressMeta = job.progress_kind === "design_concept"
-    ? `${completed} / ${total} 项设计 · ${Math.round(completed * 100 / total)}%`
-    : stopping ? `正在结束 · 已完成 ${completed} / ${total} 个舞台`
-    : paused ? `已暂停 · ${completed} / ${total} 个舞台`
-    : `${completed} / ${total} 个舞台 · ${Math.round(completed * 100 / total)}%`;
+    ? `${completed} / ${total} design items · ${Math.round(completed * 100 / total)}%`
+    : stopping ? `Ending · completed ${completed} / ${total} stages`
+    : paused ? `Paused · ${completed} / ${total} stages`
+    : `${completed} / ${total} stages · ${Math.round(completed * 100 / total)}%`;
   return `<div class="chat-job-progress ${paused ? "is-paused" : pausing ? "is-pausing" : stopping ? "is-stopping" : ""}" id="design-job-progress">
     <div class="chat-job-progress-main">
       <span class="chat-job-status-dot" aria-hidden="true"></span>
       <div class="chat-job-progress-copy">
-        <strong>${escapeHtml(job.message || "正在生成全书设计")}</strong>
+        <strong>${escapeHtml(job.message || "Generating book design")}</strong>
         <span>${progressMeta}</span>
       </div>
       ${stageActions}
@@ -1038,21 +1038,21 @@ function designChatPanelMarkup(scope, conversation, job = null) {
   const sd = wizardState.summary?.story_design || {};
   const filesExist = scope === "concept" ? Boolean(sd.concept_ready) : Boolean(sd.stage_assets_exist ?? sd.stage_ready);
   const placeholder = filesExist
-    ? "描述本轮要调整的内容（在上一版基础上整文件重写，未涉及部分保留）…"
-    : (scope === "concept" ? "写下题材、主角、金手指、冲突或任何灵感，开始生成第一版…" : "基于粗略大纲与世界观，生成长线主线与舞台路线图…");
+    ? "Describe what to change this round (the whole file is rewritten from the previous version; untouched parts are kept)…"
+    : (scope === "concept" ? "Write the genre, protagonist, cheat, conflict, or any inspiration to generate the first draft…" : "Generate the long mainline and stage roadmap from the rough outline and worldview…");
   const messages = turns.map(chatMessageMarkup).join("");
-  const resetBtn = filesExist && !busy ? '<button id="reset-design-chat" class="chat-icon-btn" type="button" title="删除当前产物并重新开始">⟳ 重置</button>' : "";
+  const resetBtn = filesExist && !busy ? '<button id="reset-design-chat" class="chat-icon-btn" type="button" title="Delete current artifacts and start over">⟳ Reset</button>' : "";
   const emptyHint = filesExist
-    ? "已生成初版。继续输入修改要求，例如「主角金手指改为推演能力」「舞台1改为势力对抗」。"
-    : (scope === "concept" ? "还没有内容。写下你的灵感，生成第一版粗略大纲与世界观。" : "还没有内容。写下对长线主线与舞台的设想，开始生成。");
+    ? "First draft generated. Keep sending changes, for example “change the protagonist cheat to deduction” or “change Stage 1 to faction conflict”."
+    : (scope === "concept" ? "Nothing here yet. Write your inspiration to generate the first rough outline and worldview." : "Nothing here yet. Write your ideas for the long mainline and stages to start generation.");
   const unusedReference = Number(sd.unused_reference_chapter_count || 0);
   const referenceOption = scope === "concept" && filesExist && unusedReference > 0
     ? `<label class="chat-reference-option">
         <input id="use-new-reference" type="checkbox" />
         <span class="chat-reference-switch" aria-hidden="true"><i></i></span>
         <span class="chat-reference-copy">
-          <span><strong>同步新增拆解到阶段粗纲</strong><b>${unusedReference} 章待处理</b></span>
-          <small>只调整最后一个阶段，或在参考小说新增分卷时追加阶段</small>
+          <span><strong>Sync new deconstruction into the phase outline</strong><b>${unusedReference} chapters pending</b></span>
+          <small>Only adjust the last phase, or append a phase when the reference novel adds a volume</small>
         </span>
       </label>`
     : "";
@@ -1061,13 +1061,13 @@ function designChatPanelMarkup(scope, conversation, job = null) {
         <input id="sync-stage-design" type="checkbox" />
         <span class="chat-reference-switch" aria-hidden="true"><i></i></span>
         <span class="chat-reference-copy">
-          <span><strong>同步阶段粗纲变化</strong><b>阶段粗纲已更新</b></span>
-          <small>只调整最后一个舞台，或在新增阶段时追加舞台</small>
+          <span><strong>Sync phase-outline changes</strong><b>Phase outline updated</b></span>
+          <small>Only adjust the last stage, or append a stage when a new phase is added</small>
         </span>
       </label>`
     : "";
   const nameSynopsisAction = scope === "stage" && filesExist && !busy
-    ? '<button id="refresh-name-synopsis" class="chat-icon-btn" type="button">重新生成书名与简介</button>'
+    ? '<button id="refresh-name-synopsis" class="chat-icon-btn" type="button">Regenerate title and synopsis</button>'
     : "";
   return `<section class="chat-panel" id="design-chat" data-scope="${scope}">
     <div class="chat-scroll" id="chat-message-list">${messages || `<div class="chat-empty"><div class="chat-empty-icon">💬</div><p>${emptyHint}</p></div>`}</div>
@@ -1075,9 +1075,9 @@ function designChatPanelMarkup(scope, conversation, job = null) {
     <div class="chat-composer">
       <div class="chat-attachments" id="chat-attachments"></div>
       <div class="chat-input-row">
-        <button class="chat-attach-button" id="chat-attach" type="button" title="加载文件作为参考" aria-label="加载文件" ${busy ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <button class="chat-attach-button" id="chat-attach" type="button" title="Load a file as reference" aria-label="Load file" ${busy ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
         <textarea id="chat-input" class="chat-input" placeholder="${placeholder}" rows="1" ${busy ? "disabled" : ""}></textarea>
-        <button id="send-design-chat" class="chat-send-btn" type="button" title="发送（Ctrl/⌘+Enter）" ${busy ? "disabled" : ""}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        <button id="send-design-chat" class="chat-send-btn" type="button" title="Send (Ctrl/⌘+Enter)" ${busy ? "disabled" : ""}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
       </div>
       ${referenceOption}
       ${stageSyncOption}
@@ -1097,7 +1097,7 @@ function renderChatAttachments(scope) {
   const host = $("#chat-attachments");
   if (!host) return;
   const items = chatAttachments(scope);
-  host.innerHTML = items.map((item, index) => `<span class="chat-attachment-chip">${escapeHtml(item.name)}<button type="button" class="chat-attachment-remove" data-remove-attachment="${index}" aria-label="移除附件">×</button></span>`).join("");
+  host.innerHTML = items.map((item, index) => `<span class="chat-attachment-chip">${escapeHtml(item.name)}<button type="button" class="chat-attachment-remove" data-remove-attachment="${index}" aria-label="Remove attachment">×</button></span>`).join("");
   host.classList.toggle("has-items", items.length > 0);
   $$("[data-remove-attachment]").forEach((btn) => btn.addEventListener("click", () => {
     chatAttachments(scope).splice(Number(btn.dataset.removeAttachment), 1);
@@ -1115,10 +1115,10 @@ function bindChatAttach(scope) {
     let pending = files.length;
     const done = () => { pending -= 1; if (pending === 0) renderChatAttachments(scope); };
     files.forEach((file) => {
-      if (file.size > 1024 * 1024 * 2) { showToast(`「${file.name}」超过 2MB，未加载（请精简后重试）。`, true); done(); return; }
+      if (file.size > 1024 * 1024 * 2) { showToast(`“${file.name}” is over 2MB and was not loaded (trim it and retry).`, true); done(); return; }
       const reader = new FileReader();
       reader.onload = () => { chatAttachments(scope).push({ name: file.name, content: String(reader.result || "") }); done(); };
-      reader.onerror = () => { showToast(`无法读取「${file.name}」。`, true); done(); };
+      reader.onerror = () => { showToast(`Could not read “${file.name}”.`, true); done(); };
       reader.readAsText(file, "utf-8");
     });
   });
@@ -1136,7 +1136,7 @@ function renderDesignChat(scope, conversation, job = null) {
   $("#send-design-chat")?.addEventListener("click", () => sendDesignMessage(scope));
   bindDesignJobControls(scope);
   $("#refresh-name-synopsis")?.addEventListener("click", async () => {
-    try { await refreshNameSynopsis(); } catch (error) { showToast(error.message || "无法生成书名与简介。", true); }
+    try { await refreshNameSynopsis(); } catch (error) { showToast(error.message || "Could not generate title and synopsis.", true); }
   });
   const chatInput = $("#chat-input");
   const autoGrow = () => { if (chatInput) { chatInput.style.height = "auto"; chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px"; } };
@@ -1145,7 +1145,7 @@ function renderDesignChat(scope, conversation, job = null) {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); sendDesignMessage(scope); }
   });
   $("#reset-design-chat")?.addEventListener("click", async () => {
-    const msg = scope === "concept" ? "将删除当前粗略大纲与世界观并清空对话，下一条消息会重新生成初版。确认重置？" : "将删除当前长线主线、舞台路线图、书名与简介，并清空对话。下一条消息会重新生成初版，确认重置？";
+    const msg = scope === "concept" ? "This will delete the current rough outline and worldview and clear the conversation. The next message will generate a first draft again. Reset?" : "This will delete the current long mainline, stage roadmap, title, and synopsis, and clear the conversation. The next message will generate a first draft again. Reset?";
     if (!confirm(msg)) return;
     try {
       await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/design/${scope}/reset`, { method: "POST", body: JSON.stringify({}) });
@@ -1153,8 +1153,8 @@ function renderDesignChat(scope, conversation, job = null) {
       await refreshWorkspaceArtifacts();
       const data = await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/design/${scope}/conversation`);
       renderDesignChat(scope, data);
-      showToast("已重置，下一条消息将重新生成初版。");
-    } catch (error) { showToast(error.message || "无法重置。", true); }
+      showToast("Reset. The next message will generate a first draft again.");
+    } catch (error) { showToast(error.message || "Could not reset.", true); }
   });
 }
 
@@ -1176,7 +1176,7 @@ function bindDesignJobControls(scope) {
   $("#continue-design-job")?.addEventListener("click", () => controlDesignJob(scope, "continue"));
   $("#show-design-prompt")?.addEventListener("click", () => showJobPrompts(
     `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/design/${scope}/prompts`,
-    scope === "concept" ? "全书设计 · 模型 Prompt" : "舞台设计 · 模型 Prompt",
+    scope === "concept" ? "Book design · model prompt" : "Stage design · model prompt",
   ));
 }
 
@@ -1194,7 +1194,7 @@ async function controlDesignJob(scope, action) {
     }
     pollDesignJob(scope);
   } catch (error) {
-    showToast(error.message || "无法控制舞台设计任务。", true);
+    showToast(error.message || "Could not control the stage-design task.", true);
   }
 }
 
@@ -1229,9 +1229,9 @@ function pollDesignJob(scope) {
       await refreshWorkspaceArtifacts();
       const conversation = await api(`${base}/conversation`);
       renderDesignChat(scope, conversation, job);
-      if (job.status === "failed") showToast(job.error || "全书设计生成失败，请重试。", true);
-      else if (job.status === "stopped") showToast("已结束本轮舞台设计，已完成内容均已保留。");
-      else if (job.status === "completed") showToast(scope === "concept" ? "全书设计生成完成。" : "舞台设计生成完成。");
+      if (job.status === "failed") showToast(job.error || "Book design failed. Please retry.", true);
+      else if (job.status === "stopped") showToast("This stage-design round has ended. Completed content was kept.");
+      else if (job.status === "completed") showToast(scope === "concept" ? "Book design generated." : "Stage design generated.");
     } catch (_) {
       designJobPollTimer = setTimeout(poll, 1500);
     }
@@ -1257,7 +1257,7 @@ async function sendDesignMessage(scope) {
   if (list) {
     const li = document.createElement("li");
     li.className = "chat-message user";
-    const preview = attachments.length ? `${message}\n（附件：${attachments.map((a) => a.name).join("、")}）` : message;
+    const preview = attachments.length ? `${message}\n(attachments: ${attachments.map((a) => a.name).join(", ")})` : message;
     li.innerHTML = `<div class="chat-message-body">${escapeHtml(preview)}</div>`;
     list.appendChild(li);
     const typing = document.createElement("li");
@@ -1286,12 +1286,12 @@ async function sendDesignMessage(scope) {
     started = true;
     pollDesignJob(scope);
   } catch (error) {
-    const message = error.message || "生成失败，请重试。";
+    const message = error.message || "Generation failed. Please retry.";
     const typing = $("#chat-typing");
     if (typing) {
       typing.classList.remove("typing");
       typing.classList.add("error");
-      typing.innerHTML = `<div class="chat-message-avatar">!</div><div class="chat-message-content"><div class="chat-message-body">生成失败：${escapeHtml(message)}</div></div>`;
+      typing.innerHTML = `<div class="chat-message-avatar">!</div><div class="chat-message-content"><div class="chat-message-body">Generation failed: ${escapeHtml(message)}</div></div>`;
     }
     showToast(message, true);
   } finally {
@@ -1315,9 +1315,9 @@ function stageOptions(selected = 1, includeEnd = false) {
   if (!stageCount) return `<input id="stage-volume" type="number" min="1" value="${selected}" />`;
   const options = Array.from({ length: stageCount }, (_, index) => {
     const value = index + 1;
-    return `<option value="${value}" ${value === Number(selected) ? "selected" : ""}>第 ${value} 舞台 / 卷</option>`;
+    return `<option value="${value}" ${value === Number(selected) ? "selected" : ""}>Stage / volume ${value}</option>`;
   });
-  if (includeEnd) options.unshift('<option value="">追加到最后</option>');
+  if (includeEnd) options.unshift('<option value="">Append at the end</option>');
   return `<select id="stage-volume">${options.join("")}</select>`;
 }
 
@@ -1330,37 +1330,37 @@ function worldForm() {
   const worldReady = Boolean(wizardState.summary?.world_knowledge?.ready);
   const sourceList = sources.length
     ? `<div class="world-uploaded">
-        <div class="world-uploaded-heading"><span>已上传</span><strong>${sources.length} 份资料</strong></div>
-        <ul class="source-list">${sources.map((source) => `<li><strong>${escapeHtml(source.file_name)}</strong><span>${source.size ? `${Math.ceil(source.size / 1024).toLocaleString()} KB` : "已导入"}</span></li>`).join("")}</ul>
+        <div class="world-uploaded-heading"><span>Uploaded</span><strong>${sources.length}  files</strong></div>
+        <ul class="source-list">${sources.map((source) => `<li><strong>${escapeHtml(source.file_name)}</strong><span>${source.size ? `${Math.ceil(source.size / 1024).toLocaleString()} KB` : "Imported"}</span></li>`).join("")}</ul>
       </div>`
-    : '<p class="reference-file-status">尚未上传目标世界资料</p>';
+    : '<p class="reference-file-status">No target-world sources uploaded yet</p>';
   return `
     <div class="reference-source world-source-flat" id="world-source">
       ${sourceList}
-      <label class="reference-file-picker" id="world-file-picker" for="world-file-input"><span id="world-file-label">${sources.length ? "继续添加资料" : "选择资料文件"}</span><input id="world-file-input" type="file" multiple accept=".txt,.md,.json,.yaml,.yml,.csv,.tsv" /><small id="world-file-help">支持多选，最大文件自动作为主资料，其他文件用于补充设定。</small></label>
-      <p id="world-file-status" class="reference-file-status">尚未选择新文件</p>
+      <label class="reference-file-picker" id="world-file-picker" for="world-file-input"><span id="world-file-label">${sources.length ? "Add more sources" : "Choose source files"}</span><input id="world-file-input" type="file" multiple accept=".txt,.md,.json,.yaml,.yml,.csv,.tsv" /><small id="world-file-help">Multiple files are allowed. The largest file becomes the primary source; others are supplement sources.</small></label>
+      <p id="world-file-status" class="reference-file-status">No new file selected yet</p>
       <ul id="world-new-file-list" class="source-list world-new-file-list" hidden></ul>
     </div>
     ${sources.length ? `<div class="world-enable-row">
-      <label class="world-toggle"><input id="world-enabled" type="checkbox" ${wizardState.summary?.world_knowledge?.enabled === false ? "" : "checked"} /><span class="world-toggle-text">启用目标世界资料库</span></label>
-      <small>${worldReady ? "资料库 7 个栏目已完整构建。关闭后后续设计不再注入资料；再次打开即恢复使用。" : "导入后会自动构建；若任务中断，可不上传新文件，直接点击下方按钮重试。"}</small>
+      <label class="world-toggle"><input id="world-enabled" type="checkbox" ${wizardState.summary?.world_knowledge?.enabled === false ? "" : "checked"} /><span class="world-toggle-text">Enable target-world knowledge base</span></label>
+      <small>${worldReady ? "All 7 knowledge-base sections are built. Turn it off to stop injecting sources into later design; turn it on again to resume." : "Build starts automatically after import. If a task is interrupted, retry with the button below without uploading a new file."}</small>
     </div>` : ""}`;
 }
 
 function mechanicsForm() {
-  const configured = wizardState.summary?.mechanics?.mode && wizardState.summary.mechanics.mode !== "未初始化";
+  const configured = wizardState.summary?.mechanics?.mode && wizardState.summary.mechanics.mode !== "Not initialized";
   const mode = wizardState.mechanicsMode === "none" ? "auto" : wizardState.mechanicsMode;
   wizardState.mechanicsMode = mode;
-  return `<fieldset class="mechanics-source" id="mechanics-source"><legend>系统面板设定</legend>
-    <div class="direction-source-switch" role="radiogroup" aria-label="系统面板设定方式">
-      <label class="direction-source-option ${mode === "auto" ? "active" : ""}"><input name="mechanics-mode" value="auto" type="radio" ${mode === "auto" ? "checked" : ""} />自动判断</label>
-      <label class="direction-source-option ${mode === "text" ? "active" : ""}"><input name="mechanics-mode" value="text" type="radio" ${mode === "text" ? "checked" : ""} />直接输入</label>
-      <label class="direction-source-option ${mode === "file" ? "active" : ""}"><input name="mechanics-mode" value="file" type="radio" ${mode === "file" ? "checked" : ""} />读取文件</label>
+  return `<fieldset class="mechanics-source" id="mechanics-source"><legend>System-panel settings</legend>
+    <div class="direction-source-switch" role="radiogroup" aria-label="System-panel setup method">
+      <label class="direction-source-option ${mode === "auto" ? "active" : ""}"><input name="mechanics-mode" value="auto" type="radio" ${mode === "auto" ? "checked" : ""} />Auto-detect</label>
+      <label class="direction-source-option ${mode === "text" ? "active" : ""}"><input name="mechanics-mode" value="text" type="radio" ${mode === "text" ? "checked" : ""} />Type directly</label>
+      <label class="direction-source-option ${mode === "file" ? "active" : ""}"><input name="mechanics-mode" value="file" type="radio" ${mode === "file" ? "checked" : ""} />Read from file</label>
     </div>
-    <p class="decision-note" data-mechanics-panel="auto" ${mode === "auto" ? "" : "hidden"}>根据核心玩法判断是否需要系统面板、数值追踪或轻量状态约束。</p>
-    <label data-mechanics-panel="text" ${mode === "text" ? "" : "hidden"}>系统面板设定<textarea id="mechanics-direction" placeholder="例如：功德值可兑换推演次数，升级需要消耗命格碎片。"></textarea></label>
-    <div class="direction-file-panel" data-mechanics-panel="file" ${mode === "file" ? "" : "hidden"}><label class="direction-file-picker" for="mechanics-file-input"><span>选择系统面板设定文件</span><input id="mechanics-file-input" type="file" accept=".txt,.md,.json,.yaml,.yml" /><small>系统面板、数值公式和资源规则等会作为初始设定。</small></label><p id="mechanics-file-status" class="direction-file-status">${wizardState.mechanicsFile ? `已选择：${escapeHtml(wizardState.mechanicsFile.name)}` : "尚未选择文件"}</p></div>
-    ${configured ? '<label class="check-label"><input id="mechanics-force" type="checkbox" />覆盖已有系统面板设定</label>' : ""}
+    <p class="decision-note" data-mechanics-panel="auto" ${mode === "auto" ? "" : "hidden"}>Decide from core gameplay whether a system panel, numeric tracking, or light state constraints are needed.</p>
+    <label data-mechanics-panel="text" ${mode === "text" ? "" : "hidden"}>System-panel settings<textarea id="mechanics-direction" placeholder="For example: merit points can be exchanged for deduction attempts, and upgrades consume fate shards."></textarea></label>
+    <div class="direction-file-panel" data-mechanics-panel="file" ${mode === "file" ? "" : "hidden"}><label class="direction-file-picker" for="mechanics-file-input"><span>Choose a system-panel settings file</span><input id="mechanics-file-input" type="file" accept=".txt,.md,.json,.yaml,.yml" /><small>The system panel, numeric formulas, and resource rules are used as the initial settings.</small></label><p id="mechanics-file-status" class="direction-file-status">${wizardState.mechanicsFile ? `Selected: ${escapeHtml(wizardState.mechanicsFile.name)}` : "No file selected yet"}</p></div>
+    ${configured ? '<label class="check-label"><input id="mechanics-force" type="checkbox" />Overwrite existing system-panel settings</label>' : ""}
   </fieldset>`;
 }
 
@@ -1368,35 +1368,35 @@ function volumeForm(kind) {
   const stageCount = Number(wizardState.summary?.story_design?.stage_count || 0);
   const fieldId = `${kind}-volume`;
   const options = stageCount
-    ? `<select id="${fieldId}">${Array.from({ length: stageCount }, (_, index) => `<option value="${index + 1}">第 ${index + 1} 舞台 / 卷</option>`).join("")}</select>`
+    ? `<select id="${fieldId}">${Array.from({ length: stageCount }, (_, index) => `<option value="${index + 1}">Stage / volume ${index + 1}</option>`).join("")}</select>`
     : `<input id="${fieldId}" type="number" min="1" value="1" />`;
-  return `<fieldset class="generation-options"><legend>生成范围</legend><label>舞台 / 卷号${options}</label><label class="check-label"><input id="${kind}-force" type="checkbox" />覆盖该卷已有内容</label></fieldset>`;
+  return `<fieldset class="generation-options"><legend>Generation range</legend><label>Stage / volume${options}</label><label class="check-label"><input id="${kind}-force" type="checkbox" />Overwrite existing content in this volume</label></fieldset>`;
 }
 
 function draftForm() {
   const stageCount = Number(wizardState.summary?.story_design?.stage_count || 0);
   const volumeDetails = wizardState.summary?.volumes || [];
   const volumes = stageCount
-    ? `<select id="draft-volume">${Array.from({ length: stageCount }, (_, index) => `<option value="${index + 1}">第 ${index + 1} 舞台 / 卷</option>`).join("")}</select>`
+    ? `<select id="draft-volume">${Array.from({ length: stageCount }, (_, index) => `<option value="${index + 1}">Stage / volume ${index + 1}</option>`).join("")}</select>`
     : '<input id="draft-volume" type="number" min="1" value="1" />';
   const firstVolume = volumeDetails.find((item) => Number(item.volume) === 1) || volumeDetails[0];
   const firstArcs = firstVolume?.arcs || [];
   const arcOptions = firstArcs.length
-    ? firstArcs.map((arc) => `<option value="${arc.idx}" data-start="${arc.start_ch}" data-end="${arc.end_ch}">情节单元${arc.idx}${arc.title ? ` · ${escapeHtml(arc.title)}` : ""}（第${arc.start_ch}-${arc.end_ch}章）</option>`).join("")
-    : '<option value="">该舞台暂无故事情节</option>';
+    ? firstArcs.map((arc) => `<option value="${arc.idx}" data-start="${arc.start_ch}" data-end="${arc.end_ch}">Arc ${arc.idx}${arc.title ? ` · ${escapeHtml(arc.title)}` : ""} (chapters ${arc.start_ch}-${arc.end_ch})</option>`).join("")
+    : '<option value="">No story arcs on this stage</option>';
   const firstArc = firstArcs[0];
   const firstCount = firstArc ? firstArc.end_ch - firstArc.start_ch + 1 : "";
-  return `<fieldset class="generation-options"><legend>生成范围</legend>
+  return `<fieldset class="generation-options"><legend>Generation range</legend>
     <div class="inline-number-fields">
-      <label>舞台 / 卷号${volumes}</label>
-      <label>故事情节<select id="draft-arc" ${firstArcs.length ? "" : "disabled"}>${arcOptions}</select></label>
+      <label>Stage / volume${volumes}</label>
+      <label>Story arcs<select id="draft-arc" ${firstArcs.length ? "" : "disabled"}>${arcOptions}</select></label>
     </div>
     <div class="draft-range-row">
-      <p id="draft-range-hint" class="decision-note">${firstArc ? `本次范围：第 ${firstArc.start_ch}-${firstArc.end_ch} 章，共 ${firstCount} 章。` : "请先在「故事情节」步骤生成该舞台的故事情节。"}</p>
-      <label>本次生成章节数<input id="draft-max" type="number" min="1" ${firstCount ? `max="${firstCount}" value="${firstCount}"` : "disabled"} /></label>
+      <p id="draft-range-hint" class="decision-note">${firstArc ? `This run: chapters ${firstArc.start_ch}-${firstArc.end_ch}, ${firstCount} chapters.` : "Generate this stage's story arcs in the Story arcs step first."}</p>
+      <label>Chapters to generate this run<input id="draft-max" type="number" min="1" ${firstCount ? `max="${firstCount}" value="${firstCount}"` : "disabled"} /></label>
     </div>
-    <label class="check-label"><input id="draft-humanize" type="checkbox" checked />生成后自动去 AI 味精修</label>
-    <label class="check-label"><input id="draft-humanize-existing" type="checkbox" />只精修所选范围内的已有正文（不新写章节）</label>
+    <label class="check-label"><input id="draft-humanize" type="checkbox" checked />Humanize after generation</label>
+    <label class="check-label"><input id="draft-humanize-existing" type="checkbox" />Only refine existing draft in the selected range (do not write new chapters)</label>
   </fieldset>`;
 }
 
@@ -1416,11 +1416,11 @@ function bindDraftRange() {
     if (count) {
       maxInput.max = String(count);
       maxInput.value = String(count);
-      hint.textContent = `本次范围：第 ${start}-${end} 章，共 ${count} 章。`;
+      hint.textContent = `This run: chapters ${start}-${end}, ${count} chapters.`;
     } else {
       maxInput.removeAttribute("max");
       maxInput.value = "";
-      hint.textContent = "请先在「故事情节」步骤生成该舞台的故事情节。";
+      hint.textContent = "Generate this stage's story arcs in the Story arcs step first.";
     }
   };
 
@@ -1429,8 +1429,8 @@ function bindDraftRange() {
     const detail = (wizardState.summary?.volumes || []).find((item) => Number(item.volume) === volume);
     const arcs = detail?.arcs || [];
     arcSelect.innerHTML = arcs.length
-      ? arcs.map((arc) => `<option value="${arc.idx}" data-start="${arc.start_ch}" data-end="${arc.end_ch}">情节单元${arc.idx}${arc.title ? ` · ${escapeHtml(arc.title)}` : ""}（第${arc.start_ch}-${arc.end_ch}章）</option>`).join("")
-      : '<option value="">该舞台暂无故事情节</option>';
+      ? arcs.map((arc) => `<option value="${arc.idx}" data-start="${arc.start_ch}" data-end="${arc.end_ch}">Arc ${arc.idx}${arc.title ? ` · ${escapeHtml(arc.title)}` : ""} (chapters ${arc.start_ch}-${arc.end_ch})</option>`).join("")
+      : '<option value="">No story arcs on this stage</option>';
     arcSelect.disabled = !arcs.length;
     updateRange();
   };
@@ -1445,33 +1445,33 @@ function formForStep(step) {
     const reference = referenceStatus();
     if (reference.hasExisting) {
       const coverage = reference.total
-        ? `${reference.processed} / ${reference.total} 章`
-        : `${reference.processed || reference.stagedChapters} 章`;
+        ? `${reference.processed} / ${reference.total} chapters`
+        : `${reference.processed || reference.stagedChapters} chapters`;
       const defaultTarget = reference.total || Math.max(reference.processed, reference.stagedChapters, 200);
       const currentFile = escapeHtml((reference.source_name || "sample_novel.txt").replace(/^[0-9a-f]{16}_/i, ""));
       const selectedFile = wizardState.referenceFile;
       return `
         <div class="reference-source reference-existing" id="reference-source">
           <div class="reference-current-file">
-            <span>已上传</span>
+            <span>Uploaded</span>
             <strong>${currentFile}</strong>
-            <small>已拆解 ${coverage}</small>
+            <small>Deconstructed ${coverage}</small>
           </div>
           <label class="reference-file-picker" id="reference-file-picker" for="reference-file-input">
-            <span id="reference-file-label">${selectedFile ? "已选择新版整本小说" : "选择更新后的整本小说"}</span>
+            <span id="reference-file-label">${selectedFile ? "New full-book novel selected" : "Choose the updated full novel"}</span>
             <input id="reference-file-input" type="file" accept=".txt,text/plain" />
-            <small id="reference-file-help">${selectedFile ? "系统会匹配已拆章节，只拆解新增部分。" : "系统会自动跳过已拆章节，并重新检查末尾故事片段。"}</small>
+            <small id="reference-file-help">${selectedFile ? "The system matches already deconstructed chapters and only deconstructs the new part." : "Already deconstructed chapters are skipped, and the ending story arcs are rechecked."}</small>
           </label>
-          <p id="reference-file-status" class="reference-file-status">${selectedFile ? `新文件：${escapeHtml(selectedFile.name)}（${Math.ceil(selectedFile.size / 1024).toLocaleString()} KB）` : (reference.isComplete ? "尚未选择新文件" : "无需重新上传，可直接重试尚未完成的拆解步骤")}</p>
+          <p id="reference-file-status" class="reference-file-status">${selectedFile ? `New file: ${escapeHtml(selectedFile.name)}（${Math.ceil(selectedFile.size / 1024).toLocaleString()} KB）` : (reference.isComplete ? "No new file selected yet" : "No re-upload needed; retry unfinished deconstruction steps directly")}</p>
           ${referenceScopeControls(defaultTarget, reference.isComplete && !selectedFile)}
         </div>`;
     }
     const selectedFile = wizardState.referenceFile;
     return `
     <fieldset class="reference-source" id="reference-source">
-      <legend>参考小说</legend>
-      <label class="reference-file-picker ${selectedFile ? "selected" : ""}" id="reference-file-picker" for="reference-file-input"><span id="reference-file-label">${selectedFile ? "已选择参考小说" : "导入小说内容"}</span><input id="reference-file-input" type="file" accept=".txt,text/plain" /><small id="reference-file-help">支持 TXT 文件。后台会检测编码，非 UTF-8 文本会自动转换后再拆解。</small></label>
-      <p id="reference-file-status" class="reference-file-status">${selectedFile ? `已选择：${escapeHtml(selectedFile.name)}（${Math.ceil(selectedFile.size / 1024).toLocaleString()} KB），请设置拆解范围。` : "先选择小说文件，再设置拆解范围。"}</p>
+      <legend>Reference novel</legend>
+      <label class="reference-file-picker ${selectedFile ? "selected" : ""}" id="reference-file-picker" for="reference-file-input"><span id="reference-file-label">${selectedFile ? "Reference novel selected" : "Import novel text"}</span><input id="reference-file-input" type="file" accept=".txt,text/plain" /><small id="reference-file-help">TXT files are supported. Encoding is detected in the background; non-UTF-8 text is converted before deconstruction.</small></label>
+      <p id="reference-file-status" class="reference-file-status">${selectedFile ? `Selected: ${escapeHtml(selectedFile.name)} (${Math.ceil(selectedFile.size / 1024).toLocaleString()} KB). Set the deconstruction range.` : "Choose a novel file first, then set the deconstruction range."}</p>
       ${referenceScopeControls(200, !selectedFile)}
     </fieldset>`;
   }
@@ -1482,7 +1482,7 @@ function formForStep(step) {
   if (step.id === "stage") {
     const conceptReady = Boolean(wizardState.summary?.story_design?.concept_ready);
     if (!conceptReady) {
-      return '<fieldset class="generation-options"><legend>生成范围</legend><p class="decision-note">请先完成上一步「全书设计」，再生成舞台路线图。</p></fieldset>';
+      return '<fieldset class="generation-options"><legend>Generation range</legend><p class="decision-note">Finish the previous Book design step before generating the stage roadmap.</p></fieldset>';
     }
     return '<div id="design-chat-host"></div>';
   }
@@ -1517,23 +1517,23 @@ function bindDirectionSource() {
     const preview = $("#direction-file-preview");
     const previewBody = preview?.querySelector("pre");
     if (!file) {
-      status.textContent = "尚未选择文件";
+      status.textContent = "No file selected yet";
       preview.hidden = true;
       return;
     }
-    status.textContent = `正在读取：${file.name}`;
+    status.textContent = `Reading: ${file.name}`;
     const reader = new FileReader();
     reader.onload = () => {
       wizardState.directionFileContent = String(reader.result || "");
-      status.textContent = `已读取：${file.name}（${wizardState.directionFileContent.length.toLocaleString()} 字符）`;
-      if (previewBody) previewBody.textContent = wizardState.directionFileContent.slice(0, 1800) || "（文件为空）";
+      status.textContent = `Read: ${file.name} (${wizardState.directionFileContent.length.toLocaleString()} characters)`;
+      if (previewBody) previewBody.textContent = wizardState.directionFileContent.slice(0, 1800) || "(file is empty)";
       preview.hidden = false;
     };
     reader.onerror = () => {
       wizardState.directionFile = null;
-      status.textContent = "文件读取失败，请重新选择。";
+      status.textContent = "Failed to read the file. Choose it again.";
       preview.hidden = true;
-      showToast("无法读取该文件。", true);
+      showToast("Could not read this file.", true);
     };
     reader.readAsText(file, "utf-8");
   });
@@ -1558,20 +1558,20 @@ function bindReferenceSource() {
       scope.disabled = !file && referenceStatus().isComplete;
     }
     if (picker) picker.classList.toggle("selected", Boolean(file));
-    if (label) label.textContent = file ? "已选择新版整本小说" : (hasExisting ? "上传作者更新后的整本小说" : "导入小说内容");
+    if (label) label.textContent = file ? "New full-book novel selected" : (hasExisting ? "Upload the author's updated full novel" : "Import novel text");
     if (help) help.textContent = file
-      ? "系统会匹配已拆章节，只拆解新增部分；可重新选择文件。"
-      : (hasExisting ? "上传重新下载的完整 TXT，并重新检查末尾故事片段。" : "支持 TXT 文件。后台会检测编码，非 UTF-8 文本会自动转换后再拆解。");
+      ? "The system matches already deconstructed chapters and only deconstructs the new part. You can pick another file."
+      : (hasExisting ? "Upload the re-downloaded full TXT and recheck the ending story arcs." : "TXT files are supported. Encoding is detected in the background; non-UTF-8 text is converted before deconstruction.");
     if (status) status.textContent = file
-      ? `已选择：${file.name}（${Math.ceil(file.size / 1024).toLocaleString()} KB），请设置本次拆解范围。`
+      ? `Selected: ${file.name} (${Math.ceil(file.size / 1024).toLocaleString()} KB). Set this deconstruction range.`
       : (hasExisting
-        ? (referenceStatus().isComplete ? "尚未选择新文件。" : "无需重新上传，可直接重试尚未完成的拆解步骤。")
-        : "先选择小说文件，再设置拆解范围。");
+        ? (referenceStatus().isComplete ? "No new file selected yet." : "No re-upload needed; retry unfinished deconstruction steps directly.")
+        : "Choose a novel file first, then set the deconstruction range.");
     if (action) {
       action.disabled = !file && referenceStatus().isComplete;
       action.textContent = !file && hasExisting && !referenceStatus().isComplete
-        ? "重试未完成步骤"
-        : "导入并开始拆解";
+        ? "Retry unfinished steps"
+        : "Import and start deconstruction";
     }
     const maxInput = $("#reference-max-chapters");
     if (maxInput) maxInput.disabled = !file || wizardState.referenceScope !== "prefix";
@@ -1594,8 +1594,8 @@ function bindWorldSource() {
     const label = $("#world-file-label");
     const list = $("#world-new-file-list");
     if (picker) picker.classList.toggle("selected", files.length > 0);
-    if (label) label.textContent = files.length ? `已选择 ${files.length} 份新资料` : (worldSources().length ? "继续添加资料" : "选择资料文件");
-    if (status) status.textContent = files.length ? "本次新增" : "尚未选择新文件";
+    if (label) label.textContent = files.length ? `${files.length} new sources selected` : (worldSources().length ? "Add more sources" : "Choose source files");
+    if (status) status.textContent = files.length ? "Added this time" : "No new file selected yet";
     if (list) {
       list.replaceChildren();
       files.forEach((file) => {
@@ -1619,9 +1619,9 @@ function bindWorldSource() {
         method: "POST", body: JSON.stringify({ enabled }),
       });
       await refreshWorkspaceArtifacts();
-      showToast(enabled ? "已启用目标世界资料库。" : "已关闭目标世界资料库，后续设计不再注入资料。");
+      showToast(enabled ? "Target-world knowledge base enabled." : "Target-world knowledge base is off. Later design will not inject these sources.");
     } catch (error) {
-      showToast(error.message || "切换失败。", true);
+      showToast(error.message || "Toggle failed.", true);
       await refreshWorkspaceArtifacts();
     } finally {
       if (toggle) toggle.disabled = false;
@@ -1647,7 +1647,7 @@ function bindMechanicsSource() {
   fileInput?.addEventListener("change", () => {
     wizardState.mechanicsFile = fileInput.files?.[0] || null;
     const status = $("#mechanics-file-status");
-    if (status) status.textContent = wizardState.mechanicsFile ? `已选择：${wizardState.mechanicsFile.name}` : "尚未选择文件";
+    if (status) status.textContent = wizardState.mechanicsFile ? `Selected: ${wizardState.mechanicsFile.name}` : "No file selected yet";
   });
 }
 
@@ -1662,7 +1662,7 @@ async function activateTask(task, message) {
   wizardState.logOffset = 0;
   const log = $("#drawer-log");
   if (log) log.textContent = "";
-  $("#drawer-prompts").innerHTML = '<p class="drawer-prompt-empty">等待模型调用…</p>';
+  $("#drawer-prompts").innerHTML = '<p class="drawer-prompt-empty">Waiting for a model call…</p>';
   $("#drawer-prompt-count").textContent = "0";
   setTaskView("log");
   $("#task-drawer").classList.add("open");
@@ -1673,7 +1673,7 @@ async function activateTask(task, message) {
 }
 
 async function startTask(type, args, message) {
-  if (!wizardState.workspace) throw new Error("请先创建或选择工作区。");
+  if (!wizardState.workspace) throw new Error("Create or select a workspace first.");
   const task = await api("/api/tasks", {
     method: "POST",
     body: JSON.stringify({ type, workspace: wizardState.workspace, args }),
@@ -1685,12 +1685,12 @@ async function submitWorldStep() {
   const files = [...($("#world-file-input")?.files || [])];
   if (files.length) {
     const uploads = await Promise.all(files.map(uploadFile));
-    await startTask("world_import", { upload_ids: uploads.map((upload) => upload.id) }, "已开始导入并构建目标世界资料库（以最大文件为主资料）。");
+    await startTask("world_import", { upload_ids: uploads.map((upload) => upload.id) }, "Started importing and building the target-world knowledge base (largest file as primary source).");
     return;
   }
   const sources = worldSources();
-  if (!sources.length) throw new Error("请先选择至少一份目标世界资料。");
-  await startTask("world_build", { force: false }, "已从已有断点继续构建目标世界资料库，可在任务日志中查看进度。");
+  if (!sources.length) throw new Error("Select at least one target-world source first.");
+  await startTask("world_build", { force: false }, "Resumed building the target-world knowledge base from a checkpoint. Watch progress in the task log.");
 }
 
 async function submitMechanicsStep() {
@@ -1699,28 +1699,28 @@ async function submitMechanicsStep() {
   if (mode === "none") args.disable = true;
   if (mode === "text") {
     const direction = $("#mechanics-direction")?.value.trim() || "";
-    if (!direction) throw new Error("请填写系统面板设定，或改为自动判断。");
+    if (!direction) throw new Error("Enter system-panel settings, or switch to auto-detect.");
     args.direction = direction;
   }
   if (mode === "file") {
-    if (!wizardState.mechanicsFile) throw new Error("请先选择系统面板设定文件。");
+    if (!wizardState.mechanicsFile) throw new Error("Choose a system-panel settings file first.");
     args.mechanics_upload_id = (await uploadFile(wizardState.mechanicsFile)).id;
   }
-  await startTask("mechanics_init", args, "已开始初始化系统面板。");
+  await startTask("mechanics_init", args, "Started initializing the system panel.");
 }
 
 function selectedVolume(id) {
   const value = Number($(id)?.value || 0);
-  if (!Number.isInteger(value) || value < 1) throw new Error("请选择有效的舞台 / 卷号。");
+  if (!Number.isInteger(value) || value < 1) throw new Error("Choose a valid stage / volume number.");
   return value;
 }
 
 async function submitArcsStep() {
-  // 故事情节单元已由统一对话框驱动，保留空实现以兼容表单提交路由。
+  // Story arcs are driven by the unified dialog; keep an empty handler for form-submit routing.
 }
 
 async function submitChaptersStep() {
-  // 逐章章纲已由统一对话框驱动，保留空实现以兼容表单提交路由。
+  // Chapter outlines are driven by the unified dialog; keep an empty handler for form-submit routing.
 }
 
 async function submitDraftStep() {
@@ -1729,11 +1729,11 @@ async function submitDraftStep() {
   const arcIdx = Number(selectedArc?.value || 0);
   const start = Number(selectedArc?.dataset.start || 0);
   const end = Number(selectedArc?.dataset.end || 0);
-  if (!arcIdx || !start || end < start) throw new Error("请先选择一个已经生成的故事情节。");
+  if (!arcIdx || !start || end < start) throw new Error("Choose a story arc that has already been generated.");
   const max = Number($("#draft-max")?.value || 0);
   const arcChapterCount = end - start + 1;
   if (!Number.isInteger(max) || max < 1 || max > arcChapterCount) {
-    throw new Error(`本次章节数应为 1-${arcChapterCount} 章。`);
+    throw new Error(`This run should be 1-${arcChapterCount} chapters.`);
   }
   const humanizeExisting = Boolean($("#draft-humanize-existing")?.checked);
   await startTask("write", {
@@ -1743,64 +1743,64 @@ async function submitDraftStep() {
     no_humanize: !Boolean($("#draft-humanize")?.checked),
     humanize_existing: humanizeExisting,
   }, humanizeExisting
-    ? `已开始精修第 ${volume} 舞台情节单元${arcIdx}范围内的已有正文。`
-    : `已开始生成第 ${volume} 舞台情节单元${arcIdx}的正文（第 ${start} 章起，共 ${max} 章）。`);
+    ? `Started refining existing draft for stage ${volume} Arc ${arcIdx}.`
+    : `Started generating draft for stage ${volume} Arc ${arcIdx} (from chapter ${start}, ${max} chapters).`);
 }
 
 
 
 async function refreshNameSynopsis() {
-  await startTask("novel_name_synopsis", { force: true }, "已开始重新生成书名建议与简介。");
+  await startTask("novel_name_synopsis", { force: true }, "Started regenerating title suggestions and synopsis.");
 }
 
 async function _gatherDirectionArgs() {
   const args = {};
   if (wizardState.directionMode === "file") {
-    if (!wizardState.directionFile || !wizardState.directionFileContent) throw new Error("请先选择并读取创作方向文件。");
+    if (!wizardState.directionFile || !wizardState.directionFileContent) throw new Error("Choose and read a creative-direction file first.");
     const upload = await uploadFile(wizardState.directionFile);
     args.direction_upload_id = upload.id;
   } else {
     const direction = $("#direction-input")?.value.trim() || "";
-    if (!direction) throw new Error("请填写创作方向，或切换为读取文件。");
+    if (!direction) throw new Error("Enter a creative direction, or switch to reading a file.");
     args.direction = direction;
   }
   return args;
 }
 
 async function submitDesignStep() {
-  // 全书设计已由统一对话框驱动，保留空实现以兼容表单提交路由。
+  // Book design is driven by the unified dialog; keep an empty handler for form-submit routing.
 }
 
 async function submitStageStep() {
-  // 舞台设计已由统一对话框驱动，保留空实现以兼容表单提交路由。
+  // Stage design is driven by the unified dialog; keep an empty handler for form-submit routing.
 }
 async function submitReferenceStep() {
-  if (!wizardState.workspace) throw new Error("请先选择工作区。");
+  if (!wizardState.workspace) throw new Error("Select a workspace first.");
   const reference = referenceStatus();
   if (reference.isComplete && !wizardState.referenceFile) return;
   const scope = $('input[name="reference-scope"]:checked')?.value || "all";
   const args = {};
   if (scope === "prefix") {
     const maxChapters = Number($("#reference-max-chapters")?.value);
-    if (!Number.isInteger(maxChapters) || maxChapters < 1) throw new Error("请输入有效的拆解章节数。");
-    if (reference.hasExisting && maxChapters < reference.processed) throw new Error(`当前已拆解至第 ${reference.processed} 章，目标章节数不能更小。`);
+    if (!Number.isInteger(maxChapters) || maxChapters < 1) throw new Error("Enter a valid deconstruction chapter count.");
+    if (reference.hasExisting && maxChapters < reference.processed) throw new Error(`Already deconstructed through chapter ${reference.processed}; the target chapter count cannot be smaller.`);
     args.max_chapters = maxChapters;
   }
   let taskType = "reference_resume";
   if (!reference.hasExisting) {
-    if (!wizardState.referenceFile) throw new Error("请选择需要拆解的参考小说 TXT 文件。");
+    if (!wizardState.referenceFile) throw new Error("Choose the reference novel TXT file to deconstruct.");
     args.reference_upload_id = (await uploadFile(wizardState.referenceFile)).id;
     taskType = "init";
   } else if (wizardState.referenceFile) {
     args.reference_upload_id = (await uploadFile(wizardState.referenceFile)).id;
   }
-  await startTask(taskType, args, reference.hasExisting ? "已开始继续拆解参考小说，可在任务日志中查看进度。" : "已开始导入并拆解参考小说，可在任务日志中查看编码识别与进度。");
+  await startTask(taskType, args, reference.hasExisting ? "Started resuming reference deconstruction. Watch progress in the task log." : "Started importing and deconstructing the reference novel. Watch encoding detection and progress in the task log.");
   wizardState.referenceFile = null;
 }
 
 function displayVolume(path) {
   const matched = path.match(/vol_(\d+)/i);
-  return matched ? `卷 ${Number(matched[1])}` : "当前文件";
+  return matched ? `Volume ${Number(matched[1])}` : "Current file";
 }
 
 function chapterNumberFromPath(path) {
@@ -1858,26 +1858,26 @@ function artifactDescriptor(step, path) {
   };
 
   if (step.id === "reference") {
-    if (filename === "novel_outline.md") return { label: "全书大纲", description: "参考小说的整体故事结构与节奏。" };
-    if (filename === "volume_outline.md") return { label: "本卷卷纲", description: "本卷的目标、冲突与阶段转折。" };
-    if (arcMatch) return { label: `故事片段 ${Number(arcMatch[1])}`, description: `参考第 ${Number(arcMatch[2])}-${Number(arcMatch[3])} 章的叙事结构。` };
+    if (filename === "novel_outline.md") return { label: "Book outline", description: "Overall story structure and pacing of the reference novel." };
+    if (filename === "volume_outline.md") return { label: "This volume's outline", description: "This volume's goals, conflicts, and phase turns." };
+    if (arcMatch) return { label: `Story arc ${Number(arcMatch[1])}`, description: `Narrative structure from reference chapters ${Number(arcMatch[2])}-${Number(arcMatch[3])}.` };
   }
   if (step.id === "world" && worldDescriptions[filename]) return { label: worldDescriptions[filename][0], description: worldDescriptions[filename][1] };
   if ((step.id === "design" || step.id === "stage") && designDescriptions[filename]) return { label: designDescriptions[filename][0], description: designDescriptions[filename][1] };
-  if (step.id === "stage" && filename === "novel_name_synopsis.md") return { label: "书名与简介", description: "基于粗略大纲、世界观、长线主线与舞台路线图生成。" };
+  if (step.id === "stage" && filename === "novel_name_synopsis.md") return { label: "Title and synopsis", description: "Generated from the rough outline, worldview, long mainline, and stage roadmap." };
   if (step.id === "mechanics" && mechanicsDescriptions[filename]) return { label: mechanicsDescriptions[filename][0], description: mechanicsDescriptions[filename][1] };
-  if (step.id === "arcs" && arcMatch) return { label: `故事情节单元 ${Number(arcMatch[1])}`, description: `覆盖新书第 ${Number(arcMatch[2])}-${Number(arcMatch[3])} 章。` };
-  if (step.id === "chapters" && chapterNumber !== null && path.includes("/system_panels/")) return { label: `第 ${chapterNumber} 章系统面板`, description: "本章结束时以主角为核心的结构化状态快照。" };
-  if (step.id === "chapters" && chapterNumber !== null) return { label: `第 ${chapterNumber} 章`, description: "本章故事线、情绪节奏与描述性简介。" };
-  if (step.id === "draft" && chapterNumber !== null) return { label: `第 ${chapterNumber} 章`, description: path.includes("/drafts/") ? "精修前保留的原始正文。" : "去 AI 味精修后的正式正文。" };
-  return { label: filename, description: "本步骤生成的相关文件。" };
+  if (step.id === "arcs" && arcMatch) return { label: `Story arc ${Number(arcMatch[1])}`, description: `Covers new-novel chapters ${Number(arcMatch[2])}-${Number(arcMatch[3])}.` };
+  if (step.id === "chapters" && chapterNumber !== null && path.includes("/system_panels/")) return { label: `Chapter ${chapterNumber} system panel`, description: "A structured protagonist-centered snapshot at the end of this chapter." };
+  if (step.id === "chapters" && chapterNumber !== null) return { label: `Chapter ${chapterNumber}`, description: "This chapter's story line, emotional pacing, and descriptive synopsis." };
+  if (step.id === "draft" && chapterNumber !== null) return { label: `Chapter ${chapterNumber}`, description: path.includes("/drafts/") ? "Raw draft kept before humanization." : "Official draft after humanization." };
+  return { label: filename, description: "Files generated by this step." };
 }
 
 function referenceVolumeInfo(directory) {
   const matched = directory.match(/^vol_(\d+)(?:_(.+))?$/i);
   const number = matched ? Number(matched[1]) : Number.MAX_SAFE_INTEGER;
-  const name = matched?.[2]?.replace(/_/g, " ") || "未命名分卷";
-  return { number, title: matched ? `第 ${number} 卷 · ${name}` : directory };
+  const name = matched?.[2]?.replace(/_/g, " ") || "Unnamed volume";
+  return { number, title: matched ? `Volume ${number} · ${name}` : directory };
 }
 
 function referenceReviewGroups(scopedFiles) {
@@ -1898,13 +1898,13 @@ function referenceReviewGroups(scopedFiles) {
         const leftOutline = left.path.endsWith("/volume_outline.md");
         const rightOutline = right.path.endsWith("/volume_outline.md");
         if (leftOutline !== rightOutline) return leftOutline ? -1 : 1;
-        return left.path.localeCompare(right.path, "zh-CN", { numeric: true });
+        return left.path.localeCompare(right.path, "en-US", { numeric: true });
       });
       const arcCount = orderedFiles.filter((file) => file.path.includes("/story_arcs/")).length;
       return {
         ...info,
         files: orderedFiles,
-        description: `${orderedFiles.some((file) => file.path.endsWith("/volume_outline.md")) ? "含本卷卷纲" : "未找到卷纲"} · ${arcCount} 个故事片段`,
+        description: `${orderedFiles.some((file) => file.path.endsWith("/volume_outline.md")) ? "includes this volume outline" : "volume outline not found"} · ${arcCount} story arcs`,
       };
     })
     .sort((left, right) => left.number - right.number);
@@ -1913,19 +1913,19 @@ function referenceReviewGroups(scopedFiles) {
 
   const overviewFile = scopedFiles.find((item) => item.path === "reference/outlines/novel_outline.md");
   const overviewArtifacts = overviewFile
-    ? [{ path: overviewFile.path, ...artifactDescriptor({ id: "reference" }, overviewFile.path), groupTitle: "全书大纲" }]
+    ? [{ path: overviewFile.path, ...artifactDescriptor({ id: "reference" }, overviewFile.path), groupTitle: "Book outline" }]
     : [];
 
   return [
-    ...(overviewArtifacts.length ? [{ kind: "reference-overview", title: "全书大纲", description: "参考小说的整体故事结构与节奏，由各卷结构汇总而来。", artifacts: overviewArtifacts }] : []),
-    { kind: "reference-volumes", title: "分卷拆解", description: `按卷查看卷纲与故事片段，共 ${volumeGroups.length} 卷。`, volumes: volumeGroups.map((volume) => ({ ...volume, artifacts: volume.files.map((file) => ({ path: file.path, ...artifactDescriptor({ id: "reference" }, file.path), groupTitle: volume.title })) })), artifacts: volumeArtifacts },
+    ...(overviewArtifacts.length ? [{ kind: "reference-overview", title: "Book outline", description: "Overall story structure and pacing of the reference novel, aggregated from each volume.", artifacts: overviewArtifacts }] : []),
+    { kind: "reference-volumes", title: "Volume deconstruction", description: `Inspect volume outlines and story arcs by volume, ${volumeGroups.length} volumes.`, volumes: volumeGroups.map((volume) => ({ ...volume, artifacts: volume.files.map((file) => ({ path: file.path, ...artifactDescriptor({ id: "reference" }, file.path), groupTitle: volume.title })) })), artifacts: volumeArtifacts },
   ].filter((group) => (group.artifacts || []).length);
 }
 
 function storyArcVolumeInfo(directory) {
   const matched = directory.match(/^vol_(\d+)$/i);
   const number = matched ? Number(matched[1]) : Number.MAX_SAFE_INTEGER;
-  return { number, title: matched ? `第 ${number} 卷` : directory };
+  return { number, title: matched ? `Volume ${number}` : directory };
 }
 
 function storyArcsReviewGroups(scopedFiles) {
@@ -1941,16 +1941,16 @@ function storyArcsReviewGroups(scopedFiles) {
   const volumeGroups = [...volumes.entries()]
     .map(([directory, files]) => {
       const info = storyArcVolumeInfo(directory);
-      const orderedFiles = [...files].sort((left, right) => left.path.localeCompare(right.path, "zh-CN", { numeric: true }));
-      return { ...info, files: orderedFiles, description: `已生成 ${orderedFiles.length} 个故事情节单元` };
+      const orderedFiles = [...files].sort((left, right) => left.path.localeCompare(right.path, "en-US", { numeric: true }));
+      return { ...info, files: orderedFiles, description: `${orderedFiles.length} story arcs generated` };
     })
     .sort((left, right) => left.number - right.number);
 
   const artifacts = volumeGroups.flatMap((volume) => volume.files.map((file) => ({ path: file.path, ...artifactDescriptor({ id: "arcs" }, file.path), groupTitle: volume.title })));
   return artifacts.length ? [{
     kind: "story-arc-volumes",
-    title: "已生成故事情节",
-    description: `按卷汇总已生成内容，共 ${volumeGroups.length} 卷。`,
+    title: "Generated story arcs",
+    description: `Generated content grouped by volume, ${volumeGroups.length} volumes.`,
     volumes: volumeGroups.map((volume) => ({ ...volume, artifacts: volume.files.map((file) => ({ path: file.path, ...artifactDescriptor({ id: "arcs" }, file.path), groupTitle: volume.title })) })),
     artifacts,
   }] : [];
@@ -1979,33 +1979,33 @@ function chapterArcReviewGroups(step, scopedFiles) {
       });
       if (unmatched.length) buckets.push({ idx: null, start_ch: null, end_ch: null, name: "", files: unmatched });
       const arcs = buckets.filter((arc) => arc.files.length).map((arc) => {
-        const orderedFiles = [...arc.files].sort((left, right) => left.path.localeCompare(right.path, "zh-CN", { numeric: true }));
-        const arcTitle = arc.idx === null ? "未归属故事片段" : `故事片段 ${arc.idx}${arc.name ? ` · ${arc.name}` : ""}`;
-        const groupTitle = `第 ${volumeNumber} 卷 · ${arcTitle}`;
+        const orderedFiles = [...arc.files].sort((left, right) => left.path.localeCompare(right.path, "en-US", { numeric: true }));
+        const arcTitle = arc.idx === null ? "Unassigned story arcs" : `Story arc ${arc.idx}${arc.name ? ` · ${arc.name}` : ""}`;
+        const groupTitle = `Volume ${volumeNumber} · ${arcTitle}`;
         return {
           ...arc,
           title: arcTitle,
-          description: arc.idx === null ? `${orderedFiles.length} 份章节内容` : `第 ${arc.start_ch}-${arc.end_ch} 章 · ${orderedFiles.length} 份内容`,
+          description: arc.idx === null ? `${orderedFiles.length} chapter files` : `Chapters ${arc.start_ch}-${arc.end_ch} · ${orderedFiles.length} files`,
           artifacts: orderedFiles.map((file) => ({ path: file.path, ...artifactDescriptor(step, file.path), groupTitle })),
         };
       });
-      return { number: volumeNumber, title: `第 ${volumeNumber} 卷`, description: `${arcs.length} 个故事片段`, arcs };
+      return { number: volumeNumber, title: `Volume ${volumeNumber}`, description: `${arcs.length} story arcs`, arcs };
     }).filter((volume) => volume.arcs.length);
     const artifacts = volumes.flatMap((volume) => volume.arcs.flatMap((arc) => arc.artifacts));
     return artifacts.length ? {
       kind: "chapter-arc-volumes", contentKind, title,
-      description: `按卷和故事片段查看，共 ${volumes.length} 卷。`,
+      description: `Inspect by volume and story arc, ${volumes.length} volumes.`,
       volumes, artifacts,
     } : null;
   }
 
   if (step.id === "chapters") {
     return [
-      buildGroup(scopedFiles.filter((file) => file.path.includes("/chapter_outlines/")), "逐章章纲", "outlines"),
-      buildGroup(scopedFiles.filter((file) => file.path.includes("/system_panels/")), "系统面板", "panels"),
+      buildGroup(scopedFiles.filter((file) => file.path.includes("/chapter_outlines/")), "Chapter outlines", "outlines"),
+      buildGroup(scopedFiles.filter((file) => file.path.includes("/system_panels/")), "System panel", "panels"),
     ].filter(Boolean);
   }
-  const drafts = buildGroup(scopedFiles, "已生成正文", "drafts");
+  const drafts = buildGroup(scopedFiles, "Generated draft", "drafts");
   return drafts ? [drafts] : [];
 }
 
@@ -2034,7 +2034,7 @@ function reviewGroupsFor(step) {
   const groups = (REVIEW_GROUPS[step.id] || []).map((group) => ({ ...group, files: scopedFiles.filter((item) => group.matches(item.path)) }));
   const matched = new Set(groups.flatMap((group) => group.files.map((file) => file.path)));
   const remaining = scopedFiles.filter((file) => !matched.has(file.path));
-  if (remaining.length) groups.push({ title: "其他相关文件", description: "本步骤生成的辅助资料。", files: remaining });
+  if (remaining.length) groups.push({ title: "Other related files", description: "Supporting files generated by this step.", files: remaining });
   return groups.filter((group) => group.files.length).map((group) => ({
     ...group,
     artifacts: group.files.map((file) => ({ path: file.path, ...artifactDescriptor(step, file.path), groupTitle: group.title })),
@@ -2054,12 +2054,12 @@ function artifactButton(artifact, activePath) {
     const synchronized = record?.status === "synced";
     const badge = record
       ? (isDraft
-        ? (synchronized ? "✓ 最终版" : "最终版 · 待同步")
-        : (synchronized ? "✓ 正文已同步" : "正文待同步"))
+        ? (synchronized ? "✓ Final" : "Final · pending sync")
+        : (synchronized ? "✓ Draft synced" : "Draft pending sync"))
       : "";
-    return `<button class="artifact-item artifact-chapter-row ${artifact.path === activePath ? "active" : ""} ${record ? "is-finalized" : ""}" data-review-path="${escapeHtml(artifact.path)}" type="button"><span>第 ${chapterNumber} 章</span>${badge ? `<small>${escapeHtml(badge)}</small>` : ""}</button>`;
+    return `<button class="artifact-item artifact-chapter-row ${artifact.path === activePath ? "active" : ""} ${record ? "is-finalized" : ""}" data-review-path="${escapeHtml(artifact.path)}" type="button"><span>Chapter ${chapterNumber}</span>${badge ? `<small>${escapeHtml(badge)}</small>` : ""}</button>`;
   }
-  return `<button class="artifact-item ${artifact.path === activePath ? "active" : ""}" data-review-path="${escapeHtml(artifact.path)}" type="button"><span class="artifact-file-icon" aria-hidden="true"></span><span class="artifact-item-copy"><span class="artifact-item-type">生成内容</span><span class="artifact-item-label">${escapeHtml(artifact.label)}</span><span class="artifact-item-description">${escapeHtml(artifact.description)}</span><span class="artifact-item-filename">${escapeHtml(artifact.path.split("/").pop())}</span></span></button>`;
+  return `<button class="artifact-item ${artifact.path === activePath ? "active" : ""}" data-review-path="${escapeHtml(artifact.path)}" type="button"><span class="artifact-file-icon" aria-hidden="true"></span><span class="artifact-item-copy"><span class="artifact-item-type">Generated content</span><span class="artifact-item-label">${escapeHtml(artifact.label)}</span><span class="artifact-item-description">${escapeHtml(artifact.description)}</span><span class="artifact-item-filename">${escapeHtml(artifact.path.split("/").pop())}</span></span></button>`;
 }
 
 function reviewOutlineMarkup(step, groups, artifacts) {
@@ -2068,14 +2068,14 @@ function reviewOutlineMarkup(step, groups, artifacts) {
     const overview = groups.find((group) => group.kind === "reference-overview");
     const volumes = groups.find((group) => group.kind === "reference-volumes");
     return `<aside class="artifact-outline reference-outline" id="artifact-outline">
-      ${overview ? `<section class="artifact-group"><div class="artifact-group-heading"><span class="artifact-group-kicker">全书结构 · 1 份资料</span><h3>${escapeHtml(overview.title)}</h3><p>${escapeHtml(overview.description)}</p></div><div class="artifact-list">${overview.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></section>` : ""}
-      ${volumes ? `<section class="reference-section reference-volume-section"><header class="reference-section-heading"><span>分卷拆解</span><p>${escapeHtml(volumes.description)}</p></header><div class="volume-accordion">${volumes.volumes.map((volume, index) => `<details class="volume-node" ${index === 0 ? "open" : ""}><summary><span class="volume-node-marker" aria-hidden="true"></span><span class="volume-node-copy"><strong>${escapeHtml(volume.title)}</strong><small>${escapeHtml(volume.description)}</small></span></summary><div class="volume-node-files">${volume.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></details>`).join("")}</div></section>` : ""}
+      ${overview ? `<section class="artifact-group"><div class="artifact-group-heading"><span class="artifact-group-kicker">Book structure · 1 file</span><h3>${escapeHtml(overview.title)}</h3><p>${escapeHtml(overview.description)}</p></div><div class="artifact-list">${overview.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></section>` : ""}
+      ${volumes ? `<section class="reference-section reference-volume-section"><header class="reference-section-heading"><span>Volume deconstruction</span><p>${escapeHtml(volumes.description)}</p></header><div class="volume-accordion">${volumes.volumes.map((volume, index) => `<details class="volume-node" ${index === 0 ? "open" : ""}><summary><span class="volume-node-marker" aria-hidden="true"></span><span class="volume-node-copy"><strong>${escapeHtml(volume.title)}</strong><small>${escapeHtml(volume.description)}</small></span></summary><div class="volume-node-files">${volume.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></details>`).join("")}</div></section>` : ""}
     </aside>`;
   }
   if (step.id === "arcs") {
     const volumes = groups.find((group) => group.kind === "story-arc-volumes");
     return `<aside class="artifact-outline story-arcs-outline" id="artifact-outline">
-      ${volumes ? `<section class="reference-section reference-volume-section"><header class="reference-section-heading"><span>已生成故事情节</span><p>${escapeHtml(volumes.description)}</p></header><div class="volume-accordion">${volumes.volumes.map((volume) => `<details class="volume-node" open><summary><span class="volume-node-marker" aria-hidden="true"></span><span class="volume-node-copy"><strong>${escapeHtml(volume.title)}</strong><small>${escapeHtml(volume.description)}</small></span></summary><div class="volume-node-files">${volume.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></details>`).join("")}</div></section>` : ""}
+      ${volumes ? `<section class="reference-section reference-volume-section"><header class="reference-section-heading"><span>Generated story arcs</span><p>${escapeHtml(volumes.description)}</p></header><div class="volume-accordion">${volumes.volumes.map((volume) => `<details class="volume-node" open><summary><span class="volume-node-marker" aria-hidden="true"></span><span class="volume-node-copy"><strong>${escapeHtml(volume.title)}</strong><small>${escapeHtml(volume.description)}</small></span></summary><div class="volume-node-files">${volume.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></details>`).join("")}</div></section>` : ""}
     </aside>`;
   }
   if (step.id === "chapters" || step.id === "draft") {
@@ -2083,7 +2083,7 @@ function reviewOutlineMarkup(step, groups, artifacts) {
       ${groups.filter((group) => group.kind === "chapter-arc-volumes").map((content, groupIndex) => `<section class="reference-section reference-volume-section"><header class="reference-section-heading"><span>${escapeHtml(content.title)}</span><p>${escapeHtml(content.description)}</p></header><div class="volume-accordion">${content.volumes.map((volume, volumeIndex) => `<details class="volume-node" ${groupIndex === 0 && volumeIndex === 0 ? "open" : ""}><summary><span class="volume-node-marker" aria-hidden="true"></span><span class="volume-node-copy"><strong>${escapeHtml(volume.title)}</strong><small>${escapeHtml(volume.description)}</small></span></summary><div class="arc-node-list">${volume.arcs.map((arc, arcIndex) => `<details class="arc-node" ${groupIndex === 0 && volumeIndex === 0 && arcIndex === 0 ? "open" : ""}><summary><span class="arc-node-marker" aria-hidden="true"></span><span class="volume-node-copy"><strong>${escapeHtml(arc.title)}</strong><small>${escapeHtml(arc.description)}</small></span></summary><div class="arc-node-files">${arc.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></details>`).join("")}</div></details>`).join("")}</div></section>`).join("")}
     </aside>`;
   }
-  return `<aside class="artifact-outline" id="artifact-outline">${groups.map((group) => `<section class="artifact-group"><div class="artifact-group-heading"><span class="artifact-group-kicker">内容分类 · ${group.artifacts.length} 份资料</span><h3>${escapeHtml(group.title)}</h3><p>${escapeHtml(group.description)}</p></div><div class="artifact-list">${group.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></section>`).join("")}</aside>`;
+  return `<aside class="artifact-outline" id="artifact-outline">${groups.map((group) => `<section class="artifact-group"><div class="artifact-group-heading"><span class="artifact-group-kicker">Content groups · ${group.artifacts.length} files</span><h3>${escapeHtml(group.title)}</h3><p>${escapeHtml(group.description)}</p></div><div class="artifact-list">${group.artifacts.map((artifact) => artifactButton(artifact, activePath)).join("")}</div></section>`).join("")}</aside>`;
 }
 
 function renderActiveStep() {
@@ -2104,23 +2104,23 @@ function renderActiveStep() {
   const hidePrimaryAction = step.id === "design" || step.id === "arcs" || step.id === "chapters" || (step.id === "stage" && !Boolean(wizardState.summary?.story_design?.stage_ready));
   const actionLabel = step.id === "reference"
     ? (reference?.hasExisting && !reference?.isComplete && !wizardState.referenceFile
-      ? "重试未完成步骤"
-      : "导入并开始拆解")
+      ? "Retry unfinished steps"
+      : "Import and start deconstruction")
     : step.id === "design"
-      ? (design?.concept_ready ? "重新生成粗略大纲与世界观" : "生成粗略大纲与世界观")
+      ? (design?.concept_ready ? "Regenerate rough outline and worldview" : "Generate rough outline and worldview")
       : step.id === "stage"
-        ? (design?.stage_ready ? "续写后续舞台" : "生成长线主线与舞台路线图")
+        ? (design?.stage_ready ? "Extend later stages" : "Generate long mainline and stage roadmap")
       : step.id === "world"
-        ? "导入并开始构建"
+        ? "Import and start building"
         : step.id === "mechanics"
-          ? "初始化系统面板"
+          ? "Initialize system panel"
           : step.id === "arcs"
-            ? "生成故事情节单元"
+            ? "Generate story arcs"
             : step.id === "chapters"
-              ? "生成逐章章纲"
+              ? "Generate chapter outlines"
               : step.id === "draft"
-                ? "开始生成正文"
-                : "开始生成";
+                ? "Start generating draft"
+                : "Start generating";
   const heading = step.heading;
   const lead = step.lead;
   const decision = step.decision;
@@ -2130,7 +2130,7 @@ function renderActiveStep() {
     <article class="step-view step-view-chat">
       <header class="chat-step-header">
         <div>
-          <p class="step-eyebrow">${step.optional ? "可选步骤" : "创作流程"}</p>
+          <p class="step-eyebrow">${step.optional ? "Optional step" : "Writing workflow"}</p>
           <h1 class="step-title">${heading}</h1>
           <p class="step-lead">${lead}</p>
         </div>
@@ -2139,44 +2139,44 @@ function renderActiveStep() {
         <div id="${step.id === "arcs" ? "arcs-chat-host" : step.id === "chapters" ? "chapters-chat-host" : step.id === "draft" ? "draft-chat-host" : "design-chat-host"}"></div>
       </section>
       <section class="review-band">
-        <div class="band-heading"><h2>生成内容</h2><p>${step.reviewHint}</p></div>
-        <div class="review-empty" id="review-empty" ${artifacts.length ? "hidden" : ""}>生成后在右侧查看，或点击对话中的文件链接。</div>
+        <div class="band-heading"><h2>Generated content</h2><p>${step.reviewHint}</p></div>
+        <div class="review-empty" id="review-empty" ${artifacts.length ? "hidden" : ""}>Review results on the right, or click file links in the chat.</div>
         <div id="review-layout" class="review-layout" ${artifacts.length ? "" : "hidden"}>
           ${reviewOutlineMarkup(step, groups, artifacts)}
           <section class="review-preview"><div id="review-document" class="review-document"></div></section>
         </div>
         <div class="review-actions">
-          <button class="primary-button" id="confirm-step" type="button" ${artifacts.length ? "" : "disabled"}>继续</button>
+          <button class="primary-button" id="confirm-step" type="button" ${artifacts.length ? "" : "disabled"}>Continue</button>
         </div>
       </section>
     </article>` : `
     <article class="step-view">
-      <p class="step-eyebrow">${step.optional ? "可选步骤" : "创作流程"}</p>
-      <div class="step-status ${status}">${isDone ? "已有生成内容，可随时返回调整" : status === "locked" ? "等待前序步骤" : step.optional ? "可选择执行或跳过" : "等待生成内容"}</div>
+      <p class="step-eyebrow">${step.optional ? "Optional step" : "Writing workflow"}</p>
+      <div class="step-status ${status}">${isDone ? "Generated content exists; you can return and adjust anytime" : status === "locked" ? "Waiting for earlier steps" : step.optional ? "You can run or skip this step" : "Waiting for generated content"}</div>
       <h1 class="step-title">${heading}</h1>
       <p class="step-lead">${lead}</p>
       <section class="decision-band">
-        <div class="band-heading"><h2>本步决定</h2><p>${step.short}</p></div>
+        <div class="band-heading"><h2>This step decides</h2><p>${step.short}</p></div>
         <div class="decision-layout">
           <form class="decision-form" id="v0-step-form">
             ${formForStep(step)}
             ${hidePrimaryAction ? "" : `<div class="decision-actions">
               <button class="primary-button" type="submit" ${referenceActionDisabled ? "disabled" : ""}>${actionLabel}</button>
-              ${step.optional ? '<button class="text-button" id="skip-step" type="button">本书跳过此步</button>' : ""}
+              ${step.optional ? '<button class="text-button" id="skip-step" type="button">Skip this step for this book</button>' : ""}
             </div>`}
           </form>
-          <aside class="context-note"><strong>设计说明</strong>${decision}</aside>
+          <aside class="context-note"><strong>Design notes</strong>${decision}</aside>
         </div>
       </section>
       <section class="review-band">
-        <div class="band-heading"><h2>生成内容</h2><p>${step.reviewHint}</p></div>
-        <div class="review-empty" id="review-empty" ${artifacts.length ? "hidden" : ""}>本步骤尚未发现产物。运行生成后，会按用途归类显示在这里。</div>
+        <div class="band-heading"><h2>Generated content</h2><p>${step.reviewHint}</p></div>
+        <div class="review-empty" id="review-empty" ${artifacts.length ? "hidden" : ""}>No artifacts found for this step yet. After generation they are grouped here by use.</div>
         <div id="review-layout" class="review-layout" ${artifacts.length ? "" : "hidden"}>
           ${reviewOutlineMarkup(step, groups, artifacts)}
           <section class="review-preview"><div id="review-document" class="review-document"></div></section>
         </div>
         <div class="review-actions">
-          <button class="primary-button" id="confirm-step" type="button" ${artifacts.length ? "" : "disabled"}>继续</button>
+          <button class="primary-button" id="confirm-step" type="button" ${artifacts.length ? "" : "disabled"}>Continue</button>
         </div>
       </section>
     </article>`;
@@ -2194,7 +2194,7 @@ function renderActiveStep() {
       else if (step.id === "chapters") await submitChaptersStep();
       else if (step.id === "draft") await submitDraftStep();
     } catch (error) {
-      showToast(error.message || "无法启动生成任务。", true);
+      showToast(error.message || "Could not start the generation task.", true);
     } finally {
       if (submit) submit.disabled = false;
     }
@@ -2244,7 +2244,7 @@ function confirmStep(step, skipped) {
   wizardState.activeStep = next?.id || step.id;
   renderRail();
   renderActiveStep();
-  showToast(skipped ? "已跳过此可选步骤。" : "已进入下一步，当前内容仍可随时返回调整。");
+  showToast(skipped ? "Skipped this optional step." : "Moved to the next step. You can still come back and adjust the current content.");
 }
 
 function isReferenceAsset(path) {
@@ -2256,20 +2256,20 @@ function isReferenceStoryArc(path) {
 }
 
 const CARD_SECTION_LABELS = [
-  ["chapter_outline_600", "单章简介"],
-  ["story_line", "故事线"],
+  ["chapter_outline_600", "Chapter synopsis"],
+  ["story_line", "Story line"],
 ];
 const CARD_RHYTHM_LABELS = [
-  ["core_content", "核心内容"],
-  ["emotion_tone", "情绪基调"],
-  ["beat_detail", "节奏拆解"],
+  ["core_content", "Core content"],
+  ["emotion_tone", "Emotional tone"],
+  ["beat_detail", "Pacing breakdown"],
 ];
 const CARD_ENTITY_LABELS = [
-  ["characters", "角色"],
-  ["factions", "势力"],
-  ["locations", "地点"],
-  ["items", "物品"],
-  ["skills", "技能"],
+  ["characters", "Characters"],
+  ["factions", "Factions"],
+  ["locations", "Locations"],
+  ["items", "Items"],
+  ["skills", "Skills"],
 ];
 
 function renderChapterCardSections(chapter) {
@@ -2288,10 +2288,10 @@ function renderChapterCardSections(chapter) {
     .join("");
   const highlights = Array.isArray(chapter.highlights) ? chapter.highlights : [];
   const highlightText = highlights.map((item) => escapeHtml(String(item || "").trim())).filter(Boolean).join("\n");
-  const highlightSection = highlightText ? `<section class="card-section"><h5>亮点</h5><p>${highlightText.replace(/\n/g, "<br>")}</p></section>` : "";
-  const rhythmWrap = rhythmSections ? `<section class="card-section card-section-rhythm"><h5>单章节奏</h5><div class="card-grid card-grid-inner">${rhythmSections}</div></section>` : "";
+  const highlightSection = highlightText ? `<section class="card-section"><h5>Highlights</h5><p>${highlightText.replace(/\n/g, "<br>")}</p></section>` : "";
+  const rhythmWrap = rhythmSections ? `<section class="card-section card-section-rhythm"><h5>Chapter pacing</h5><div class="card-grid card-grid-inner">${rhythmSections}</div></section>` : "";
   if (!sections && !rhythmSections && !highlightText) {
-    return '<p class="card-empty">该章节尚未拆解出事实卡内容。</p>';
+    return '<p class="card-empty">This chapter has no fact-card content yet.</p>';
   }
   return `<div class="card-grid">${sections}${rhythmWrap}${highlightSection}</div>`;
 }
@@ -2305,12 +2305,12 @@ function renderReferenceArcChapters(artifact, data) {
     const chapter = chapters[activeIndex];
     const content = $("#reference-arc-chapter-content");
     if (!chapter || !content) return;
-    const sourceTag = chapter.source === "raw" ? '<span class="card-source-tag">原文回退</span>' : "";
-    content.innerHTML = `<header><p>第 ${chapter.number} 章</p><h4>${escapeHtml(chapter.title)}</h4>${sourceTag}</header>${renderChapterCardSections(chapter)}`;
+    const sourceTag = chapter.source === "raw" ? '<span class="card-source-tag">Source fallback</span>' : "";
+    content.innerHTML = `<header><p>Chapter ${chapter.number}</p><h4>${escapeHtml(chapter.title)}</h4>${sourceTag}</header>${renderChapterCardSections(chapter)}`;
     $$('[data-reference-chapter-index]').forEach((button) => button.classList.toggle("active", Number(button.dataset.referenceChapterIndex) === activeIndex));
   };
 
-  documentNode.innerHTML = `<header class="preview-meta"><div><p>单章事实卡</p><h3>${escapeHtml(artifact.label)} · 覆盖章节</h3><span>选择左侧章节查看拆解后的事实卡；参考拆解资产仅供阅读，不可在工作台中编辑。</span><code>${escapeHtml(data.path)}</code></div><div class="preview-tools"><button id="back-to-reference-arc" class="secondary-button" type="button">返回故事片段</button></div></header><div class="reference-arc-browser"><nav class="reference-arc-chapter-list" aria-label="故事片段章节">${chapters.map((chapter, index) => `<button class="reference-arc-chapter ${index === 0 ? "active" : ""}" data-reference-chapter-index="${index}" type="button"><strong>第 ${chapter.number} 章</strong><span>${escapeHtml(chapter.title)}</span></button>`).join("")}</nav><article id="reference-arc-chapter-content" class="reference-arc-chapter-content"></article></div>`;
+  documentNode.innerHTML = `<header class="preview-meta"><div><p>Chapter fact card</p><h3>${escapeHtml(artifact.label)} · Covered chapters</h3><span>Select a chapter on the left to view its fact card. Reference deconstruction assets are read-only and cannot be edited in the workbench.</span><code>${escapeHtml(data.path)}</code></div><div class="preview-tools"><button id="back-to-reference-arc" class="secondary-button" type="button">Back to story arc</button></div></header><div class="reference-arc-browser"><nav class="reference-arc-chapter-list" aria-label="Story-arc chapters">${chapters.map((chapter, index) => `<button class="reference-arc-chapter ${index === 0 ? "active" : ""}" data-reference-chapter-index="${index}" type="button"><strong>Chapter ${chapter.number}</strong><span>${escapeHtml(chapter.title)}</span></button>`).join("")}</nav><article id="reference-arc-chapter-content" class="reference-arc-chapter-content"></article></div>`;
   $("#back-to-reference-arc")?.addEventListener("click", () => renderReviewDocument(artifact));
   $$('[data-reference-chapter-index]').forEach((button) => button.addEventListener("click", () => {
     activeIndex = Number(button.dataset.referenceChapterIndex);
@@ -2324,7 +2324,7 @@ async function openReferenceArcChapters(path, artifact) {
     const data = await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/reference-arc-chapters?path=${encodeURIComponent(path)}`);
     renderReferenceArcChapters(artifact, data);
   } catch (error) {
-    showToast(error.message || "无法读取该故事片段的章节原文。", true);
+    showToast(error.message || "Could not read source chapters for this story arc.", true);
   }
 }
 
@@ -2333,9 +2333,9 @@ function isSystemPanelSnapshot(path) {
 }
 
 function systemPanelValueMarkup(value) {
-  if (value === null || value === undefined || value === "") return '<span class="panel-empty-value">未记录</span>';
+  if (value === null || value === undefined || value === "") return '<span class="panel-empty-value">Not recorded</span>';
   if (Array.isArray(value)) {
-    if (!value.length) return '<span class="panel-empty-value">无</span>';
+    if (!value.length) return '<span class="panel-empty-value">None</span>';
     if (value.some((item) => item && typeof item === "object")) {
       return `<div class="panel-item-list">${value.map((item) => `<div>${systemPanelValueMarkup(item)}</div>`).join("")}</div>`;
     }
@@ -2343,10 +2343,10 @@ function systemPanelValueMarkup(value) {
   }
   if (typeof value === "object") {
     const entries = Object.entries(value);
-    if (!entries.length) return '<span class="panel-empty-value">无</span>';
+    if (!entries.length) return '<span class="panel-empty-value">None</span>';
     return `<dl class="panel-kv-list">${entries.map(([key, item]) => `<div><dt>${escapeHtml(key)}</dt><dd>${systemPanelValueMarkup(item)}</dd></div>`).join("")}</dl>`;
   }
-  if (typeof value === "boolean") return `<span class="panel-boolean ${value ? "yes" : "no"}">${value ? "是" : "否"}</span>`;
+  if (typeof value === "boolean") return `<span class="panel-boolean ${value ? "yes" : "no"}">${value ? "yes" : "no"}</span>`;
   return `<span class="panel-scalar">${escapeHtml(String(value))}</span>`;
 }
 
@@ -2360,10 +2360,10 @@ function systemPanelPreview(content) {
       ? panel.protagonist_state
       : {};
   const labels = {
-    values: "核心数值", resources: "资源", inventory: "物品数量",
-    skills: "技能等级", task_progress: "任务进度",
-    identity: "身份", attributes: "属性", equipment: "装备", tasks: "任务", relationships: "关系",
-    injuries_and_status: "伤势与状态", flags: "关键标记",
+    values: "Core numbers", resources: "Resources", inventory: "Item counts",
+    skills: "Skill levels", task_progress: "Quest progress",
+    identity: "Identity", attributes: "Attributes", equipment: "Equipment", tasks: "Quests", relationships: "Relationships",
+    injuries_and_status: "Injuries and status", flags: "Key flags",
   };
   const orderedState = {};
   Object.entries(labels).forEach(([key, label]) => {
@@ -2372,18 +2372,18 @@ function systemPanelPreview(content) {
     if (hasContent) orderedState[label] = value;
   });
   Object.entries(state).filter(([key]) => !labels[key]).forEach(([key, value]) => { orderedState[key] = value; });
-  const stateSections = `<section class="system-panel-wide panel-current-state"><h4>当前面板</h4>${systemPanelValueMarkup(orderedState)}</section>`;
+  const stateSections = `<section class="system-panel-wide panel-current-state"><h4>Current panel</h4>${systemPanelValueMarkup(orderedState)}</section>`;
   const changes = Array.isArray(panel.changes) ? panel.changes : [];
   const changeMarkup = changes.length
-    ? `<section class="system-panel-wide"><h4>本章变化</h4><div class="panel-change-list">${changes.map((item) => `<article><strong>${escapeHtml(String(item.field || [item.category, item.key].filter(Boolean).join(".") || "状态变化"))}</strong><div><span>${escapeHtml(String(item.before ?? "未记录"))}</span><b>→</b><span>${escapeHtml(String(item.after ?? "未记录"))}</span></div>${item.reason ? `<p>${escapeHtml(String(item.reason))}</p>` : ""}</article>`).join("")}</div></section>`
-    : '<section class="system-panel-wide panel-no-change"><h4>本章变化</h4><p>本章没有需要记录的主角状态变化。</p></section>';
+    ? `<section class="system-panel-wide"><h4>This chapter's changes</h4><div class="panel-change-list">${changes.map((item) => `<article><strong>${escapeHtml(String(item.field || [item.category, item.key].filter(Boolean).join(".") || "State changes"))}</strong><div><span>${escapeHtml(String(item.before ?? "Not recorded"))}</span><b>→</b><span>${escapeHtml(String(item.after ?? "Not recorded"))}</span></div>${item.reason ? `<p>${escapeHtml(String(item.reason))}</p>` : ""}</article>`).join("")}</div></section>`
+    : '<section class="system-panel-wide panel-no-change"><h4>Chapter changes</h4><p>This chapter has no protagonist state changes to record.</p></section>';
   const displays = Array.isArray(panel.panel_display) ? panel.panel_display : [];
   const notes = Array.isArray(panel.continuity_notes) ? panel.continuity_notes : [];
   const supporting = [
-    displays.length ? `<section class="system-panel-wide"><h4>正文可展示面板</h4>${systemPanelValueMarkup(displays)}</section>` : "",
-    notes.length ? `<section class="system-panel-wide"><h4>下一章连续性提醒</h4>${systemPanelValueMarkup(notes)}</section>` : "",
+    displays.length ? `<section class="system-panel-wide"><h4>In-text display panel</h4>${systemPanelValueMarkup(displays)}</section>` : "",
+    notes.length ? `<section class="system-panel-wide"><h4>Continuity notes for the next chapter</h4>${systemPanelValueMarkup(notes)}</section>` : "",
   ].join("");
-  return `<div class="system-panel-overview"><div><span>章节</span><strong>第 ${Number(panel.chapter || 0)} 章</strong></div><div><span>状态变化</span><strong>${changes.length} 项</strong></div>${displays.length ? `<div><span>正文展示</span><strong>${displays.length} 项</strong></div>` : ""}</div><div class="system-panel-grid">${stateSections}${changeMarkup}${supporting}</div>`;
+  return `<div class="system-panel-overview"><div><span>Chapter</span><strong>Chapter ${Number(panel.chapter || 0)}</strong></div><div><span>State changes</span><strong>${changes.length} items</strong></div>${displays.length ? `<div><span>Draft display</span><strong>${displays.length} items</strong></div>` : ""}</div><div class="system-panel-grid">${stateSections}${changeMarkup}${supporting}</div>`;
 }
 
 async function copyPreviewText(text) {
@@ -2400,7 +2400,7 @@ async function copyPreviewText(text) {
   textarea.select();
   const copied = document.execCommand("copy");
   textarea.remove();
-  if (!copied) throw new Error("浏览器未允许复制");
+  if (!copied) throw new Error("The browser blocked copying");
 }
 
 function renderReviewDocument(artifact) {
@@ -2412,20 +2412,20 @@ function renderReviewDocument(artifact) {
     wizardState.activeStep === "draft"
     && path.includes("/chapters/")
     && !wizardState.fileEditing
-  ) ? '<button id="copy-draft-preview" class="secondary-button copy-preview-button" type="button">一键复制</button>' : "";
+  ) ? '<button id="copy-draft-preview" class="secondary-button copy-preview-button" type="button">Copy all</button>' : "";
   const finalizationTarget = chapterFinalizationTarget(path);
   const finalizationRecord = chapterFinalizationRecord(path);
   const finalized = Boolean(finalizationRecord?.finalized);
   const finalizationButton = finalizationTarget && !wizardState.fileEditing
-    ? `<button id="toggle-chapter-finalized" class="secondary-button ${finalized ? "is-finalized" : ""}" type="button">${finalized ? "取消最终版" : "标记为最终版"}</button>`
+    ? `<button id="toggle-chapter-finalized" class="secondary-button ${finalized ? "is-finalized" : ""}" type="button">${finalized ? "Unmark final" : "Mark as final"}</button>`
     : "";
   const controls = isReferenceStoryArc(path)
-    ? '<div class="preview-tools"><button id="view-reference-arc-chapters" class="secondary-button" type="button">查看本片段章节</button></div>'
+    ? '<div class="preview-tools"><button id="view-reference-arc-chapters" class="secondary-button" type="button">View chapters in this arc</button></div>'
     : readonlyReference
       ? ""
       : wizardState.fileEditing
-        ? '<div class="preview-tools"><button id="cancel-file-edit" class="secondary-button" type="button">取消</button><button id="save-file-edit" class="primary-button" type="button">保存修改</button></div>'
-        : `<div class="preview-tools">${copyDraftButton}${finalizationButton}<button id="edit-review-file" class="secondary-button" type="button">编辑此文件</button></div>`;
+        ? '<div class="preview-tools"><button id="cancel-file-edit" class="secondary-button" type="button">Cancel</button><button id="save-file-edit" class="primary-button" type="button">Save changes</button></div>'
+        : `<div class="preview-tools">${copyDraftButton}${finalizationButton}<button id="edit-review-file" class="secondary-button" type="button">Edit this file</button></div>`;
   const panelPreview = !wizardState.fileEditing && isSystemPanelSnapshot(path)
     ? systemPanelPreview(wizardState.selectedFileContent)
     : null;
@@ -2445,10 +2445,10 @@ function renderReviewDocument(artifact) {
       wizardState.summary.finalized_chapters = result.finalized_chapters;
       renderActiveStep();
       await openReviewFile(path);
-      showToast(finalized ? "已取消最终版标记。" : "已标记为最终版，后续对话调整将跳过本章。");
+      showToast(finalized ? "Final marker removed." : "Marked as finalized. Later chat adjustments will skip this chapter.");
     } catch (error) {
       button.disabled = false;
-      showToast(error.message || "无法更新最终版标记。", true);
+      showToast(error.message || "Could not update the final marker.", true);
     }
   });
   $("#copy-draft-preview")?.addEventListener("click", async (event) => {
@@ -2456,17 +2456,17 @@ function renderReviewDocument(artifact) {
     button.disabled = true;
     try {
       await copyPreviewText(wizardState.selectedFileContent);
-      button.textContent = "已复制";
-      showToast("正文已复制到剪贴板。");
+      button.textContent = "Copied";
+      showToast("Draft copied to the clipboard.");
       setTimeout(() => {
         if (button.isConnected) {
-          button.textContent = "一键复制";
+          button.textContent = "Copy all";
           button.disabled = false;
         }
       }, 1200);
     } catch (error) {
       button.disabled = false;
-      showToast(error.message || "复制失败，请手动选择正文复制。", true);
+      showToast(error.message || "Copy failed. Select the draft text and copy it manually.", true);
     }
   });
   $("#edit-review-file")?.addEventListener("click", () => {
@@ -2491,9 +2491,9 @@ function renderReviewDocument(artifact) {
       wizardState.fileEditing = false;
       await refreshWorkspaceArtifacts();
       await openReviewFile(path);
-      showToast("文件已保存。");
+      showToast("File saved.");
     } catch (error) {
-      showToast(error.message || "保存文件失败。", true);
+      showToast(error.message || "Failed to save the file.", true);
     } finally {
       button.disabled = false;
     }
@@ -2502,9 +2502,9 @@ function renderReviewDocument(artifact) {
 
 async function openReviewFile(path) {
   try {
-    if (!wizardState.workspace) throw new Error("请先选择工作区。");
+    if (!wizardState.workspace) throw new Error("Select a workspace first.");
     const data = await api(`/api/workspaces/${encodeURIComponent(wizardState.workspace)}/file?path=${encodeURIComponent(path)}`);
-    const artifact = wizardState.reviewArtifacts.find((item) => item.path === path) || { label: path.split("/").pop(), description: "工作区中的可编辑文件。", groupTitle: "工作区文件" };
+    const artifact = wizardState.reviewArtifacts.find((item) => item.path === path) || { label: path.split("/").pop(), description: "Editable files in the workspace.", groupTitle: "Workspace files" };
     wizardState.selectedFile = path;
     wizardState.selectedFileContent = data.content;
     wizardState.fileEditing = false;
@@ -2535,7 +2535,7 @@ function renderFileBrowser() {
   const items = wizardState.fileTree.filter((item) => item.type === "file" && isPreviewableFile(item.path) && !isHiddenReferenceSupportFile(item.path) && item.path.toLowerCase().includes(query));
   $("#file-browser-list").innerHTML = items.length
     ? items.map((item) => `<button class="file-browser-item" data-open-file="${escapeHtml(item.path)}" type="button"><strong>${escapeHtml(item.path.split("/").pop())}</strong><span>${escapeHtml(item.path)}</span></button>`).join("")
-    : '<p class="review-empty">未找到可预览的文本文件。</p>';
+    : '<p class="review-empty">No previewable text files found.</p>';
   $$('[data-open-file]').forEach((button) => button.addEventListener("click", async () => {
     closeFileBrowser();
     await openReviewFile(button.dataset.openFile);
@@ -2544,7 +2544,7 @@ function renderFileBrowser() {
 
 function openFileBrowser() {
   if (!wizardState.workspace) {
-    showToast("请先创建或选择工作区。", true);
+    showToast("Create or select a workspace first.", true);
     return;
   }
   $("#file-browser").classList.add("open");
@@ -2559,17 +2559,17 @@ function closeFileBrowser() {
 }
 
 function taskLabel(task) {
-  if (task.status === "running") return "运行中";
-  if (task.status === "succeeded") return "完成";
-  if (task.status === "succeeded_with_warnings") return "需检查";
-  if (task.status === "failed") return "失败";
-  return "等待";
+  if (task.status === "running") return "Running";
+  if (task.status === "succeeded") return "Done";
+  if (task.status === "succeeded_with_warnings") return "Needs review";
+  if (task.status === "failed") return "Failed";
+  return "Waiting";
 }
 
 function promptCardsMarkup(items, openLatest = false) {
-  if (!items?.length) return '<p class="drawer-prompt-empty">该任务尚未调用大模型。</p>';
+  if (!items?.length) return '<p class="drawer-prompt-empty">This task has not called a model yet.</p>';
   return items.map((item, index) => {
-    const call = `第 ${index + 1} 次调用${item.model ? ` · ${escapeHtml(item.model)}` : ""}`;
+    const call = `Call ${index + 1}${item.model ? ` · ${escapeHtml(item.model)}` : ""}`;
     const open = openLatest && index === items.length - 1 ? " open" : "";
     return `<details class="drawer-prompt-card"${open}>
       <summary><strong>${call}</strong><span>${escapeHtml(item.created_at || "")}</span></summary>
@@ -2597,7 +2597,7 @@ async function refreshTaskPrompts() {
   } catch (_) { /* task may have been removed */ }
 }
 
-function openPromptDialog(items, meta = "模型调用") {
+function openPromptDialog(items, meta = "Model call") {
   const dialog = $("#prompt-dialog");
   const list = Array.isArray(items) ? items : [];
   $("#prompt-dialog-meta").textContent = meta;
@@ -2611,7 +2611,7 @@ async function showJobPrompts(url, meta) {
     const data = await api(url);
     openPromptDialog(data.items || [], meta);
   } catch (error) {
-    showToast(error.message || "无法读取模型 Prompt。", true);
+    showToast(error.message || "Could not read the model prompt.", true);
   }
 }
 
@@ -2623,7 +2623,7 @@ async function refreshTasks() {
   const activeTask = tasks.find((task) => task.id === wizardState.activeTaskId);
   $("#drawer-prompt-count").textContent = String(Number(activeTask?.prompt_count || 0));
   $("#delete-current-task").disabled = !activeTask || ["queued", "running"].includes(activeTask.status);
-  $("#drawer-tasks").innerHTML = tasks.length ? tasks.map((task) => `<button class="drawer-task ${task.id === wizardState.activeTaskId ? "active" : ""}" data-task="${task.id}" type="button"><span><span class="drawer-task-title">${escapeHtml(task.label)}</span><span class="drawer-task-meta">${escapeHtml(task.created_at || "")}</span></span><span class="task-state ${task.status}">${taskLabel(task)}</span></button>`).join("") : '<p class="review-empty">当前工作区还没有任务记录。</p>';
+  $("#drawer-tasks").innerHTML = tasks.length ? tasks.map((task) => `<button class="drawer-task ${task.id === wizardState.activeTaskId ? "active" : ""}" data-task="${task.id}" type="button"><span><span class="drawer-task-title">${escapeHtml(task.label)}</span><span class="drawer-task-meta">${escapeHtml(task.created_at || "")}</span></span><span class="task-state ${task.status}">${taskLabel(task)}</span></button>`).join("") : '<p class="review-empty">This workspace has no task records yet.</p>';
   $$('[data-task]').forEach((button) => button.addEventListener("click", () => {
     wizardState.activeTaskId = button.dataset.task;
     wizardState.logOffset = 0;
@@ -2648,7 +2648,7 @@ async function refreshLog() {
       wizardState.lastSyncedTaskId = data.task.id;
       await refreshTasks();
       await refreshWorkspaceArtifacts();
-      showToast(data.task.status === "failed" ? "任务结束但未成功，请检查日志。" : "任务完成，生成内容已刷新。", data.task.status === "failed");
+      showToast(data.task.status === "failed" ? "The task finished unsuccessfully. Check the log." : "Task completed. Generated content was refreshed.", data.task.status === "failed");
     }
   } catch (_) { /* A server restart clears in-memory task metadata. */ }
 }
@@ -2711,7 +2711,7 @@ async function refreshWorkspaceOptions(selectedName = "") {
   const select = $("#workspace-select");
   select.innerHTML = data.items.length
     ? data.items.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("")
-    : '<option value="">还没有工作区</option>';
+    : '<option value="">No workspace yet</option>';
   if (selectedName && data.items.some((item) => item.name === selectedName)) select.value = selectedName;
   const deleteButton = $("#delete-workspace");
   if (deleteButton) deleteButton.disabled = !data.items.length;
@@ -2735,8 +2735,8 @@ async function createWorkspace(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const name = $("#new-workspace-name").value.trim();
-  if (!name) throw new Error("请填写作品名称。");
-  if ([...$("#workspace-select").options].some((option) => option.value === name)) throw new Error("该工作区已存在，请使用其他名称。");
+  if (!name) throw new Error("Enter a work title.");
+  if ([...$("#workspace-select").options].some((option) => option.value === name)) throw new Error("That workspace already exists. Use another name.");
   const submit = form.querySelector('button[type="submit"]');
   submit.disabled = true;
   try {
@@ -2745,7 +2745,7 @@ async function createWorkspace(event) {
     await selectWorkspace(name);
     closeWorkspacePanel();
     form.reset();
-    await activateTask(task, "工作区已创建，请在第一步导入参考小说。 ");
+    await activateTask(task, "Workspace created. Import a reference novel in step 1. ");
   } finally {
     submit.disabled = false;
   }
@@ -2753,9 +2753,9 @@ async function createWorkspace(event) {
 
 async function deleteCurrentWorkspace() {
   const name = wizardState.workspace || $("#workspace-select")?.value || "";
-  if (!name) throw new Error("当前没有可删除的工作区。");
+  if (!name) throw new Error("There is no workspace to delete.");
   const confirmed = window.confirm(
-    `确认删除当前工作区“${name}”？\n\n对应的本地文件、生成内容、任务日志和 Prompt 都会被永久删除，此操作无法恢复。`,
+    `Delete workspace “${name}”?\n\nLocal files, generated content, task logs, and prompts will be permanently deleted. This cannot be undone.`,
   );
   if (!confirmed) return;
 
@@ -2767,7 +2767,7 @@ async function deleteCurrentWorkspace() {
     const nextName = data.items[0]?.name || "";
     $("#workspace-select").value = nextName;
     await selectWorkspace(nextName);
-    showToast(`工作区“${name}”已删除。`);
+    showToast(`Workspace “${name}” deleted.`);
   } finally {
     button.disabled = !$("#workspace-select")?.value;
   }
@@ -2812,10 +2812,10 @@ async function boot() {
     select.addEventListener("change", () => selectWorkspace(select.value));
     $("#new-workspace").addEventListener("click", openWorkspacePanel);
     $("#delete-workspace").addEventListener("click", async () => {
-      try { await deleteCurrentWorkspace(); } catch (error) { showToast(error.message || "无法删除工作区。", true); }
+      try { await deleteCurrentWorkspace(); } catch (error) { showToast(error.message || "Could not delete the workspace.", true); }
     });
     $("#new-workspace-form").addEventListener("submit", async (event) => {
-      try { await createWorkspace(event); } catch (error) { showToast(error.message || "无法创建工作区。", true); }
+      try { await createWorkspace(event); } catch (error) { showToast(error.message || "Could not create the workspace.", true); }
     });
     $("#cancel-workspace").addEventListener("click", closeWorkspacePanel);
     $("#close-workspace-panel").addEventListener("click", closeWorkspacePanel);
@@ -2834,40 +2834,40 @@ async function boot() {
     $("#copy-current-prompt").addEventListener("click", async () => {
       if (!wizardState.currentPromptText) return;
       await navigator.clipboard.writeText(wizardState.currentPromptText);
-      showToast("Prompt 已复制。");
+      showToast("Prompt copied.");
     });
     $("#clear-workspace-prompts").addEventListener("click", async () => {
-      if (!wizardState.workspace || !confirm("清空当前工作区所有已结束任务的 Prompt 记录？任务日志和生成产物不会删除。")) return;
+      if (!wizardState.workspace || !confirm("Clear prompt records for all finished tasks in this workspace? Task logs and generated artifacts are kept.")) return;
       try {
         const result = await api(`/api/task-prompts?workspace=${encodeURIComponent(wizardState.workspace)}`, { method: "DELETE" });
-        $("#drawer-prompts").innerHTML = '<p class="drawer-prompt-empty">当前工作区的历史 Prompt 已清空。</p>';
+        $("#drawer-prompts").innerHTML = '<p class="drawer-prompt-empty">Historical prompts for this workspace were cleared.</p>';
         $("#drawer-prompt-count").textContent = "0";
         await refreshTasks();
         const skipped = Number(result.skipped_active_count || 0);
-        showToast(skipped ? `已清理历史 Prompt；${skipped} 个运行中任务已跳过。` : "当前工作区的历史 Prompt 已清空。");
-      } catch (error) { showToast(error.message || "无法清空 Prompt。", true); }
+        showToast(skipped ? `Cleared historical prompts; skipped ${skipped} running tasks.` : "Historical prompts for this workspace were cleared.");
+      } catch (error) { showToast(error.message || "Could not clear prompts.", true); }
     });
     $("#delete-current-task").addEventListener("click", async () => {
-      if (!wizardState.activeTaskId || !confirm("删除当前任务记录？对应执行日志和 Prompt 也会一并删除，此操作不可恢复。")) return;
+      if (!wizardState.activeTaskId || !confirm("Delete the current task record? Its run log and prompts will also be deleted. This cannot be undone.")) return;
       try {
         await api(`/api/tasks/${wizardState.activeTaskId}`, { method: "DELETE" });
         wizardState.activeTaskId = null;
         wizardState.logOffset = 0;
         $("#drawer-log").textContent = "";
-        $("#drawer-prompts").innerHTML = '<p class="drawer-prompt-empty">请选择任务。</p>';
+        $("#drawer-prompts").innerHTML = '<p class="drawer-prompt-empty">Select a task.</p>';
         await refreshTasks();
-        showToast("任务记录、日志和 Prompt 已删除。");
-      } catch (error) { showToast(error.message || "无法删除任务记录。", true); }
+        showToast("Task record, log, and prompts deleted.");
+      } catch (error) { showToast(error.message || "Could not delete the task record.", true); }
     });
     document.addEventListener("click", (event) => {
       const id = event.target.closest("button")?.id;
       const workspace = encodeURIComponent(wizardState.workspace || "");
       if (id === "show-arcs-prompt") {
-        showJobPrompts(`/api/workspaces/${workspace}/arcs/${Number(wizardState.arcsChatVolume || 1)}/prompts`, "故事情节 · 模型 Prompt");
+        showJobPrompts(`/api/workspaces/${workspace}/arcs/${Number(wizardState.arcsChatVolume || 1)}/prompts`, "Story arcs · model prompt");
       } else if (id === "show-chapters-prompt") {
-        showJobPrompts(`/api/workspaces/${workspace}/chapters/${Number(wizardState.chaptersChatVolume || 1)}/${Number(wizardState.chaptersChatArc || 1)}/prompts`, "逐章章纲 · 模型 Prompt");
+        showJobPrompts(`/api/workspaces/${workspace}/chapters/${Number(wizardState.chaptersChatVolume || 1)}/${Number(wizardState.chaptersChatArc || 1)}/prompts`, "Chapter outlines · model prompt");
       } else if (id === "show-draft-prompt") {
-        showJobPrompts(`/api/workspaces/${workspace}/drafts/${Number(wizardState.draftChatVolume || 1)}/${Number(wizardState.draftChatArc || 1)}/prompts`, "正文生成 · 模型 Prompt");
+        showJobPrompts(`/api/workspaces/${workspace}/drafts/${Number(wizardState.draftChatVolume || 1)}/${Number(wizardState.draftChatArc || 1)}/prompts`, "Draft generation · model prompt");
       }
     });
     await selectWorkspace(data.items[0]?.name || "");

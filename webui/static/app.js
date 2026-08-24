@@ -19,7 +19,7 @@ async function api(path, options = {}) {
     },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || "请求失败，请稍后重试。");
+  if (!response.ok) throw new Error(data.detail || "Request failed. Please retry shortly.");
   return data;
 }
 
@@ -57,7 +57,7 @@ function renderMarkdown(value) {
 function formatDate(value) {
   if (!value) return "";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function countText(label, value) {
@@ -69,12 +69,12 @@ function renderSummary(summary) {
   $("#workspace-name").textContent = summary.name;
   $("#workspace-path").textContent = summary.root;
   $("#next-action").textContent = summary.next_action;
-  $("#reference-metric").textContent = summary.reference.has_sample ? `${summary.reference.chapter_count} 章已拆` : "未初始化";
-  $("#design-metric").textContent = `${summary.story_design.ready_count}/${summary.story_design.total_count} 设计资产`;
+  $("#reference-metric").textContent = summary.reference.has_sample ? `${summary.reference.chapter_count} chapters deconstructed` : "Not initialized";
+  $("#design-metric").textContent = `${summary.story_design.ready_count}/${summary.story_design.total_count} design assets`;
   $("#mechanics-metric").textContent = summary.mechanics.mode;
-  $("#writing-metric").textContent = `${summary.writing.chapter_count} 章正文`;
-  $("#world-summary").innerHTML = countText("已导入资料 ", summary.world_knowledge.source_count) + countText("最终知识栏 ", summary.world_knowledge.final_section_count);
-  $("#design-summary").innerHTML = countText("舞台 ", summary.story_design.stage_count) + countText("书名简介 ", summary.story_design.has_name_synopsis ? "已生成" : "未生成");
+  $("#writing-metric").textContent = `${summary.writing.chapter_count}  draft chapters`;
+  $("#world-summary").innerHTML = countText("Imported sources ", summary.world_knowledge.source_count) + countText("Final sections ", summary.world_knowledge.final_section_count);
+  $("#design-summary").innerHTML = countText("Stages ", summary.story_design.stage_count) + countText("Title/synopsis ", summary.story_design.has_name_synopsis ? "Generated" : "Not generated");
   $("#progress-steps").innerHTML = summary.steps.map((item, index) => `
     <div class="progress-step ${item.done ? "done" : ""}"><span class="progress-dot">${item.done ? "✓" : index + 1}</span><span>${item.name}</span></div>
   `).join("");
@@ -107,7 +107,7 @@ async function selectWorkspace(name) {
   $("#file-editor").value = "";
   $("#file-editor").disabled = true;
   $("#save-file").disabled = true;
-  $("#editing-path").textContent = "选择一个文本文件";
+  $("#editing-path").textContent = "Select a text file";
   await refreshWorkspaces(name);
 }
 
@@ -160,7 +160,7 @@ async function saveFile() {
       method: "PUT",
       body: JSON.stringify({ path: state.editingPath, content: $("#file-editor").value }),
     });
-    toast("文件已保存。");
+    toast("File saved.");
   } catch (error) { toast(error.message, true); }
 }
 
@@ -175,13 +175,13 @@ async function uploadFiles(files) {
 }
 
 async function launchTask(type, args = {}) {
-  if (!state.workspace) { toast("请先新建工作区。", true); return; }
+  if (!state.workspace) { toast("Create a workspace first.", true); return; }
   try {
     const task = await api("/api/tasks", { method: "POST", body: JSON.stringify({ type, workspace: state.workspace, args }) });
     state.activeTaskId = task.id;
     state.logOffset = 0;
     $("#task-log").textContent = "";
-    toast(`${task.label}已开始执行。`);
+    toast(`${task.label} started.`);
     await refreshTasks();
   } catch (error) { toast(error.message, true); }
 }
@@ -194,9 +194,9 @@ async function refreshTasks() {
   $("#task-list").innerHTML = tasks.length ? tasks.map((task) => `
     <button class="task-item ${task.id === state.activeTaskId ? "active" : ""}" type="button" data-task-id="${task.id}">
       <span><span class="task-label">${escapeHtml(task.label)}</span><span class="task-meta">${formatDate(task.created_at)}</span></span>
-      <span class="status-pill ${task.status}">${task.status === "running" ? "运行中" : task.status === "succeeded" ? "完成" : task.status === "succeeded_with_warnings" ? "需检查" : task.status === "failed" ? "失败" : "等待"}</span>
+      <span class="status-pill ${task.status}">${task.status === "running" ? "Running" : task.status === "succeeded" ? "Done" : task.status === "succeeded_with_warnings" ? "Needs review" : task.status === "failed" ? "Failed" : "Waiting"}</span>
     </button>
-  `).join("") : '<div class="task-meta">还没有运行任务。</div>';
+  `).join("") : '<div class="task-meta">No tasks have run yet.</div>';
   $$("[data-task-id]").forEach((button) => button.addEventListener("click", () => {
     state.activeTaskId = button.dataset.taskId;
     state.logOffset = 0;
@@ -205,7 +205,7 @@ async function refreshTasks() {
   }));
   const active = tasks.find((task) => task.id === state.activeTaskId);
   const status = $("#active-task-status");
-  status.textContent = active ? (active.status === "running" ? "运行中" : active.status === "succeeded" ? "已完成" : active.status === "succeeded_with_warnings" ? "需检查" : active.status === "failed" ? "失败" : "等待") : "空闲";
+  status.textContent = active ? (active.status === "running" ? "Running" : active.status === "succeeded" ? "Done" : active.status === "succeeded_with_warnings" ? "Needs review" : active.status === "failed" ? "Failed" : "Waiting") : "Idle";
   status.className = `status-pill ${active?.status || ""}`;
 }
 
@@ -235,9 +235,9 @@ async function loadSettings() {
     <section class="model-group">
       <h3>${escapeHtml(group.label)}</h3>
       <div class="model-fields">
-        <label><span>模型</span><input data-config-key="${id}_MODEL" value="${escapeHtml(group.model)}" /></label>
+        <label><span>Model</span><input data-config-key="${id}_MODEL" value="${escapeHtml(group.model)}" /></label>
         <label><span>Base URL</span><input data-config-key="${id}_BASE_URL" value="${escapeHtml(group.base_url)}" /></label>
-        <label><span>API Key ${group.api_key_configured ? "（已配置）" : ""}</span><input type="password" data-config-key="${id}_API_KEY" placeholder="${group.api_key_configured ? "留空保留原密钥" : "请输入 API Key"}" /></label>
+        <label><span>API Key ${group.api_key_configured ? "(configured)" : ""}</span><input type="password" data-config-key="${id}_API_KEY" placeholder="${group.api_key_configured ? "Leave blank to keep the current key" : "Enter API key"}" /></label>
       </div>
     </section>
   `).join("");
@@ -262,7 +262,7 @@ function bindEvents() {
     event.preventDefault();
     const name = $("#new-workspace-name").value.trim();
     const file = $("#reference-file").files[0];
-    if (!file) { toast("请选择参考小说 txt 文件。", true); return; }
+    if (!file) { toast("Choose a reference novel txt file.", true); return; }
     try {
       const [uploaded] = await uploadFiles([file]);
       state.workspace = name;
@@ -275,7 +275,7 @@ function bindEvents() {
   $("#world-import-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const files = [...$("#world-files").files];
-    if (!files.length) { toast("请先选择目标题材资料。", true); return; }
+    if (!files.length) { toast("Choose target-genre sources first.", true); return; }
     try {
       const uploads = await uploadFiles(files);
       await launchTask("world_import", { upload_ids: uploads.map((item) => item.id), force: $("#world-import-force").checked });
@@ -330,7 +330,7 @@ function bindEvents() {
       await api("/api/config", { method: "PUT", body: JSON.stringify({ values }) });
       closeDialog("settings-dialog");
       await refreshWorkspaces(null);
-      toast("设置已保存。新的任务会使用当前配置。");
+      toast("Settings saved. New tasks will use the current configuration.");
     } catch (error) { toast(error.message, true); }
   });
 }
