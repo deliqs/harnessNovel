@@ -2,11 +2,11 @@ import os
 
 
 def get_novels_dir():
-    """返回工作区根目录。
+    """Return the workspace root directory.
 
-    命令行模式保持原有约定：未配置时使用当前目录下的 ``my-novels``。
-    Web 工作台可通过 ``HARNESS_NOVEL_HOME`` 指向用户选择的固定目录，避免
-    服务器启动目录改变后找不到既有小说。
+    CLI mode keeps the original convention: when unset, use ``my-novels`` under the
+    current directory. The Web workbench can point ``HARNESS_NOVEL_HOME`` at a
+    user-chosen fixed directory so novels are still found after the server cwd changes.
     """
     configured = os.getenv("HARNESS_NOVEL_HOME")
     if configured:
@@ -14,12 +14,12 @@ def get_novels_dir():
     return os.path.join(os.getcwd(), "my-novels")
 
 
-# 保留旧常量，兼容可能直接引用它的外部脚本；本项目内部统一走 get_novels_dir()。
+# Keep the old constant for external scripts that import it; internals use get_novels_dir().
 NOVELS_DIR = get_novels_dir()
 
 
 class NovelWorkspace:
-    """一本小说的独立工作区，包含所有数据目录的路径解析。"""
+    """An independent workspace for one novel, with path resolution for every data directory."""
 
     def __init__(self, name):
         self.name = name
@@ -31,16 +31,16 @@ class NovelWorkspace:
         self.reference_sample = os.path.join(self.reference, "sample_novel.txt")
         self.reference_chapters = os.path.join(self.reference, "chapters")
 
-    # ── 目录初始化 ──
+    # ── directory setup ──
 
     def ensure_dirs(self):
-        """确保所有必要的子目录存在。其他派生子目录由写入时自动创建。"""
+        """Ensure all required subdirectories exist. Other derived dirs are created on write."""
         for d in [self.root, self.file_system, self.reference, self.reference_outlines, self.reference_chapters]:
             os.makedirs(d, exist_ok=True)
 
 
 def list_novels():
-    """列出所有已有工作区名称。"""
+    """List all existing workspace names."""
     novels_dir = get_novels_dir()
     if not os.path.isdir(novels_dir):
         return []
@@ -51,7 +51,7 @@ def list_novels():
 
 
 def init_workspace(name):
-    """创建或返回已有工作区。"""
+    """Create or return an existing workspace."""
     ws = NovelWorkspace(name)
     ws.ensure_dirs()
     return ws

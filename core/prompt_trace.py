@@ -1,4 +1,4 @@
-"""记录模型调用的实际 Prompt，供 Web 工作台实时展示。"""
+"""Record the actual prompt of each model call for the Web workbench live view."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def record_prompt(prompt: str, model: str = "", label: str = "") -> dict:
         "id": uuid.uuid4().hex,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "model": str(model or ""),
-        "label": str(label or "模型调用"),
+        "label": str(label or "model call"),
         "prompt": str(prompt or ""),
     }
     trace_file = os.getenv("HARNESS_NOVEL_PROMPT_TRACE_FILE", "").strip()
@@ -42,14 +42,14 @@ def record_prompt(prompt: str, model: str = "", label: str = "") -> dict:
         try:
             callback(dict(event))
         except Exception:
-            # Prompt 展示属于观测能力，不能反向中断正文生成。
+            # Prompt display is observational; it must not interrupt draft generation.
             pass
     return event
 
 
 @contextmanager
 def capture_prompts(callback: Callable[[dict], None]):
-    """在当前后台任务线程中捕获模型 Prompt，不影响其他并发任务。"""
+    """Capture model prompts on the current background-task thread without affecting other tasks."""
     token = _TRACE_CALLBACK.set(callback)
     try:
         yield

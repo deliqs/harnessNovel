@@ -29,6 +29,15 @@ TERM_EXTRACT_STOPWORDS = {
     "映射说明",
     "输出",
     "处理方式",
+    "chapter outline",
+    "draft",
+    "batch summary",
+    "volume outline",
+    "later generation",
+    "reference novel",
+    "mapping notes",
+    "output",
+    "handling",
 }
 
 
@@ -73,8 +82,8 @@ def load_rewrite_map(ws, volume=None):
         seen.add(path)
         content = _read_file(path)
         if content:
-            parts.append(f"【来源：{path}】\n{content}")
-    return "\n\n---\n\n".join(parts) if parts else "（未找到换皮映射表，请严格以新小说大纲和世界观为准。）"
+            parts.append(f"[Source: {path}]\n{content}")
+    return "\n\n---\n\n".join(parts) if parts else "(rewrite map not found; follow the new novel outline and worldview.)"
 
 
 def _load_forbidden_term_files(ws, volume=None):
@@ -134,7 +143,7 @@ def extract_forbidden_terms_from_text(text):
             if (
                 2 <= len(item) <= 20
                 and item not in TERM_EXTRACT_STOPWORDS
-                and not any(x in item for x in ["必须", "改写", "替换", "出现", "参考", "输出"])
+                and not any(x in item for x in ["必须", "改写", "替换", "出现", "参考", "输出", "must", "rewrite", "replace", "appear", "reference", "output"])
             ):
                 terms.append(item)
 
@@ -171,7 +180,7 @@ def load_forbidden_terms(ws, volume=None):
 
 def format_forbidden_terms(terms):
     if not terms:
-        return "（无显式禁用词。仍需避免继承参考小说专有名词和事件因果。）"
+        return "(no explicit forbidden terms. Still avoid inheriting the reference novel's proper nouns and event causality.)"
     return "\n".join(f"- {term}" for term in terms)
 
 

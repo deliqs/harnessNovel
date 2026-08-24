@@ -12,7 +12,7 @@ _EN_CH_NUM_RE = re.compile(r'(?:Chapter|Ch\.?)\s+(\d+)', re.I)
 
 
 def _cn_to_int(s):
-    """中文数字转整数。"""
+    """Convert a Chinese numeral to an integer."""
     if s.isdigit():
         return int(s)
     result = 0
@@ -33,7 +33,7 @@ def _cn_to_int(s):
 
 
 def _int_to_cn(n):
-    """整数（0-9999）转中文数字。"""
+    """Convert an integer (0-9999) to a Chinese numeral."""
     if n < 10:
         return _CN_DIGITS[n]
 
@@ -74,7 +74,7 @@ def _int_to_cn(n):
 
 
 def _extract_novel_chapter_num(title):
-    """从章节标题中提取小说章节编号。返回整数，提取失败返回 None。"""
+    """Extract the novel chapter number from a chapter title. Return int, or None on failure."""
     m = _CH_NUM_RE.search(title or "")
     if m:
         return _cn_to_int(m.group(1))
@@ -85,7 +85,7 @@ def _extract_novel_chapter_num(title):
 
 
 def _fix_chapter_numbering(groups):
-    """校正每卷内的章节编号：如果编号比"上一章编号+1"偏差过大（>=50），自动修正。"""
+    """Fix per-volume chapter numbers when they drift >= 50 from the previous number + 1."""
     fixed_total = 0
     for vi, g in enumerate(groups):
         vol_chapters = g["chapters"]
@@ -115,14 +115,14 @@ def _fix_chapter_numbering(groups):
                 ch["title"] = new_title
                 fixed += 1
                 fixed_total += 1
-                print(f"    修正卷{vi+1} ci={ci}: {old_title[:25]:25s} → {new_title[:25]}")
+                print(f"    Fixed volume {vi+1} ci={ci}: {old_title[:25]:25s} → {new_title[:25]}")
                 last_valid = expected
             else:
                 last_valid = nn
 
         if fixed:
-            print(f"  卷{vi+1} 修正了 {fixed} 个章节编号")
+            print(f"  Volume {vi+1} fixed {fixed} chapter numbers")
 
     if fixed_total:
-        print(f"  共修正 {fixed_total} 个章节编号")
+        print(f"  Fixed {fixed_total} chapter numbers in total")
     return fixed_total

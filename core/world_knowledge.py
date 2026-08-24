@@ -91,7 +91,7 @@ def _heading_re(section_name):
     return re.compile(rf"(?m)^#\s*(?:{alt})\s*$", re.I)
 
 
-# ── 路径工具 ──
+# ── path helpers ──
 
 def _world_root(ws):
     return os.path.join(ws.file_system, "world_knowledge")
@@ -121,7 +121,7 @@ def _manifest_path(ws):
     return os.path.join(_world_root(ws), "manifest.json")
 
 
-# ── 文件 IO ──
+# ── file IO ──
 
 def _read_file(path):
     for encoding in ["utf-8", "utf-8-sig", "gb18030"]:
@@ -154,7 +154,7 @@ def _require_headings(content, headings, label):
         if not _heading_re(heading).search(content or "")
     ]
     if missing:
-        raise RuntimeError(f"{label}缺少必要栏目：{'、'.join(missing)}。本轮结果未写入，请重试。")
+        raise RuntimeError(f"{label} is missing required sections: {', '.join(missing)}. This round was not written; please retry.")
 
 
 def _has_meaningful_file(path):
@@ -162,7 +162,7 @@ def _has_meaningful_file(path):
 
 
 def _load_fresh_checkpoint(path, dependencies, required_headings, force=False):
-    """读取仍然有效的阶段检查点；依赖变更或格式损坏时返回空串。"""
+    """Read a still-valid stage checkpoint; return empty if deps changed or the file is corrupt."""
     if force or not _has_meaningful_file(path):
         return ""
     dependency_paths = [item for item in dependencies if item and os.path.exists(item)]
@@ -170,29 +170,29 @@ def _load_fresh_checkpoint(path, dependencies, required_headings, force=False):
         return ""
     content = _read_file(path).strip()
     try:
-        _require_headings(content, required_headings, "断点文件")
+        _require_headings(content, required_headings, "checkpoint file")
     except RuntimeError:
         return ""
     return content
 
 
 def _run_prompt(llm, folder, prompt_vars, output_path, required_headings=None):
-    """加载 prompt → llm.generate → normalize_text → _write_file，返回 normalize 后内容。
+    """Load prompt -> llm.generate -> normalize_text -> _write_file; return normalized text.
 
-    纯生成+落盘。不含 print、不含 mtime 跳过、不读回文件。
-    print 顺序 / skip 分支 / 返回值语义(path vs content)由调用点保留。
+    Pure generate-and-write. No print, no mtime skip, no read-back.
+    Print order / skip branches / return semantics (path vs content) stay at the call site.
     """
     prompt = PromptLoader.load(folder, **prompt_vars)
     content = normalize_text(llm.generate(prompt))
     if not content:
-        raise RuntimeError(f"{folder} 未返回有效内容，本轮结果未写入，请检查模型配置或重试。")
+        raise RuntimeError(f"{folder} did not return valid content. This round was not written; check the model config or retry.")
     if required_headings:
         _require_headings(content, required_headings, folder)
     _write_file(output_path, content)
     return content
 
 
-# ── Manifest 与资料命名 ──
+# ── Manifest and source naming ──
 
 def _load_manifest(ws):
     path = _manifest_path(ws)
@@ -205,7 +205,7 @@ def _load_manifest(ws):
             return {"version": 1, "sources": [], "enabled": True}
         data.setdefault("version", 1)
         data.setdefault("sources", [])
-        # enabled 默认 True（导入资料后即视为启用）；老 manifest 没有该字段时补上。
+        # enabled defaults to True (imported sources are treated as enabled); backfill old manifests.
         if "enabled" not in data:
             data["enabled"] = True
         return data
@@ -282,7 +282,7 @@ def _canon_index_path(ws):
     return os.path.join(_world_root(ws), "canon_index.md")
 
 
-# ── 公共入口：导入资料 ──
+# ── public entry: import sources ──
 
 def import_world_sources(ws, paths, force=False):
     """Copy one or more target-world source files into the workspace."""
@@ -344,7 +344,7 @@ def import_world_sources(ws, paths, force=False):
     }
 
 
-# ── 文本切分 ──
+# ── text slicing ──
 
 def _split_text(text, chunk_size):
     text = text.strip()
@@ -422,7 +422,7 @@ def _split_source_slices(text, chapter_batch_size, fallback_chunk_size):
             if not batch:
                 return
             slices.append({
-                "label": f"第{batch_start}-{end_index}章",
+                "label": f"Chapters {batch_start}-{end_index}",
                 "kind": "chapter_batch",
                 "text": "\n\n".join(ch["content"] for ch in batch),
                 "chapter_count": len(batch),
@@ -445,7 +445,7 @@ def _split_source_slices(text, chapter_batch_size, fallback_chunk_size):
     chunks = _split_text(text, fallback_chunk_size)
     return [
         {
-            "label": f"字符分片{i + 1}",
+            "label": f"character slice {i + 1}",
             "kind": "text_chunk",
             "text": chunk,
             "chapter_count": 0,
@@ -462,7 +462,7 @@ def _format_knowledge_items(items):
     )
 
 
-# ── 资料记录与角色 ──
+# ── source records and roles ──
 
 def _source_records(ws):
     manifest = _load_manifest(ws)
@@ -527,20 +527,20 @@ def _select_primary_record(records, primary_source=None):
     if primary_source:
         matches = [record for record in records if _record_matches_selector(record, primary_source)]
         if len(matches) == 1:
-            return matches[0], "用户指定"
+            return matches[0], "user-specified"
         if len(matches) > 1:
             print(
-                "  警告：--primary 匹配到多个资料，将使用第一个："
-                + "、".join(record.get("file_name", "") for record in matches)
+                "  Warning: --primary matched multiple sources; using the first: "
+                + ", ".join(record.get("file_name", "") for record in matches)
             )
-            return matches[0], "用户指定"
-        print(f"  警告：未找到 --primary 指定的资料：{primary_source}")
+            return matches[0], "user-specified"
+        print(f"  Warning: --primary source not found: {primary_source}")
         print(
-            "  可选资料："
-            + "、".join(record.get("file_name", record.get("id", "")) for record in records)
+            "  Available sources: "
+            + ", ".join(record.get("file_name", record.get("id", "")) for record in records)
         )
-        print("  将回退为最大文件作为主资料。")
-    return max(records, key=lambda item: item.get("size", 0)), "最大文件"
+        print("  Falling back to the largest file as the primary source.")
+    return max(records, key=lambda item: item.get("size", 0)), "largest file"
 
 
 def _assign_source_roles(records, primary_source=None):
@@ -552,7 +552,7 @@ def _assign_source_roles(records, primary_source=None):
     for item in records:
         copied = dict(item)
         copied["role"] = "primary" if item.get("id") == primary_id else "supplement"
-        copied["role_label"] = "主资料" if copied["role"] == "primary" else "补充资料"
+        copied["role_label"] = "primary source" if copied["role"] == "primary" else "supplement source"
         copied["role_reason"] = primary_reason if copied["role"] == "primary" else ""
         assigned.append(copied)
     return sorted(
@@ -561,7 +561,7 @@ def _assign_source_roles(records, primary_source=None):
     )
 
 
-# ── 栏目文档处理 ──
+# ── section document handling ──
 
 def _render_section_document(section_name, content):
     content = (content or "").strip()
@@ -573,7 +573,7 @@ def _render_section_document(section_name, content):
     if body.lower() in _EMPTY_SECTION_BODIES:
         body = ""
     if not body:
-        return f"# {section_name}\n\n无"
+        return f"# {section_name}\n\nNone"
     return f"# {section_name}\n\n{body}"
 
 
@@ -583,7 +583,7 @@ def _split_sections_from_document(content):
     for idx, (section_name, _) in enumerate(WORLD_SECTIONS):
         match = _heading_re(section_name).search(content)
         if not match:
-            sections[section_name] = f"# {section_name}\n\n无"
+            sections[section_name] = f"# {section_name}\n\nNone"
             continue
 
         next_start = len(content)
@@ -598,7 +598,7 @@ def _split_sections_from_document(content):
 
 
 def _compact_world_document(content, max_chars=45000):
-    """按栏目均衡压缩阶段摘要，避免串行汇总时单次上下文持续膨胀。"""
+    """Compress stage summaries evenly by section so serial merges do not keep growing context."""
     content = normalize_text(content or "")
     if len(content) <= max_chars:
         return content
@@ -606,9 +606,9 @@ def _compact_world_document(content, max_chars=45000):
     section_budget = max(1200, max_chars // len(WORLD_SECTIONS) - 80)
     parts = []
     for section_name, _ in WORLD_SECTIONS:
-        block = sections.get(section_name, f"# {section_name}\n\n无")
+        block = sections.get(section_name, f"# {section_name}\n\nNone")
         if len(block) > section_budget:
-            block = block[:section_budget].rstrip() + "\n\n（本栏目阶段摘要过长，已均衡截断。）"
+            block = block[:section_budget].rstrip() + "\n\n(this section stage summary was too long and was truncated evenly.)"
         parts.append(block)
     return "\n\n---\n\n".join(parts)
 
@@ -632,12 +632,12 @@ def _aggregate_sections(section_paths, max_chars=None):
         if section_budget and len(content) > section_budget:
             content = (
                 content[:section_budget]
-                + f"\n\n（{section_name}内容过长，以上为按栏目截断后的前置摘要。）"
+                + f"\n\n({section_name} was too long; the above is a truncated front summary.)"
             )
         parts.append(_render_section_document(section_name, content))
     result = "\n\n---\n\n".join(parts)
     if max_chars and len(result) > max_chars:
-        return result[:max_chars] + "\n\n（目标世界知识库内容过长，以上为截断后的分栏摘要。）"
+        return result[:max_chars] + "\n\n(target world knowledge base was too long; the above is a truncated sectioned summary.)"
     return result
 
 
@@ -650,7 +650,7 @@ def _source_slices(record, chunk_size, chapter_batch_size):
     )
 
 
-# ── Cards 与基准索引 ──
+# ── Cards and baseline index ──
 
 def _resolved_workers(max_workers, task_count):
     try:
@@ -681,22 +681,22 @@ def _build_record_cards(ws, record, slices, llm, force=False, canon_index="",
     reused_count = len(source_card_paths) - len(pending)
     if reused_count:
         print(
-            f"  断点续传{record['role_label']}《{record['file_name']}》："
-            f"复用 {reused_count}/{len(source_card_paths)} 个已完成资料卡"
+            f"  Resuming {record['role_label']} '{record['file_name']}': "
+            f"reusing {reused_count}/{len(source_card_paths)} completed source cards"
         )
     if not pending:
         return source_card_paths
 
     workers = _resolved_workers(max_workers, len(pending))
     print(
-        f"  并行结构化{record['role_label']}《{record['file_name']}》："
-        f"共 {len(pending)} 个章节批次，并发 {workers}"
+        f"  Structuring {record['role_label']} '{record['file_name']}' in parallel: "
+        f"{len(pending)} chapter batches, concurrency {workers}"
     )
 
     def extract_card(job):
         idx, source_slice, card_path = job
         print(
-            f"  开始结构化{record['role_label']}：{record['file_name']} "
+            f"  Starting structure of {record['role_label']}: {record['file_name']} "
             f"{source_slice['label']}（{idx}/{len(slices)}）"
         )
         _run_prompt(
@@ -705,7 +705,7 @@ def _build_record_cards(ws, record, slices, llm, force=False, canon_index="",
             dict(
                 source_name=record["file_name"],
                 source_role=record["role_label"],
-                canon_index=canon_index or "（无。当前资料为主资料，或尚未生成主资料基准索引。）",
+                canon_index=canon_index or "(none. This source is the primary source, or the primary-source baseline index is not generated yet.)",
                 slice_label=source_slice["label"],
                 slice_kind=source_slice["kind"],
                 chunk_index=idx,
@@ -724,7 +724,7 @@ def _build_record_cards(ws, record, slices, llm, force=False, canon_index="",
             for future in as_completed(futures):
                 idx, label = future.result()
                 completed += 1
-                print(f"  完成资料卡 {completed}/{len(pending)}：{label}（原批次 {idx}）")
+                print(f"  Finished source card {completed}/{len(pending)}: {label} (original batch {idx})")
         except Exception:
             for future in futures:
                 future.cancel()
@@ -746,16 +746,16 @@ def _build_canon_index(ws, primary_record, primary_card_paths, llm, force=False)
     ):
         existing_index = _read_file(output_path).strip()
         try:
-            _require_headings(existing_index, CANON_INDEX_SECTIONS, "主资料基准索引")
-            print("  -> 复用已完成的主资料基准索引。")
+            _require_headings(existing_index, CANON_INDEX_SECTIONS, "primary-source baseline index")
+            print("  -> Reusing the completed primary-source baseline index.")
             return existing_index
         except RuntimeError:
             pass
 
-    print(f"  串行生成主资料基准索引：{primary_record['file_name']}")
+    print(f"  Generating primary-source baseline index serially: {primary_record['file_name']}")
     partial_dir = os.path.join(_partials_dir(ws), "_canon_index")
     os.makedirs(partial_dir, exist_ok=True)
-    previous_index = "（无，这是第一批主资料卡片。）"
+    previous_index = "(none; this is the first batch of primary-source cards.)"
     previous_checkpoint = None
     total_steps = (len(existing_cards) + 1) // 2
     canon_index = ""
@@ -773,9 +773,9 @@ def _build_canon_index(ws, primary_record, primary_card_paths, llm, force=False)
             force=force,
         )
         if canon_index:
-            print(f"  断点续传主资料基准索引 {step_index}/{total_steps}")
+            print(f"  Resuming primary-source baseline index {step_index}/{total_steps}")
         else:
-            print(f"  汇总主资料基准索引 {step_index}/{total_steps}")
+            print(f"  Summarizing primary-source baseline index {step_index}/{total_steps}")
             canon_index = _run_prompt(
                 llm,
                 "world_canon_index",
@@ -790,17 +790,17 @@ def _build_canon_index(ws, primary_record, primary_card_paths, llm, force=False)
         previous_index = canon_index
         previous_checkpoint = checkpoint_path
     _write_file(output_path, canon_index)
-    print(f"  -> 主资料基准索引已保存：{output_path}")
+    print(f"  -> Primary-source baseline index saved: {output_path}")
     return canon_index
 
 
-# ── 单资料全栏目汇总 ──
+# ── per-source all-section summary ──
 
 def _write_sections_to_source(ws, record, section_documents):
     section_paths = {}
     for section_name, _ in WORLD_SECTIONS:
         output_path = _source_section_path(ws, record, section_name)
-        _write_file(output_path, section_documents.get(section_name, f"# {section_name}\n\n无"))
+        _write_file(output_path, section_documents.get(section_name, f"# {section_name}\n\nNone"))
         section_paths[section_name] = output_path
     return section_paths
 
@@ -809,7 +809,7 @@ def _write_sections_to_final(ws, section_documents):
     section_paths = {}
     for section_name, _ in WORLD_SECTIONS:
         output_path = _final_section_path(ws, section_name)
-        _write_file(output_path, section_documents.get(section_name, f"# {section_name}\n\n无"))
+        _write_file(output_path, section_documents.get(section_name, f"# {section_name}\n\nNone"))
         section_paths[section_name] = output_path
     return section_paths
 
@@ -836,7 +836,7 @@ def _build_source_all_sections(ws, record, card_paths, llm, force=False):
     ):
         return section_paths
 
-    previous_summary = "（无，这是该资料的第一轮全栏目汇总。）"
+    previous_summary = "(none; this is the first all-section summary for this source.)"
     previous_checkpoint = None
     total_steps = (len(existing_cards) + 1) // 2
     current_summary = ""
@@ -1086,7 +1086,7 @@ def _build_supplement_usage_audit(ws, source_items, llm, force=False):
         dict(
             primary_name=primary_item["record"].get("file_name", "主资料"),
             supplement_names="、".join(item["record"].get("file_name", "补充资料") for item in supplement_items),
-            canon_index=_read_file(canon_path) if os.path.exists(canon_path) else "（无主资料基准索引）",
+            canon_index=_read_file(canon_path) if os.path.exists(canon_path) else "(no primary-source baseline index)",
             final_knowledge=_aggregate_sections(final_paths, max_chars=40000),
             supplement_knowledge=_aggregate_sections(supplement_paths, max_chars=40000),
         ),

@@ -523,7 +523,7 @@ class ReferenceAnalyzer:
                 window_start=window[0]["chapter"],
                 window_end=window[-1]["chapter"],
                 max_chapters=self.max_chapters_per_segment,
-                is_final_window="是" if is_final_window else "否",
+                is_final_window="yes" if is_final_window else "no",
                 previous_tail_context="（无，本轮按正常滚动窗口识别。）",
                 chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
             )
@@ -593,7 +593,7 @@ class ReferenceAnalyzer:
             window_start=window[0]["chapter"],
             window_end=window[-1]["chapter"],
             max_chapters=self.max_chapters_per_segment,
-            is_final_window="否",
+            is_final_window="no",
             previous_tail_context=tail["content"],
             chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
         )

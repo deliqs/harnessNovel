@@ -38,6 +38,16 @@ VOLUME_TITLE_RE = re.compile(
 
 # 卷目录名格式：vol_01_卷名
 VOL_DIR_RE = re.compile(r'^vol_(\d+)_(.+)$')
+PROMPT_JOIN_MAX_CHARS = 26000
+
+
+def _join_prompt_parts(parts, sep="\n\n---\n\n", max_chars=PROMPT_JOIN_MAX_CHARS):
+    joined = sep.join(part for part in parts if part)
+    if len(joined) <= max_chars:
+        return joined
+    return joined[:max_chars] + "\n\n（内容过长，以上为截断后的摘要。）"
+
+
 ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
 ARC_HEADER_RE = re.compile(
     r'^【(?:情节(?:\d+)?[：:]\s*第|Arc\s*\d+[：:]\s*Chapters?\s*)'
@@ -426,7 +436,7 @@ def _extract_story_arcs_for_volume(vol_idx, volume_title, chapters, llm, outline
         end_idx = min(start_idx + batch_size, total)
         start_ch = start_idx + 1
         end_ch = end_idx
-        is_final_window = "是" if end_idx >= total else "否"
+        is_final_window = "yes" if end_idx >= total else "no"
         print(f"    -> 识别故事情节（第 {start_ch}-{end_ch} 章，读取窗口 {batch_size} 章）...")
 
         prompt = PromptLoader.load(
@@ -466,8 +476,9 @@ def _extract_story_arcs_for_volume(vol_idx, volume_title, chapters, llm, outline
         fname = _arc_file_name(arc_idx, existing_end + 1, total)
         fpath = os.path.join(arc_path, fname)
         fallback = (
-            f"【情节{arc_idx}：第{existing_end + 1}-{total}章｜格式兜底情节】\n"
-            "情节功能：模型未按标准格式输出，以下保留原始分析结果供后续人工检查。\n\n"
+            f"【Arc{arc_idx}: Chapters {existing_end + 1}-{total} | format-fallback arc】\n"
+            "Plot function: the model did not follow the standard format; "
+            "the raw analysis is kept for later inspection.\n\n"
             + last_result
         )
         _write_file(fpath, fallback)
@@ -512,7 +523,7 @@ def _generate_volume_outline_from_arcs(vol_dir, volume_title, total_chapters, ll
         outline = arc_summaries[0]
     else:
         print(f"    -> 合并 {len(arc_summaries)} 个故事情节单元为卷纲...")
-        all_subs = "\n\n---\n\n".join(arc_summaries)
+        all_subs = _join_prompt_parts(arc_summaries)
         merge_prompt = PromptLoader.load(
             "volume_merge",
             volume_title=volume_title,
@@ -547,7 +558,7 @@ def extract_novel_outline(volume_outlines, llm, outlines_dir, force=False):
         return existing
 
     print(f"  -> 汇总 {len(volume_outlines)} 卷卷纲，生成完整大纲...")
-    all_outlines = "\n\n---\n\n".join(
+    all_outlines = _join_prompt_parts(
         f"【{vo['title']}】\n{vo['outline']}"
         for vo in volume_outlines
     )
@@ -577,7 +588,11 @@ def _parse_virtual_volumes(llm_result):
     volumes = []
     for line in llm_result.strip().split('\n'):
         line = line.strip()
-        m = re.match(r'卷(\d+)：(.+?)\s*\|\s*第(\d+)-(\d+)章', line)
+        m = re.match(
+            r'(?:Volume|Vol\.?|卷)\s*(\d+)\s*[：:]\s*(.+?)\s*\|\s*(?:Chapters?\s*|第)?(\d+)\s*[-–—]\s*(\d+)\s*章?',
+            line,
+            re.IGNORECASE,
+        )
         if m:
             vol_idx = int(m.group(1))
             title = m.group(2).strip()
@@ -723,7 +738,7 @@ def _generate_virtual_volume_outline(vol_dir, start_ch, end_ch, llm):
     if len(batch_summaries) == 1:
         outline = batch_summaries[0]
     else:
-        all_subs = "\n\n---\n\n".join(batch_summaries)
+        all_subs = _join_prompt_parts(batch_summaries)
         total = end_ch - start_ch + 1
         merge_prompt = PromptLoader.load(
             "volume_merge",
@@ -1051,7 +1066,7 @@ def resegment(outlines_dir):
     print(f">>> 虚拟分卷（重新分卷）<<<")
     print(f"  故事情节单元/摘要：{len(segment_summaries)} 个文件，约 {total_ch} 章")
 
-    all_batches_text = "\n\n---\n\n".join(segment_summaries)
+    all_batches_text = _join_prompt_parts(segment_summaries)
     print(f"  -> 调用 LLM 分析故事情节单元，识别卷边界...")
     seg_prompt = PromptLoader.load("virtual_volume_segment", batch_summaries=all_batches_text)
     seg_result = normalize_text(llm.generate(seg_prompt))

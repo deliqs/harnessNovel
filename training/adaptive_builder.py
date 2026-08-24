@@ -35,13 +35,16 @@ from training.reference_finder import (
 BATCH_SIZE = 20
 STORY_ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
 STORY_ARC_TARGET_CHAPTERS = 5
+STORY_ARC_TARGET_CHARS_MAX = 2000
 STAGE_DESIGN_PIPELINE_VERSION = 2
+OPERATION_ADJUST_LAST_PHASE = "adjust last phase"
+OPERATION_ADD_PHASE = "add phase"
 STAGE_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 STAGE_OUTLINE_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:第\s*)?阶段\s*0*(\d+)\b[^\n]*",
+    r"^#{1,6}\s*(?:第\s*)?(?:阶段|phase)\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 # 舞台路线图规整用：识别各种写法的舞台标题行（# / ## / 加粗 / 纯文本，可带前导零），
@@ -59,10 +62,9 @@ _STAGE_CODE_FENCE_RE = re.compile(r"^\s*```.*$", re.IGNORECASE)
 
 
 def _normalize_stage_roadmap(text):
-    """Normalize stage headers to `# Stage N: name` (English) or `# 舞台N：名称` (zh)."""
+    """Normalize stage headers to `# Stage N: name`. Also parses `# 舞台N：名称`."""
     if not text:
         return ""
-    english = os.getenv("HARNESS_NOVEL_LANG", "en").strip().lower() != "zh"
     output_lines = []
     for line in text.splitlines():
         if _STAGE_CODE_FENCE_RE.match(line):
@@ -71,15 +73,26 @@ def _normalize_stage_roadmap(text):
         if header:
             number = int(header.group(1))
             name = header.group(2).strip().strip("*#：:.- ").strip()
-            if english:
-                output_lines.append(f"# Stage {number}: {name}" if name else f"# Stage {number}:")
-            else:
-                output_lines.append(f"# 舞台{number}：{name}" if name else f"# 舞台{number}：")
+            output_lines.append(f"# Stage {number}: {name}" if name else f"# Stage {number}:")
             continue
         if _STAGE_TITLE_LINE_RE.match(line):
             continue
         output_lines.append(line)
     return "\n".join(output_lines).strip()
+
+
+def _stage_append_starts_at(text, stage_number):
+    """True when appended roadmap text starts at stage N (English emit or Chinese alias)."""
+    return bool(re.search(
+        rf"^#{{1,6}}\s*(?:舞台|stage)\s*{int(stage_number)}\s*[：:]",
+        text or "",
+        re.IGNORECASE | re.MULTILINE,
+    ))
+
+
+def _is_empty_design_asset(text):
+    value = text or ""
+    return value.startswith("(not generated") or value.startswith("（未生成")
 
 
 def _get_llm():
@@ -116,7 +129,7 @@ def _read_file(path):
 def _load_outline_rules(ws):
     """加载大纲/卷纲设计规则。"""
     rules = _read_file(os.path.join(ws.file_system, "OUTLINE_RULES.md"))
-    return rules or "（无大纲设计规则）"
+    return rules or "(no outline design rules)"
 
 
 def _load_world_knowledge_optional(ws, purpose, max_chars=80000, require_ready=False):
@@ -189,8 +202,13 @@ def _load_creative_direction(ws, cli_input=None, direction_file=None):
             lines.append(line)
         cleaned = '\n'.join(lines).strip()
         body = cleaned
-        for heading in ['# 创作方向', '## 题材与定位', '## 主角构想', '## 世界观方向',
-                        '## 核心冲突', '## 希望保留的参考特质', '## 希望改变的部分', '## 其他补充']:
+        for heading in [
+            '# Creative direction', '## Genre and positioning', '## Protagonist concept',
+            '## Worldview direction', '## Core conflict', '## Reference traits to keep',
+            '## Parts to change', '## Other notes',
+            '# 创作方向', '## 题材与定位', '## 主角构想', '## 世界观方向',
+            '## 核心冲突', '## 希望保留的参考特质', '## 希望改变的部分', '## 其他补充',
+        ]:
             body = body.replace(heading, '')
         if body.strip():
             return cleaned
@@ -224,7 +242,7 @@ def _gen_rewrite_map(ws, llm, force=False):
         prompt_vars=dict(
             reference_outline=reference_outline,
             novel_outline=novel_outline,
-            new_novel_worldview=new_worldview or "（未生成新小说世界观）",
+            new_novel_worldview=new_worldview or "(not generated: new-novel worldview)",
         ),
     )
 
@@ -266,7 +284,7 @@ def _rough_outline_with_stages(ws):
     rough = (
         _read_file(_rough_outline_path(ws))
         or _read_file(_story_design_path(ws, "core_gameplay.md"))
-        or "（未生成粗略大纲）"
+        or "(not generated: rough outline)"
     )
     stages = _read_file(_stage_outline_path(ws))
     return f"{rough}\n\n---\n\n{stages}" if stages else rough
@@ -294,10 +312,10 @@ def _load_story_design_assets(ws):
     # 新流程：核心玩法与角色线并入粗略大纲 rough_outline.md，保持下游 4 个 key 不变。
     rough = _rough_outline_with_stages(ws)
     return {
-        "core_gameplay": rough or "（未生成粗略大纲/核心玩法）",
-        "long_mainline": _read_file(_story_design_path(ws, "long_mainline.md")) or "（未生成全书长线主线）",
-        "stage_roadmap": _read_file(_story_design_path(ws, "stage_roadmap.md")) or "（未生成舞台路线图）",
-        "character_arcs": rough or _read_file(_story_design_path(ws, "character_arcs.md")) or "（未生成角色成长线）",
+        "core_gameplay": rough or "(not generated: rough outline / core gameplay)",
+        "long_mainline": _read_file(_story_design_path(ws, "long_mainline.md")) or "(not generated: long mainline)",
+        "stage_roadmap": _read_file(_story_design_path(ws, "stage_roadmap.md")) or "(not generated: stage roadmap)",
+        "character_arcs": rough or _read_file(_story_design_path(ws, "character_arcs.md")) or "(not generated: character arcs)",
     }
 
 
@@ -652,7 +670,7 @@ def extend_story_design(ws, use_reference=False, creative_direction=None, direct
     """在不改动已有设计的前提下，追加长线、角色线和后续舞台。"""
     assets = _load_story_design_assets(ws)
     required_assets = ("core_gameplay", "long_mainline", "stage_roadmap", "character_arcs")
-    missing = [name for name in required_assets if assets[name].startswith("（未生成")]
+    missing = [name for name in required_assets if _is_empty_design_asset(assets[name])]
     if missing:
         print("错误：请先完成全书设计，再执行设计续写。")
         return
@@ -669,7 +687,7 @@ def extend_story_design(ws, use_reference=False, creative_direction=None, direct
         reference_delta = _reference_story_arc_delta(ws, baseline, current_progress)
         if not reference_delta:
             print("警告：未找到新增参考故事片段，将只依据新增章节范围与现有设计继续扩展。")
-            reference_delta = "（新增参考章节已完成解析，但未找到可读取的新增故事片段。）"
+            reference_delta = "(new reference chapters were parsed, but no readable new story segments were found.)"
 
     direction = _load_creative_direction(ws, creative_direction, direction_file)
     record_creative_direction(ws, direction, "extend")
@@ -686,16 +704,16 @@ def extend_story_design(ws, use_reference=False, creative_direction=None, direct
     print(f">>> 续写全书设计：基于{source_label} <<<")
     raw = normalize_text(llm.generate(PromptLoader.load(
         "story_design_extend",
-        creative_direction=direction or "（无额外补充方向）",
-        use_reference="是" if use_reference else "否",
-        reference_range=f"第{baseline + 1}-{current_progress}章" if use_reference else "（本次不读取参考新增章节）",
-        reference_delta=reference_delta or "（本次不参考新增拆解内容）",
+        creative_direction=direction or "(no extra direction)",
+        use_reference="yes" if use_reference else "no",
+        reference_range=f"chapters {baseline + 1}-{current_progress}" if use_reference else "(not reading newly added reference chapters this time)",
+        reference_delta=reference_delta or "(not using newly added deconstruction this time)",
         core_gameplay=assets["core_gameplay"],
         existing_long_mainline=assets["long_mainline"],
         existing_character_arcs=assets["character_arcs"],
         existing_stage_roadmap=assets["stage_roadmap"],
         next_stage_number=next_stage,
-        world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+        world_knowledge=world_knowledge or "(target world knowledge base not provided)",
     )))
 
     try:
@@ -704,7 +722,7 @@ def extend_story_design(ws, use_reference=False, creative_direction=None, direct
         print(f"错误：{exc}，未写入任何设计文件。")
         return
     sections["STAGE_ROADMAP_APPEND"] = _normalize_stage_roadmap(sections["STAGE_ROADMAP_APPEND"])
-    if not re.search(rf"^#{{1,6}}\s*舞台\s*{next_stage}\s*[：:]", sections["STAGE_ROADMAP_APPEND"], re.MULTILINE):
+    if not _stage_append_starts_at(sections["STAGE_ROADMAP_APPEND"], next_stage):
         print(f"错误：新增舞台必须从“# 舞台{next_stage}：”开始，未写入任何设计文件。")
         return
 
@@ -1099,7 +1117,7 @@ def _ensure_system_panel_decision(ws, cancel_event=None):
     prompt = PromptLoader.load(
         "mechanics_init",
         mechanics_source="（用户选择自动判断）",
-        creative_direction="（无额外创作方向）",
+        creative_direction="(no extra direction)",
         core_gameplay=assets["core_gameplay"],
         long_mainline=assets["long_mainline"],
         stage_roadmap=assets["stage_roadmap"],
@@ -1224,7 +1242,7 @@ def _generate_chapter_system_panel(llm, ws, volume, chapter_num, chapter_outline
         "visible_panel": False,
         "rules": {"constraints": ["以主角状态连续性为主，不虚构章纲未发生的数值变化。"]},
     }
-    validation_feedback = "（首次生成，无校验错误）"
+    validation_feedback = "(first generation; no validation errors)"
     last_error = ""
     for _attempt in range(3):
         prompt = PromptLoader.load(
@@ -1324,7 +1342,7 @@ def sync_finalized_drafts_for_outlines(
             raise RuntimeError(f"第{chapter}章最终版正文不存在或为空，无法同步。")
         expected_hash = record.get("current_hash") or _content_hash(finalized_draft)
         outline_path = os.path.join(outline_dir, f"chapter_{chapter:03d}.md")
-        current_outline = _read_file(outline_path) or "（本章原章纲不存在）"
+        current_outline = _read_file(outline_path) or "(this chapter has no existing outline)"
         previous_panel = _previous_system_panel(ws, volume, chapter)
         if progress_callback:
             progress_callback(
@@ -1422,8 +1440,8 @@ def init_mechanics(ws, force=False, creative_direction=None, direction_file=None
 
     prompt = PromptLoader.load(
         "mechanics_init",
-        mechanics_source=mechanics_source or "（用户未提供机制设定）",
-        creative_direction=direction or "（无额外创作方向）",
+        mechanics_source=mechanics_source or "(user did not provide mechanics settings)",
+        creative_direction=direction or "(no extra direction)",
         core_gameplay=assets["core_gameplay"],
         long_mainline=assets["long_mainline"],
         stage_roadmap=assets["stage_roadmap"],
@@ -1457,9 +1475,9 @@ def _gen_core_gameplay(ws, llm, direction, world_knowledge, force=False):
         label="核心玩法文档",
         output_path=output_path,
         prompt_vars=dict(
-            creative_direction=direction or "（用户未提供具体方向）",
-            reference_outline=reference_outline or "（无参考小说全书大纲）",
-            world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+            creative_direction=direction or "(no extra direction)",
+            reference_outline=reference_outline or "(reference novel outline not provided)",
+            world_knowledge=world_knowledge or "(target world knowledge base not provided)",
             outline_rules=_load_outline_rules(ws),
         ),
     )
@@ -1473,7 +1491,7 @@ def _gen_long_mainline(ws, llm, direction, world_knowledge, force=False):
         return existing
 
     reference_outline = load_reference_novel_outline(ws.reference_outlines)
-    core_gameplay = _read_file(_story_design_path(ws, "core_gameplay.md")) or "（未生成核心玩法文档）"
+    core_gameplay = _read_file(_story_design_path(ws, "core_gameplay.md")) or "(not generated: core gameplay)"
 
     return run_step(
         llm=llm,
@@ -1481,10 +1499,10 @@ def _gen_long_mainline(ws, llm, direction, world_knowledge, force=False):
         label="全书长线主线",
         output_path=output_path,
         prompt_vars=dict(
-            creative_direction=direction or "（用户未提供具体方向）",
+            creative_direction=direction or "(no extra direction)",
             core_gameplay=core_gameplay,
-            reference_outline=reference_outline or "（无参考小说全书大纲）",
-            world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+            reference_outline=reference_outline or "(reference novel outline not provided)",
+            world_knowledge=world_knowledge or "(target world knowledge base not provided)",
         ),
     )
 
@@ -1496,8 +1514,8 @@ def _gen_stage_roadmap(ws, llm, direction, world_knowledge, force=False):
         print(f"舞台路线图已存在：{output_path}")
         return existing
 
-    core_gameplay = _read_file(_story_design_path(ws, "core_gameplay.md")) or "（未生成核心玩法文档）"
-    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "（未生成全书长线主线）"
+    core_gameplay = _read_file(_story_design_path(ws, "core_gameplay.md")) or "(not generated: core gameplay)"
+    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "(not generated: long mainline)"
 
     result = run_step(
         llm=llm,
@@ -1506,10 +1524,10 @@ def _gen_stage_roadmap(ws, llm, direction, world_knowledge, force=False):
         save=f"  -> 舞台路线图已保存：{output_path}",
         output_path=output_path,
         prompt_vars=dict(
-            creative_direction=direction or "（用户未提供具体方向）",
+            creative_direction=direction or "(no extra direction)",
             core_gameplay=core_gameplay,
             long_mainline=long_mainline,
-            world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+            world_knowledge=world_knowledge or "(target world knowledge base not provided)",
         ),
     )
     # 规整为稳定的舞台标题格式（一级「# 舞台N：名称」），避免后续步骤识别不到舞台。
@@ -1526,9 +1544,9 @@ def _gen_character_arcs(ws, llm, direction, world_knowledge, force=False):
         print(f"角色成长线已存在：{output_path}")
         return existing
 
-    core_gameplay = _read_file(_story_design_path(ws, "core_gameplay.md")) or "（未生成核心玩法文档）"
-    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "（未生成全书长线主线）"
-    stage_roadmap = _read_file(_story_design_path(ws, "stage_roadmap.md")) or "（未生成舞台路线图）"
+    core_gameplay = _read_file(_story_design_path(ws, "core_gameplay.md")) or "(not generated: core gameplay)"
+    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "(not generated: long mainline)"
+    stage_roadmap = _read_file(_story_design_path(ws, "stage_roadmap.md")) or "(not generated: stage roadmap)"
 
     return run_step(
         llm=llm,
@@ -1536,17 +1554,17 @@ def _gen_character_arcs(ws, llm, direction, world_knowledge, force=False):
         label="角色成长线",
         output_path=output_path,
         prompt_vars=dict(
-            creative_direction=direction or "（用户未提供具体方向）",
+            creative_direction=direction or "(no extra direction)",
             core_gameplay=core_gameplay,
             long_mainline=long_mainline,
             stage_roadmap=stage_roadmap,
-            world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+            world_knowledge=world_knowledge or "(target world knowledge base not provided)",
         ),
     )
 
 
 def _load_reference_context(ws):
-    return load_reference_novel_outline(ws.reference_outlines) or "（无参考小说全书大纲）"
+    return load_reference_novel_outline(ws.reference_outlines) or "(reference novel outline not provided)"
 
 
 def _reference_volume_structure_context(ws, per_volume_chars=1800, max_chars=36000):
@@ -1569,20 +1587,11 @@ def _reference_volume_structure_context(ws, per_volume_chars=1800, max_chars=360
         content = load_reference_volume_outline(ws.reference_outlines, volume["vol_idx"]) or ""
         if not content:
             continue
-        sections = {}
-        matches = list(re.finditer(r"(?m)^#\s+(.+?)\s*$", content))
-        for index, match in enumerate(matches):
-            end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
-            title = re.sub(
-                r"^\s*(?:[一二三四五六七八九十百]+|\d+)\s*[、.．：:]\s*",
-                "",
-                match.group(1).strip(),
-            )
-            sections[title] = content[match.start():end].strip()
+        sections = _parse_markdown_h1_sections(content)
 
         selected = []
-        overview = sections.get("卷纲概览", "")
-        three_acts = sections.get("三幕结构", "")
+        overview = _lookup_volume_style_section(sections, "Volume overview")
+        three_acts = _lookup_volume_style_section(sections, "Three-act structure")
         if overview:
             selected.append(overview[:overview_budget].rstrip())
         if three_acts:
@@ -1591,7 +1600,7 @@ def _reference_volume_structure_context(ws, per_volume_chars=1800, max_chars=360
         if len(selected_text) > volume_budget:
             selected_text = selected_text[:volume_budget].rstrip()
         if not selected:
-            selected_text = "（该卷未识别到卷纲概览或三幕结构）"
+            selected_text = "(this volume has no Volume overview or Three-act structure)"
 
         meta = _read_file(os.path.join(volume["dir_path"], "meta.json"))
         chapter_range = ""
@@ -1610,7 +1619,7 @@ def _reference_volume_structure_context(ws, per_volume_chars=1800, max_chars=360
         )
         parts.append(part)
         used += len(part)
-    return "\n\n---\n\n".join(parts) or "（未找到参考小说分卷卷纲）"
+    return "\n\n---\n\n".join(parts) or "(no reference-novel volume outlines found)"
 
 
 def _reference_volume_stage_structure(ws, volume):
@@ -1618,18 +1627,12 @@ def _reference_volume_stage_structure(ws, volume):
     content = load_reference_volume_outline(
         ws.reference_outlines, volume["vol_idx"]
     ) or ""
-    sections = {}
-    matches = list(re.finditer(r"(?m)^#\s+(.+?)\s*$", content))
-    for index, match in enumerate(matches):
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
-        title = re.sub(
-            r"^\s*(?:[一二三四五六七八九十百]+|\d+)\s*[、.．：:]\s*",
-            "",
-            match.group(1).strip(),
-        )
-        sections[title] = content[match.start():end].strip()
-    selected = [sections.get("卷纲概览", ""), sections.get("三幕结构", "")]
-    return "\n\n".join(item for item in selected if item).strip() or "（对应参考卷缺少卷纲概览与三幕结构）"
+    sections = _parse_markdown_h1_sections(content)
+    selected = [
+        _lookup_volume_style_section(sections, "Volume overview"),
+        _lookup_volume_style_section(sections, "Three-act structure"),
+    ]
+    return "\n\n".join(item for item in selected if item).strip() or "(matching reference volume is missing Volume overview and Three-act structure)"
 
 
 def _design_structure_guidance(ws):
@@ -1655,15 +1658,19 @@ def _design_structure_guidance(ws):
 def _design_structure_counts(rough, worldview):
     chinese_number = r"[一二三四五六七八九十百]+"
     arabic_or_chinese = rf"(?:\d+|{chinese_number})"
+    phase_token = rf"(?:阶段|phase)"
     stage_patterns = (
-        # ## 阶段1 / ### 阶段一 / ## 第八阶段
-        rf"(?m)^\s*#{{2,6}}\s*(?:第\s*)?(?:阶段\s*{arabic_or_chinese}|{arabic_or_chinese}\s*阶段)\b",
-        # 1. 阶段一 / - 第八阶段（模型偶尔不用子标题）
-        rf"(?m)^\s*(?:[-*+]|\d+[.、．])\s*(?:第\s*)?(?:阶段\s*{arabic_or_chinese}|{arabic_or_chinese}\s*阶段)\b",
+        # ## Phase 1 / ## 阶段1 / ### 阶段一 / ## 第八阶段
+        rf"(?m)^\s*#{{2,6}}\s*(?:第\s*)?(?:{phase_token}\s*{arabic_or_chinese}|{arabic_or_chinese}\s*{phase_token})\b",
+        # 1. Phase 1 / - 第八阶段 (models sometimes skip subheadings)
+        rf"(?m)^\s*(?:[-*+]|\d+[.、．])\s*(?:第\s*)?(?:{phase_token}\s*{arabic_or_chinese}|{arabic_or_chinese}\s*{phase_token})\b",
     )
     stage_lines = set()
     for pattern in stage_patterns:
-        stage_lines.update(match.group(0).strip() for match in re.finditer(pattern, rough or ""))
+        stage_lines.update(
+            match.group(0).strip()
+            for match in re.finditer(pattern, rough or "", re.IGNORECASE)
+        )
     stage_count = len(stage_lines)
     map_text = ""
     worldview_lines = (worldview or "").splitlines()
@@ -1672,10 +1679,14 @@ def _design_structure_counts(rough, worldview):
         if not heading:
             continue
         heading_title = re.sub(r"^\s*6\s*[.、．:]?\s*", "", heading.group(2)).strip()
+        title_l = heading_title.lower()
         is_map_heading = (
-            "地图" in heading_title
-            and any(word in heading_title for word in ("舞台", "区域", "版图"))
-            and any(word in heading_title for word in ("层级", "层次", "体系", "结构"))
+            (
+                "地图" in heading_title
+                and any(word in heading_title for word in ("舞台", "区域", "版图"))
+                and any(word in heading_title for word in ("层级", "层次", "体系", "结构"))
+            )
+            or ("map" in title_l and "layer" in title_l)
         )
         if not is_map_heading:
             continue
@@ -1693,14 +1704,14 @@ def _design_structure_counts(rough, worldview):
         map_count = len(re.findall(r"(?m)^##+\s+\S+", map_text))
     if not map_count:
         map_count = len(re.findall(
-            rf"(?m)^\s*(?:层级|地图|舞台)\s*{arabic_or_chinese}\s*[：:]|"
+            rf"(?mi)^\s*(?:层级|地图|舞台|layer)\s*{arabic_or_chinese}\s*[：:]|"
             rf"^\s*第\s*{arabic_or_chinese}\s*(?:层|级|区域|舞台)\s*[：:]",
             map_text,
         ))
     if not map_count and map_text:
-        # 兼容模型把多个层级写在同一段、用分号分隔的情况。
+        # Models sometimes put several layers in one paragraph, split by semicolons.
         labels = re.findall(
-            rf"(?:层级|地图|舞台)\s*{arabic_or_chinese}\s*[：:]|"
+            rf"(?i)(?:层级|地图|舞台|layer)\s*{arabic_or_chinese}\s*[：:]|"
             rf"第\s*{arabic_or_chinese}\s*(?:层|级|区域|舞台)\s*[：:]",
             map_text,
         )
@@ -1716,7 +1727,10 @@ def _remove_stage_outline_section(rough):
     skipped_level = 0
     for line in lines:
         heading = re.match(r"^\s*(#{1,6})\s+(.+?)\s*$", line)
-        if heading and "阶段粗纲" in heading.group(2):
+        if heading and (
+            "阶段粗纲" in heading.group(2)
+            or re.search(r"phase\s+outline", heading.group(2), re.I)
+        ):
             skipping = True
             skipped_level = len(heading.group(1))
             continue
@@ -1756,13 +1770,48 @@ _VOLUME_STYLE_SECTIONS_EN = (
     "Volume overview", "Three-act structure", "Character roster",
     "Foreshadowing tracker", "Core payoff",
 )
+_VOLUME_STYLE_SECTION_ALIASES = {
+    "Volume overview": ("Volume overview", "Volume-outline overview", "卷纲概览"),
+    "Three-act structure": ("Three-act structure", "三幕结构"),
+    "Character roster": ("Character roster", "人物谱系"),
+    "Foreshadowing tracker": ("Foreshadowing tracker", "Foreshadowing tracking", "伏笔追踪"),
+    "Core payoff": ("Core payoff", "Core payoffs", "核心爽点"),
+}
+
+
+def _parse_markdown_h1_sections(content):
+    sections = {}
+    text = content or ""
+    matches = list(re.finditer(r"(?m)^#\s+(.+?)\s*$", text))
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        title = re.sub(
+            r"^\s*(?:[一二三四五六七八九十百]+|\d+|[IVXivx]+)\s*[、.．：:]\s*",
+            "",
+            match.group(1).strip(),
+        )
+        sections[title] = text[match.start():end].strip()
+    return sections
+
+
+def _lookup_volume_style_section(sections, english_name):
+    aliases = _VOLUME_STYLE_SECTION_ALIASES.get(english_name, (english_name,))
+    for alias in aliases:
+        value = sections.get(alias) or ""
+        if value:
+            return value
+    wanted = {alias.lower() for alias in aliases}
+    for key, value in sections.items():
+        if key.strip().lower() in wanted and value:
+            return value
+    return ""
 
 
 def _is_volume_style_stage(content):
     text = content or ""
-    has_sections = (
-        all(name in text for name in _VOLUME_STYLE_SECTIONS_ZH)
-        or all(name in text for name in _VOLUME_STYLE_SECTIONS_EN)
+    has_sections = all(
+        any(alias in text for alias in aliases)
+        for aliases in _VOLUME_STYLE_SECTION_ALIASES.values()
     )
     has_count = bool(re.search(
         r"(?:预计章节数|Planned chapters?)\s*[：:]\s*\d+",
@@ -1867,12 +1916,12 @@ def gen_design_concept(
         )
         prompt = PromptLoader.load(
             "design_worldview",
-            creative_direction=direction or "（用户未提供具体方向）",
-            world_knowledge=world_knowledge or "（未提供目标世界资料库，请创建原创世界。）",
+            creative_direction=direction or "(no extra direction)",
+            world_knowledge=world_knowledge or "(target world knowledge base not provided; create an original world.)",
             reference_outline=reference_outline,
         )
         payload = parse_json_response(_call_design_llm(llm, prompt, "新小说世界观"))
-        worldview = _normalize_design_field(payload, "worldview_md", "# 世界观")
+        worldview = _normalize_design_field(payload, "worldview_md", "# Worldview")
         if not _is_real_design_field(worldview):
             raise RuntimeError("世界观生成失败：模型未返回有效内容，请重试。")
         _write_file(worldview_path, worldview)
@@ -1885,13 +1934,13 @@ def gen_design_concept(
     if not _is_real_design_field(rough):
         prompt = PromptLoader.load(
             "design_rough_outline",
-            creative_direction=direction or "（用户未提供具体方向）",
+            creative_direction=direction or "(no extra direction)",
             worldview=worldview,
             reference_outline=reference_outline,
             outline_rules=_load_outline_rules(ws),
         )
         payload = parse_json_response(_call_design_llm(llm, prompt, "新小说粗略大纲"))
-        rough = _normalize_design_field(payload, "rough_outline_md", "# 粗略大纲")
+        rough = _normalize_design_field(payload, "rough_outline_md", "# Rough outline")
         rough = _remove_stage_outline_section(rough)
         if not _is_real_design_field(rough):
             raise RuntimeError("粗略大纲生成失败：模型未返回有效内容，请重试。")
@@ -1922,7 +1971,7 @@ def gen_design_concept(
             payload = parse_json_response(
                 _call_design_llm(llm, prompt, f"新小说阶段粗纲（第{attempt}次）")
             )
-            candidate = _normalize_design_field(payload, "stage_outline_md", "# 阶段粗纲")
+            candidate = _normalize_design_field(payload, "stage_outline_md", "# Phase outline")
             if not _is_real_design_field(candidate):
                 continue
             actual_count, _ = _design_structure_counts(candidate, "")
@@ -2031,7 +2080,7 @@ def gen_stage_design(
         payload = parse_json_response(
             _call_design_llm(llm, prompt, "全书长线主线", cancel_event=cancel_event)
         )
-        long_mainline = _normalize_design_field(payload, "long_mainline_md", "# 全书长线主线")
+        long_mainline = _normalize_design_field(payload, "long_mainline_md", "# Long mainline")
         if not _is_real_design_field(long_mainline):
             raise RuntimeError("长线主线生成失败：模型未返回有效内容，请重试。")
         _write_file(long_path, long_mainline)
@@ -2076,11 +2125,11 @@ def gen_stage_design(
             volume = reference_volumes[number - 1]
             reference_volume_outline = load_reference_volume_outline(
                 ws.reference_outlines, volume["vol_idx"]
-            ) or "（对应参考卷纲缺失）"
+            ) or "(matching reference volume outline is missing)"
             reference_chapter_count = _reference_volume_chapter_count(
                 volume, reference_volume_outline,
             )
-            previous_stage = completed_parts[-1] if completed_parts else "（这是第一个舞台，无上一舞台）"
+            previous_stage = completed_parts[-1] if completed_parts else "(this is the first stage; no previous stage)"
             prompt = PromptLoader.load(
                 "stage_roadmap_serial",
                 stage_number=number,
@@ -2238,22 +2287,24 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
     old_count = len(sections)
     target_count = len(reference_volumes)
     start_number = old_count if target_count == old_count else old_count + 1
-    operation_for_first = "调整最后阶段" if target_count == old_count else "新增阶段"
+    operation_for_first = (
+        OPERATION_ADJUST_LAST_PHASE if target_count == old_count else OPERATION_ADD_PHASE
+    )
 
     for number in range(start_number, target_count + 1):
         sections = _stage_outline_sections(stage_outline)
-        operation = operation_for_first if number == start_number else "新增阶段"
+        operation = operation_for_first if number == start_number else OPERATION_ADD_PHASE
         volume = reference_volumes[number - 1]
         reference_structure = _reference_volume_stage_structure(ws, volume)
-        if operation == "调整最后阶段":
+        if operation in (OPERATION_ADJUST_LAST_PHASE, "调整最后阶段"):
             stage_context = (
-                "【倒数第二个阶段】\n"
-                + (sections.get(number - 1) or "（这是第一阶段，无倒数第二阶段）")
-                + "\n\n【当前最后一个阶段】\n"
+                "[Second-to-last phase]\n"
+                + (sections.get(number - 1) or "(this is the first phase; no second-to-last phase)")
+                + "\n\n[Current last phase]\n"
                 + sections[number]
             )
         else:
-            stage_context = "【当前最后一个阶段】\n" + sections[number - 1]
+            stage_context = "[Current last phase]\n" + sections[number - 1]
         prompt = PromptLoader.load(
             "design_stage_outline_incremental",
             operation=operation,
@@ -2272,7 +2323,7 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
             raise RuntimeError(
                 f"阶段粗纲增量结果编号无效：期望阶段{number}，检测到 {numbers or '无编号'}。"
             )
-        if operation == "调整最后阶段":
+        if operation in (OPERATION_ADJUST_LAST_PHASE, "调整最后阶段"):
             heading = list(STAGE_OUTLINE_HEADING_RE.finditer(stage_outline))[-1]
             stage_outline = stage_outline[:heading.start()].rstrip() + "\n\n" + candidate.strip()
         else:
@@ -2396,7 +2447,9 @@ def refine_stage_design(
     except (TypeError, ValueError):
         start_stage = 1
     explicit_stages = [
-        int(value) for value in re.findall(r"舞台\s*0*(\d+)", instruction or "")
+        int(value) for value in re.findall(
+            r"(?:舞台|stage)\s*0*(\d+)", instruction or "", re.I,
+        )
         if 1 <= int(value) <= total_stages
     ]
     if explicit_stages:
@@ -2406,7 +2459,11 @@ def refine_stage_design(
     if mode not in {"regenerate", "revise"}:
         mode = (
             "regenerate"
-            if re.search(r"重新生成|完全重写|推倒重来|全部重写", instruction or "")
+            if re.search(
+                r"重新生成|完全重写|推倒重来|全部重写|regenerate|rewrite|start over|full rewrite",
+                instruction or "",
+                re.I,
+            )
             else "revise"
         )
     update_long_mainline = routed.get("update_long_mainline") is True
@@ -2448,11 +2505,11 @@ def refine_stage_design(
         volume = reference_volumes[number - 1]
         reference_volume_outline = load_reference_volume_outline(
             ws.reference_outlines, volume["vol_idx"]
-        ) or "（对应参考卷纲缺失）"
+        ) or "(matching reference volume outline is missing)"
         reference_chapter_count = _reference_volume_chapter_count(
             volume, reference_volume_outline,
         )
-        previous_stage = completed_parts[-1] if completed_parts else "（这是第一个舞台，无上一舞台）"
+        previous_stage = completed_parts[-1] if completed_parts else "(this is the first stage; no previous stage)"
         current_stage = (
             original_parts[number - 1]
             if mode == "revise" else
@@ -2551,11 +2608,11 @@ def _sync_later_stages_serial(ws, instruction, cancel_event=None):
         volume = reference_volumes[number - 1]
         reference_volume_outline = load_reference_volume_outline(
             ws.reference_outlines, volume["vol_idx"]
-        ) or "（对应参考卷纲缺失）"
+        ) or "(matching reference volume outline is missing)"
         reference_chapter_count = _reference_volume_chapter_count(
             volume, reference_volume_outline,
         )
-        previous_stage = completed_parts[-1] if completed_parts else "（这是第一个舞台，无上一舞台）"
+        previous_stage = completed_parts[-1] if completed_parts else "(this is the first stage; no previous stage)"
         prompt = PromptLoader.load(
             "stage_roadmap_serial",
             stage_number=number,
@@ -2614,7 +2671,7 @@ def extend_stage_design(ws, instruction, sync_updated_design=False, cancel_event
     if sync_updated_design:
         return _sync_later_stages_serial(ws, instruction, cancel_event=cancel_event)
     rough = _rough_outline_with_stages(ws)
-    worldview = _read_file(_worldview_path(ws)) or "（未生成世界观）"
+    worldview = _read_file(_worldview_path(ws)) or "(not generated: worldview)"
     long_mainline = _read_file(_story_design_path(ws, "long_mainline.md"))
     stage_roadmap = _read_file(_story_design_path(ws, "stage_roadmap.md"))
     if not long_mainline or not stage_roadmap:
@@ -2635,7 +2692,7 @@ def extend_stage_design(ws, instruction, sync_updated_design=False, cancel_event
         reference_text = "\n\n".join(ref_parts)
         print(f"  -> 发现 {len(unused_arcs)} 个未使用的参考片段。")
     else:
-        reference_text = "（无新增参考片段）"
+        reference_text = "(no newly added reference segments)"
 
     next_stage = _next_stage_number(stage_roadmap)
     world_knowledge = _load_world_knowledge_optional(ws, "续写舞台")
@@ -2647,7 +2704,7 @@ def extend_stage_design(ws, instruction, sync_updated_design=False, cancel_event
         long_mainline=long_mainline,
         stage_roadmap=stage_roadmap,
         reference_arcs=reference_text,
-        world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+        world_knowledge=world_knowledge or "(target world knowledge base not provided)",
         next_stage_number=next_stage,
     )
     payload = parse_json_response(
@@ -2696,19 +2753,19 @@ def extend_stage_design(ws, instruction, sync_updated_design=False, cancel_event
 
 def _refine_design(ws, scope, instruction, compact_summary, prompt_folder, fields, prompt_field_map, output_keys, extra_vars=None):
     rough = _rough_outline_with_stages(ws)
-    worldview = _read_file(_worldview_path(ws)) or "（未生成世界观）"
+    worldview = _read_file(_worldview_path(ws)) or "(not generated: worldview)"
     llm = _get_llm()
     if not llm:
         raise RuntimeError("未配置可用模型。")
     prompt_vars = {
-        "creative_direction": _read_file(ws.creative_direction) or "（未提供）",
-        "reference_outline": load_reference_novel_outline(ws.reference_outlines) or "（无参考小说全书大纲）",
-        "compact_summary": compact_summary or "（无）",
+        "creative_direction": _read_file(ws.creative_direction) or "(not provided)",
+        "reference_outline": load_reference_novel_outline(ws.reference_outlines) or "(reference novel outline not provided)",
+        "compact_summary": compact_summary or "(none)",
         "rough_outline": rough,
         "worldview": worldview,
     }
     for rel, path in fields.items():
-        prompt_vars[prompt_field_map[rel]] = _read_file(path) or f"（未生成{rel}）"
+        prompt_vars[prompt_field_map[rel]] = _read_file(path) or f"(not generated: {rel})"
     if extra_vars:
         prompt_vars.update(extra_vars)
     prompt = PromptLoader.load(prompt_folder, **prompt_vars)
@@ -2759,16 +2816,21 @@ def _normalize_design_field(payload, key, fallback_title):
         return ""
     text = str(payload.get(key) or "").strip()
     if not text:
-        return (fallback_title + "\n\n（模型未返回 " + key + "，请重试或人工补充。）") if fallback_title else ""
+        return (
+            (fallback_title + "\n\n(Model did not return " + key + ", please retry or fill in manually.)")
+            if fallback_title else ""
+        )
     return text
 
 
 def _is_real_design_field(text):
-    """判断设计字段是否是真实内容，而非空值或占位符。"""
+    """True when a design field is real content, not empty or a placeholder."""
     if not text or not str(text).strip():
         return False
     t = str(text).strip()
     if "模型未返回" in t and "请重试或人工补充" in t:
+        return False
+    if "Model did not return" in t and "please retry or fill in manually" in t:
         return False
     return True
 
@@ -2876,7 +2938,7 @@ def _extract_reference_name_synopsis(ws):
 
     if name_match:
         name = name_match.group(1).strip()
-        synopsis = synopsis_match.group(1).strip() if synopsis_match else "（未提供）"
+        synopsis = synopsis_match.group(1).strip() if synopsis_match else "(not provided)"
         return name, synopsis
 
     # 兜底：启发式提取
@@ -2902,7 +2964,7 @@ def _extract_reference_name_synopsis(ws):
         in_synopsis = True
         synopsis_lines.append(stripped)
 
-    synopsis = "\n".join(synopsis_lines) if synopsis_lines else "（未提取到简介）"
+    synopsis = "\n".join(synopsis_lines) if synopsis_lines else "(synopsis not extracted)"
     return name, synopsis
 
 
@@ -2910,6 +2972,10 @@ def gen_novel_name_synopsis(ws, force=False, cancel_event=None):
     """只基于粗略大纲与长线主线推荐书名和简介。"""
     rough_outline = _read_file(_rough_outline_path(ws))
     long_mainline = _read_file(_story_design_path(ws, "long_mainline.md"))
+    # novel-outline (legacy combined command) never writes rough_outline.md;
+    # core_gameplay.md is the equivalent brief for title/synopsis.
+    if not rough_outline:
+        rough_outline = _read_file(_story_design_path(ws, "core_gameplay.md"))
     if not rough_outline or not long_mainline:
         raise RuntimeError("请先生成粗略大纲与长线主线，再生成书名和简介。")
 
@@ -2979,7 +3045,7 @@ def insert_stage(ws, creative_direction=None, direction_file=None, after_stage=N
         long_mainline=assets["long_mainline"],
         stage_roadmap=stage_roadmap,
         character_arcs=assets["character_arcs"],
-        world_knowledge=world_knowledge or "（未提供目标世界知识库）",
+        world_knowledge=world_knowledge or "(target world knowledge base not provided)",
     )
     result = _normalize_stage_roadmap(normalize_text(llm.generate(prompt)))
     backup_path = _stage_insert_backup_path(ws)
@@ -2997,7 +3063,7 @@ def _map_to_reference_volumes_sequential(ws, vol_idx, ref_volumes):
     idx = min(vol_idx - 1, len(ref_volumes) - 1)
     vol = ref_volumes[idx]
     outline = load_reference_volume_outline(ws.reference_outlines, vol["vol_idx"])
-    return f"（参考原作第{vol['vol_idx']}卷）\n{outline}" if outline else "（无对应参考卷纲）"
+    return f"(reference original volume {vol['vol_idx']})\n{outline}" if outline else "(no matching reference volume outline)"
 
 
 def _gen_volume_worldview(ws, vol_idx, llm, force, novel_outline, new_novel_worldview):
@@ -3089,10 +3155,10 @@ def _gen_volume_stage_plan(ws, vol_idx, llm, force, vol_outline, vol_worldview,
             core_gameplay=assets["core_gameplay"],
             stage_roadmap=assets["stage_roadmap"],
             character_arcs=assets["character_arcs"],
-            novel_outline=novel_outline or "（未生成新小说大纲）",
-            new_novel_worldview=new_novel_worldview or "（未生成新小说世界观）",
-            volume_outline=vol_outline or "（未生成本卷卷纲）",
-            volume_worldview=vol_worldview or "（未生成本卷世界观）",
+            novel_outline=novel_outline or "(not generated: new-novel outline)",
+            new_novel_worldview=new_novel_worldview or "(not generated: new-novel worldview)",
+            volume_outline=vol_outline or "(not generated: this volume outline)",
+            volume_worldview=vol_worldview or "(not generated: this volume worldview)",
             rewrite_map=rewrite_map,
         ),
     )
@@ -3109,7 +3175,7 @@ def _gen_single_volume(ws, vol_idx, ref_volumes, force, creative_direction, llm,
         print(f"  -> 卷{vol_idx}卷纲已存在，跳过。（用 --force 覆盖）")
         vol_outline_clean = re.sub(r'\n?\[(?:FINISHED|CONTINUE)\]\s*$', '', existing_this).strip()
         existing_novel_outline = _read_file(os.path.join(ws.file_system, "novel_outline.md")) or ""
-        new_novel_worldview = _read_file(os.path.join(ws.file_system, "new_novel_worldview.md")) or "（无新小说世界观，请先运行 novel-outline 命令）"
+        new_novel_worldview = _read_file(os.path.join(ws.file_system, "new_novel_worldview.md")) or "(no new-novel worldview; run novel-outline first)"
         vol_worldview = _gen_volume_worldview(ws, vol_idx, llm, force, existing_novel_outline, new_novel_worldview)
         _gen_volume_stage_plan(
             ws,
@@ -3135,10 +3201,10 @@ def _gen_single_volume(ws, vol_idx, ref_volumes, force, creative_direction, llm,
     prev_vol_file = os.path.join(vol_dir, f"vol_{vol_idx - 1:02d}_outline.md")
     previous_volumes = _read_file(prev_vol_file) if vol_idx > 1 and os.path.exists(prev_vol_file) else ""
     if not previous_volumes:
-        previous_volumes = "（无前卷，这是第一卷）"
+        previous_volumes = "(no previous volume; this is volume 1)"
 
     # 使用新小说全书世界观
-    new_novel_worldview = _read_file(os.path.join(ws.file_system, "new_novel_worldview.md")) or "（无新小说世界观，请先运行 novel-outline 命令）"
+    new_novel_worldview = _read_file(os.path.join(ws.file_system, "new_novel_worldview.md")) or "(no new-novel worldview; run novel-outline first)"
 
     ref_vol_outline = _map_to_reference_volumes_sequential(ws, vol_idx, ref_volumes)
     rewrite_map = load_rewrite_map(ws, vol_idx)
@@ -3150,12 +3216,12 @@ def _gen_single_volume(ws, vol_idx, ref_volumes, force, creative_direction, llm,
     prompt = PromptLoader.load(
         "adaptive_volume_outline",
         novel_outline=novel_outline,
-        reference_volume_outline=ref_vol_outline or "（无参考卷纲）",
+        reference_volume_outline=ref_vol_outline or "(no reference volume outline)",
         new_novel_worldview=new_novel_worldview,
         rewrite_map=rewrite_map,
         inspirations="（无灵感库）",
         volume_index=vol_idx,
-        creative_direction=direction or "（用户未提供具体方向）",
+        creative_direction=direction or "(no extra direction)",
         previous_volumes=previous_volumes,
         outline_rules=_load_outline_rules(ws),
         preserved_content=preserved_section,
@@ -3362,7 +3428,7 @@ def _load_stage_context(ws, stage_idx):
         print(f"错误：舞台{stage_idx}缺少“预计章节数”，无法生成故事情节单元。")
         print("请补充 stage_roadmap.md 中该舞台的预计章节数，或重新运行 novel-outline/story-design。")
         return None
-    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "（未生成全书长线主线）"
+    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "(not generated: long mainline)"
     stage_worldview = (
         "【全书长线主线】\n" + long_mainline + "\n\n"
         "【当前舞台规则与边界】\n" + stage_text
@@ -3460,7 +3526,7 @@ def _reference_story_arc_average_chars(ws, stage_number=None):
                 lengths.append(char_count)
     if not lengths:
         return 1000
-    return max(300, round(sum(lengths) / len(lengths)))
+    return max(300, min(STORY_ARC_TARGET_CHARS_MAX, round(sum(lengths) / len(lengths))))
 
 
 def _reference_volume_for_stage(ws, stage_number):
@@ -3472,31 +3538,50 @@ def _reference_volume_for_stage(ws, stage_number):
 
 
 def _reference_volume_story_arcs_summary(ws, stage_number):
-    """直接汇总对应参考卷的全部故事片段，不再调用模型二次压缩。"""
+    """Matching-volume arc index (ids and chapter ranges only, no bodies)."""
     volume = _reference_volume_for_stage(ws, stage_number)
     if not volume:
-        return "（未找到当前舞台对应的参考卷故事片段）"
+        return "(no reference-volume story segments found for the current stage)"
     arcs = list_reference_story_arcs(ws.reference_outlines, volume["vol_idx"])
     if not arcs:
-        return f"（参考卷{volume['vol_idx']}没有可用故事片段）"
-    return "\n\n===\n\n".join(
-        f"【参考情节{arc['idx']}：第{arc['start_ch']}-{arc['end_ch']}章】\n{arc.get('content', '').strip()}"
+        return f"(reference volume {volume['vol_idx']} has no usable story segments)"
+    return "\n".join(
+        f"【参考情节{arc['idx']}：第{arc['start_ch']}-{arc['end_ch']}章】"
         for arc in arcs
     )
 
 
+def _story_arc_plans_for_volume(ws, volume, total_chapters):
+    mapped = _reference_volume_for_stage(ws, volume)
+    reference_arcs = (
+        list_reference_story_arcs(ws.reference_outlines, mapped["vol_idx"])
+        if mapped else []
+    )
+    if reference_arcs:
+        return _plan_story_arcs_from_reference(reference_arcs, total_chapters)
+    return _plan_story_arcs(total_chapters)
+
+
+def _story_arc_prompt_context(generation_context, plan):
+    ctx = dict(generation_context)
+    sample = str(plan.get("reference_story_arc") or "").strip()
+    if sample:
+        ctx["reference_story_arcs"] = sample
+    return ctx
+
+
 def _simple_story_arc_context(ws, stage_number):
     """故事情节生成唯一允许使用的四类内容资料。"""
-    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "（未生成长线主线）"
+    long_mainline = _read_file(_story_design_path(ws, "long_mainline.md")) or "(not generated: long mainline)"
     stage_roadmap = _read_file(_story_design_path(ws, "stage_roadmap.md")) or ""
-    current_stage = _extract_stage_from_roadmap(stage_roadmap, stage_number) or "（未找到当前舞台）"
+    current_stage = _extract_stage_from_roadmap(stage_roadmap, stage_number) or "(current stage not found)"
     previous_stage = (
         _extract_stage_from_roadmap(stage_roadmap, stage_number - 1)
         if int(stage_number) > 1 else ""
     )
     return {
         "long_mainline": long_mainline,
-        "previous_stage": previous_stage or "（这是第一个舞台，无上一舞台）",
+        "previous_stage": previous_stage or "(this is the first stage; no previous stage)",
         "current_stage": current_stage,
         "reference_story_arcs": _reference_volume_story_arcs_summary(ws, stage_number),
     }
@@ -3533,7 +3618,7 @@ def _compact_story_arc_result(llm, result, arc_idx, start_ch, end_ch, target_cha
 
 def _format_reference_arc_group(group):
     if not group:
-        return "（无参考故事情节单元）"
+        return ""
     parts = []
     for arc in group:
         source_label = "参考故事情节单元" if arc.get("source_type") == "story_arc" else "旧版参考批次"
@@ -3565,7 +3650,7 @@ def story_arc_resume_status(ws, volume):
     if not context:
         return {"can_resume": False, "completed": 0, "total": 0}
     _, _, total_chapters = context
-    plans = _plan_story_arcs(total_chapters)
+    plans = _story_arc_plans_for_volume(ws, volume, total_chapters)
     completed_files = {
         (item["idx"], item["start_ch"], item["end_ch"])
         for item in _list_novel_story_arcs(ws, volume)
@@ -3705,8 +3790,8 @@ def _audit_batch_summary_reasonability(ws, llm, volume, batch_idx, start_ch, end
                                        reference_batch, adapted_reference_batch,
                                        rewrite_map, batch_summary, attempt):
     """用 pro 模型审计批次摘要是否符合新书大纲/世界观，而不是做简单禁词扫描。"""
-    novel_outline = _read_file(os.path.join(ws.file_system, "novel_outline.md")) or "（未找到新小说全书大纲）"
-    new_novel_worldview = _read_file(os.path.join(ws.file_system, "new_novel_worldview.md")) or "（未找到新小说全书世界观）"
+    novel_outline = _read_file(os.path.join(ws.file_system, "novel_outline.md")) or "(new-novel outline not found)"
+    new_novel_worldview = _read_file(os.path.join(ws.file_system, "new_novel_worldview.md")) or "(new-novel worldview not found)"
 
     prompt = PromptLoader.load(
         "batch_reasonability_audit",
@@ -3719,8 +3804,8 @@ def _audit_batch_summary_reasonability(ws, llm, volume, batch_idx, start_ch, end
         start_chapter=start_ch,
         end_chapter=end_ch,
         previous_batch=previous_batch,
-        adapted_reference_batch=adapted_reference_batch or "（无适配后的参考批次草稿）",
-        reference_batch=reference_batch or "（无参考批次数据）",
+        adapted_reference_batch=adapted_reference_batch or "(no adapted reference-batch draft)",
+        reference_batch=reference_batch or "(no reference-batch data)",
         batch_summary=batch_summary,
     )
     raw = normalize_text(llm.generate(prompt))
@@ -3775,8 +3860,8 @@ def _generate_batch_summary_with_audit(ws, llm, volume, batch_idx, start_ch, end
             start_chapter=start_ch,
             end_chapter=end_ch,
             previous_batch=previous_batch,
-            adapted_reference_batch=adapted_reference_batch or "（无适配后的参考批次草稿）",
-            reference_batch=reference_batch or "（无参考批次数据）",
+            adapted_reference_batch=adapted_reference_batch or "(no adapted reference-batch draft)",
+            reference_batch=reference_batch or "(no reference-batch data)",
             audit_feedback=audit_feedback,
             previous_result=previous_result,
         )
@@ -3894,7 +3979,7 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
     generation_context = _simple_story_arc_context(ws, volume)
     print(f"  -> 已读取舞台{volume}的简化故事情节输入（不再生成压缩上下文）。")
 
-    arc_plans = _plan_story_arcs(total_chapters)
+    arc_plans = _story_arc_plans_for_volume(ws, volume, total_chapters)
     target_char_count = _reference_story_arc_average_chars(ws, volume)
     total_arcs = len(arc_plans)
     story_arc_dir = _volume_story_arc_dir(ws, volume)
@@ -3959,7 +4044,7 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
                     arc_idx=arc_idx,
                     start_ch=start_ch,
                     end_ch=end_ch,
-                    generation_context=generation_context,
+                    generation_context=_story_arc_prompt_context(generation_context, plan),
                     target_char_count=target_char_count,
                     cancel_event=cancel_event,
                 )
@@ -3979,6 +4064,11 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
                     cancel_event.clear()
         if result is None:
             break
+        if not str(result).strip():
+            print(
+                f"  警告：情节单元{arc_idx}未获得模型输出，未写入文件，可重试。"
+            )
+            continue
         _write_file(arc_file, result)
         generated_items.append({
             "idx": arc_idx,
@@ -4094,14 +4184,20 @@ def refine_story_arcs(ws, volume, instruction, cancel_event=None):
 
 
 def _normalize_refinement_mode(value, instruction):
-    """将路由器返回值归一为 regenerate/revise，并为旧模型输出提供兜底。"""
+    """Normalize router output to regenerate/revise, with aliases for older model text."""
     normalized = str(value or "").strip().lower()
-    if normalized in {"regenerate", "rewrite", "重新生成", "完全重写"}:
+    if normalized in {
+        "regenerate", "rewrite", "start over", "full rewrite",
+        "重新生成", "完全重写", "推倒重来", "全部重写", "从头生成",
+    }:
         return "regenerate"
-    if normalized in {"revise", "adjust", "修改", "调整", "优化"}:
+    if normalized in {"revise", "adjust", "optimize", "修改", "调整", "优化"}:
         return "revise"
-    compact = re.sub(r"\s+", "", str(instruction or ""))
-    regenerate_markers = ("重新生成", "完全重写", "推倒重来", "从头生成", "重新写一版", "重写一版")
+    compact = re.sub(r"\s+", "", str(instruction or "")).lower()
+    regenerate_markers = (
+        "重新生成", "完全重写", "推倒重来", "从头生成", "重新写一版", "重写一版", "全部重写",
+        "regenerate", "rewrite", "startover", "fullrewrite",
+    )
     return "regenerate" if any(marker in compact for marker in regenerate_markers) else "revise"
 
 
@@ -4135,7 +4231,7 @@ def _serial_refinement_targets(ws, volume, arcs, start_arc):
     _, _, total_chapters = context
     existing = {arc["idx"]: arc for arc in arcs}
     targets = []
-    for plan in _plan_story_arcs(total_chapters):
+    for plan in _story_arc_plans_for_volume(ws, volume, total_chapters):
         if plan["idx"] < start_arc:
             continue
         saved = existing.get(plan["idx"])
@@ -4147,7 +4243,7 @@ def _serial_refinement_targets(ws, volume, arcs, start_arc):
             "path": saved["path"] if saved else _story_arc_path(
                 ws, volume, plan["idx"], plan["start_ch"], plan["end_ch"],
             ),
-            "content": saved["content"] if saved else "（该情节单元尚未生成，请根据前序最新状态和用户指令创建。）",
+            "content": saved["content"] if saved else "(this story-arc unit has not been generated; create it from the latest prior state and the user instruction.)",
             "existed": bool(saved),
         })
     return targets
@@ -4204,7 +4300,7 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
         if stop_event is not None and stop_event.is_set():
             break
 
-        previous = generated_by_idx.get(target["idx"] - 1) or "（这是当前卷第一个情节单元）"
+        previous = generated_by_idx.get(target["idx"] - 1) or "(this is the first story-arc unit of the current volume)"
         action_label = (
             "基于原内容调整"
             if target["existed"] and refinement_mode == "revise"
@@ -4219,13 +4315,13 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
             )
         prompt = PromptLoader.load(
             "story_arc_serial_refine",
-            **generation_context,
+            **_story_arc_prompt_context(generation_context, target),
             instruction=instruction,
             previous_story_arc=previous,
             current_story_arc=(
                 target["content"]
                 if refinement_mode == "revise"
-                else "（本轮为完全重新生成，不提供当前单元旧版本，也不得臆测或复原旧文。）"
+                else "(this round is a full regenerate; do not use the old version of this unit, and do not invent or restore old text.)"
             ),
             arc_index=target["idx"],
             start_chapter=target["start_ch"],
@@ -4255,6 +4351,11 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
                     cancel_event.clear()
         if result is None:
             break
+        if not str(result).strip():
+            print(
+                f"  警告：情节单元{target['idx']}未获得模型输出，未写入文件，可重试。"
+            )
+            continue
 
         backup_path = os.path.join(backup_dir, f"{target['file']}_{stamp}")
         if target["existed"] and not os.path.exists(backup_path):
@@ -4403,7 +4504,7 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
             ) if ch_num > 1 else ""
             previous_text = re.sub(
                 r'\n?\[(?:FINISHED|CONTINUE)\]\s*$', '', previous_text or "",
-            ).strip() or "（这是第一章，无上一章章纲）"
+            ).strip() or "(this is chapter 1; no previous chapter outline)"
 
             print(f"  生成第{ch_num}章章纲...")
             prompt = PromptLoader.load(
@@ -4416,6 +4517,9 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
                 chapter_num=ch_num,
             )
             result = normalize_text(llm.generate(prompt))
+            if not str(result).strip():
+                print(f"  警告：第{ch_num}章章纲未获得模型输出，未写入文件，可重试。")
+                continue
             _generate_chapter_system_panel(llm, ws, volume, ch_num, result)
             result = _cap_story_line_in_outline(result)
             _write_file(out_file, result)
@@ -4545,7 +4649,7 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
         ) if ch_num > 1 else ""
         previous_text = re.sub(
             r'\n?\[(?:FINISHED|CONTINUE)\]\s*$', '', previous_text or "",
-        ).strip() or "（这是第一章，无上一章章纲）"
+        ).strip() or "(this is chapter 1; no previous chapter outline)"
 
         print(f"  生成第{ch_num}章章纲...")
         prompt = PromptLoader.load(
@@ -4623,7 +4727,7 @@ def _route_chapter_outline_refinement(llm, outlines, instruction, start_ch, end_
         "chapter_outline_refine_route",
         start_chapter=start_ch,
         end_chapter=end_ch,
-        current_outlines=current_text or "（当前尚无章纲）",
+        current_outlines=current_text or "(no chapter outlines yet)",
         instruction=instruction,
     )
     raw = normalize_text(_generate_with_cancel(llm, prompt, cancel_event, temperature=0.2))
@@ -4706,7 +4810,10 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
             "routing", 0, len(outlines),
             f"正在第{editable_start}-{end_ch}章可编辑范围内判断调整起点",
         )
-    generic_instruction = instruction.strip() in {"生成", "重新生成", "继续生成", "调整", "优化"}
+    generic_instruction = instruction.strip().lower() in {
+        "生成", "重新生成", "继续生成", "调整", "优化",
+        "generate", "regenerate", "continue generating", "adjust", "optimize",
+    }
     if generic_instruction:
         routed_chapter = editable_start
         refinement_mode = _normalize_refinement_mode(None, instruction)
@@ -4770,14 +4877,14 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
             "chapter_outline_serial_refine",
             story_arc=target_arc["content"],
             instruction=instruction,
-            previous_outline=previous or "（这是本情节单元的起始章）",
+            previous_outline=previous or "(this is the first chapter of this story-arc unit)",
             previous_system_panel=json.dumps(
                 _previous_system_panel(ws, volume, ch_num), ensure_ascii=False, indent=2,
             ),
             current_outline=(
-                (current or "（该章尚未生成）")
+                (current or "(this chapter has not been generated yet)")
                 if refinement_mode == "revise"
-                else "（本轮为完全重新生成，不提供当前章旧章纲，也不得臆测或复原旧文。）"
+                else "(this round is a full regenerate; do not use the old chapter outline, and do not invent or restore old text.)"
             ),
             chapter_num=ch_num,
         )
@@ -5014,14 +5121,22 @@ def _format_chapter_paragraphs(text, target_length=140, max_length=200):
 
 
 _CHAPTER_FORBIDDEN_STYLE_PATTERNS = (
-    ("破折号“——”", re.compile(r"——")),
+    ("em dash '——'", re.compile(r"——")),
     (
-        "“不是/并非……而是/却是……”二分对比套式",
+        "Chinese not-X-but-Y contrast template",
         re.compile(r"(?:不是|并非)[^。！？\n]{0,60}?(?:而是|却是)"),
     ),
     (
-        "“不仅/不只是……而且/更……”递进套式",
+        "Chinese not-only-X-but-also-Y template",
         re.compile(r"(?:不仅|不只是)[^。！？\n]{0,60}?(?:而且|更(?:是|加)?)"),
+    ),
+    (
+        "not X but Y contrast template",
+        re.compile(r"\bnot\b(?!\s+only\b)[^.\n]{0,60}?\bbut\b", re.I),
+    ),
+    (
+        "not only X but also Y template",
+        re.compile(r"\bnot only\b[^.\n]{0,60}?\bbut(?:\s+also)?\b", re.I),
     ),
 )
 
@@ -5081,10 +5196,6 @@ def _load_system_prompt_guide(ws, project_root):
     custom = _read_file(os.path.join(ws.file_system, "writing", "system_prompt.md"))
     if custom:
         return custom
-    if os.getenv("HARNESS_NOVEL_LANG", "en").strip().lower() != "zh":
-        english = _read_file(os.path.join(project_root, "core", "system_prompt.en.md"))
-        if english:
-            return english
     return _read_file(os.path.join(project_root, "core", "system_prompt.md"))
 
 
@@ -5100,7 +5211,7 @@ def _humanize_chapter_text(
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     writing_guide = (
         _load_system_prompt_guide(ws, project_root)
-        or "（无额外生文规范，请严格保持待精修正文已有的作者声音。）"
+        or "(no extra prose guide; keep the author voice already in the draft to refine.)"
     )
     prompt = PromptLoader.load(
         "humanize_chapter",
@@ -5148,7 +5259,7 @@ def gen_serial_chapters(
     custom_style_path = os.path.join(ws.file_system, "writing", "system_prompt.md")
     style_guide = _load_system_prompt_guide(ws, _root) or ""
     agents_md = _read_file(os.path.join(_root, "core", "agents.md")) or ""
-    writing_rules = f"{style_guide}\n\n{agents_md}" if style_guide or agents_md else "（无写作文风规范）"
+    writing_rules = f"{style_guide}\n\n{agents_md}" if style_guide or agents_md else "(no writing-style guide)"
     hard_style_rules = (
         "=== 本轮正文硬性风格约束（最终优先）===\n"
         "1. 不使用二分对比套式：例如“不是A，而是B”“不是X，也不是Y，是Z”。\n"
@@ -5319,7 +5430,7 @@ def gen_serial_chapters(
             content = _read_file(prev_file)
             if content:
                 prev_texts.append(content.strip())
-        history_section = "\n\n".join(prev_texts) if prev_texts else "（无前序正文，这是第一章）"
+        history_section = "\n\n".join(prev_texts) if prev_texts else "(no prior prose; this is chapter 1)"
 
         # 读取本章对应的新流程故事情节单元。
         story_arc_summary = _find_story_arc_for_chapter(ws, volume, ch_num)
@@ -5382,11 +5493,17 @@ def gen_serial_chapters(
                     cancel_event.clear()
         if result is None:
             break
+        if not str(result).strip():
+            print(f"  警告：第{ch_num}章正文未获得模型输出，未写入文件，可重试。")
+            continue
         if humanize:
             print(f"  第{ch_num}章正文去AI味处理中...")
             result = humanize_with_controls(ch_num, result, idx, len(tasks))
             if result is None:
                 break
+            if not str(result).strip():
+                print(f"  警告：第{ch_num}章去AI味未获得模型输出，未写入文件，可重试。")
+                continue
         result = _format_chapter_paragraphs(result)
         if regenerate_existing and os.path.exists(out_file):
             import shutil

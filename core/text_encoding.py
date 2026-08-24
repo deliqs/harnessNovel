@@ -1,4 +1,4 @@
-"""文本导入时的编码识别与 UTF-8 规范化。"""
+"""Encoding detection and UTF-8 normalization for imported text."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 try:
     from charset_normalizer import from_bytes
-except ImportError:  # 兼容已安装的旧版本，仍可使用内置中文编码回退。
+except ImportError:  # Fall back to built-in Chinese encodings if charset_normalizer is missing.
     from_bytes = None
 
 
@@ -24,14 +24,14 @@ _COMMON_CJK = set(
 
 
 def _cjk_score(text: str) -> tuple[int, int]:
-    """为中文候选解码打分，避免短 GBK 文本被误判成 Big5。"""
+    """Score Chinese decode candidates so short GBK text is not mistaken for Big5."""
     cjk_count = sum("\u4e00" <= char <= "\u9fff" for char in text)
     common_count = sum(char in _COMMON_CJK for char in text)
     return common_count, cjk_count
 
 
 def decode_text_bytes(raw: bytes) -> tuple[str, str]:
-    """解码常见网文文本编码，并返回内容及识别出的编码名称。"""
+    """Decode common web-novel encodings and return the text plus the detected encoding name."""
     for marker, encoding, label in _BOM_ENCODINGS:
         if raw.startswith(marker):
             return raw.decode(encoding), label
@@ -47,7 +47,7 @@ def decode_text_bytes(raw: bytes) -> tuple[str, str]:
         if detected and detected.encoding:
             candidates.append((str(detected), detected.encoding.upper()))
 
-    # GB18030 覆盖 GBK/GB2312，是中文小说最常见的兼容选择；与探测结果一起评分。
+    # GB18030 covers GBK/GB2312 and is the usual Chinese-novel fallback; score it with detections.
     for encoding, label in (("gb18030", "GB18030/GBK"), ("big5", "Big5")):
         try:
             candidates.append((raw.decode(encoding), label))
@@ -60,11 +60,11 @@ def decode_text_bytes(raw: bytes) -> tuple[str, str]:
     if candidates:
         return candidates[0]
 
-    raise ValueError("无法识别参考小说编码。请先转换为 UTF-8 后重新导入。")
+    raise ValueError("Could not detect the reference novel encoding. Convert it to UTF-8 and import again.")
 
 
 def copy_as_utf8(source: str | Path, destination: str | Path) -> str:
-    """读取源文本并以 UTF-8 写入目标路径，返回源文件识别编码。"""
+    """Read source text, write it as UTF-8 to the destination, and return the detected encoding."""
     source_path = Path(source)
     destination_path = Path(destination)
     text, encoding = decode_text_bytes(source_path.read_bytes())
