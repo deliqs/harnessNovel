@@ -1,56 +1,58 @@
-你是一个专业的网文故事情节设计师。请根据长线主线、前后舞台和对应参考卷的故事片段汇总，生成新小说的故事情节单元。
+You are a professional web-novel plot designer. Using the long mainline, the surrounding stages, and the matching reference-volume story-arc digest, generate a story-arc unit for the new novel.
 
-你的任务是基于核心玩法、长线主线、当前舞台规则和角色线，设计出符合当前阶段的故事情节。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【全书长线主线】
+Your task is to design a stage-appropriate story arc from the core gameplay, the long mainline, the current stage rules, and the character lines.
+
+【Full-book long mainline】
 {long_mainline}
 
-【上一个舞台】
+【Previous stage】
 {previous_stage}
 
-【当前舞台】
+【Current stage】
 {current_stage}
 
-【参考小说对应卷的故事片段汇总】
+【Reference novel matching-volume story-arc digest】
 {reference_story_arcs}
 
-【当前故事情节单元】
-情节单元 {arc_index}，覆盖第 {start_chapter} 章 - 第 {end_chapter} 章
+【Current story-arc unit】
+Story-arc unit {arc_index}, covering Chapter {start_chapter} - Chapter {end_chapter}
 
-【生成要求】
-请生成当前新小说的完整故事情节单元。必须做到：
-1. 情节必须符合当前新小说的世界观阶段、核心玩法和长线主线。
-2. 必须承接上一个舞台的结束状态，并严格服从当前舞台的三幕结构、人物谱系和伏笔安排。
-3. 当前单元需要覆盖第 {start_chapter} 章 - 第 {end_chapter} 章，内部可按自然节奏划分小片段，但不要机械逐章罗列。
-4. 以拆书故事片段的平均篇幅为基准，全文控制在约 {target_char_count} 个中文字符；每个字段平均约 {target_field_chars} 字，允许按信息量略作调配。
-5. 每个故事情节应包含：确立目标→铺垫危机→尝试解决→核心冲突爆发（爽点）→收获盘点→开启下一个困境的循环。若某阶段在此情节中自然缺失或延后，须在“叙事阶段识别”中说明。
-6. 确保读者有情绪变化：紧张、期待、痛快、意外、好奇。
-7. 输出格式、字段和简略程度必须对齐输入中的参考故事片段；输出是“故事片段摘要”，不是章纲或正文。每个字段只写一个紧凑段落，通常 1-2 句；禁止使用项目符号、子标题、逐章分解、角色逐人清单和重复解释。
-8. 只保留推动因果、状态变化和后续承接所必需的信息；具体对白、场景调度、每章安排和同义复述全部删除。
-9. 参考故事片段只用于学习格式、信息密度、自然边界和叙事功能，禁止照搬人物、地点、势力、能力、事件链与独特因果。
+【Generation requirements】
+Generate a complete story-arc unit for the current new novel. You must:
+1. The plot must fit the current new novel's worldview stage, core gameplay, and long mainline.
+2. It must pick up the previous stage's ending state and strictly obey the current stage's three-act structure, character roster, and foreshadowing plan.
+3. The current unit must cover Chapter {start_chapter} - Chapter {end_chapter}. Internally you may split small beats by natural rhythm, but do not list chapter by chapter mechanically.
+4. Using the average length of deconstructed story-arc summaries as the baseline, keep the full text around {target_char_count} characters-or-equivalent; each field averages about {target_field_chars} characters-or-equivalent, with modest redistribution by information load.
+5. Each story arc should contain the cycle: establish a goal → plant a crisis → attempt a solution → core conflict erupts (payoff) → tally gains → open the next bind. If a stage is naturally missing or delayed in this arc, say so in Narrative stages.
+6. Make sure the reader feels emotional change: tension, anticipation, satisfaction, surprise, curiosity.
+7. Output format, fields, and density must align with the reference story arcs in the input; the output is a "story-arc summary", not a chapter outline or prose. Each field is one compact paragraph, usually 1-2 sentences; do not use bullets, subheadings, chapter-by-chapter breakdowns, per-character inventories, or repeated explanations.
+8. Keep only the information needed to drive causality, state change, and later pickup; delete specific dialogue, scene blocking, per-chapter scheduling, and synonymous restatement.
+9. Use the reference story arcs only to learn format, information density, natural boundaries, and narrative function. Do not copy characters, places, factions, abilities, event chains, or unique causality.
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 表格。除第一行标题外，只输出以下 10 个字段，不得增删或改名。
+【Output format】
+Output plain text. Do not use Markdown tables. Except for the first-line title, output only the following 10 fields, with no additions, deletions, or renamed labels.
 
-第一行必须为：
-【情节{arc_index}：第{start_chapter}-{end_chapter}章｜标题】
+The first line must be:
+【Arc{arc_index}: Chapters {start_chapter}-{end_chapter} | title】
 
-情节功能：说明本情节在当前舞台和长线主线中的结构作用。
+Plot function: State this arc's structural role in the current stage and the long mainline.
 
-自然边界判断：说明为什么从第 {start_chapter} 章开始、到第 {end_chapter} 章结束，以及结尾形成的阶段性结果。
+Boundary reason: State why it starts at Chapter {start_chapter} and ends at Chapter {end_chapter}, and the staged result formed at the close.
 
-起承转合：写清触发、推进、转折、收束，包含具体角色、势力、地点、物品或能力。
+Rise and turn: Write the trigger, advance, turn, and close, including specific characters, factions, places, items, or abilities.
 
-叙事阶段识别：列出本情节实际包含的阶段；缺失阶段说明是自然缺失、延后还是并入其他情节。
+Narrative stages: List the stages this arc actually contains; for missing stages, say whether they are naturally absent, delayed, or folded into another arc.
 
-主角行动链：按“目标→判断→行动→阻力→调整→结果→下一步目标”写清完整行动链。
+Protagonist action chain: Write the full chain as "goal → judgment → action → resistance → adjustment → result → next goal".
 
-矛盾与情绪曲线：写清表层与深层矛盾、压抑点、拉扯点、爆发点、余韵，以及结尾情绪基调。
+Conflict and emotion curve: Write the surface and deep conflicts, pressure points, tug points, burst points, aftertaste, and the ending emotional tone.
 
-核心爽点或张力点：写清爽点/张力如何蓄积、触发和兑现；没有强爽点时写明主要承担的张力功能。
+Core payoff or tension: Write how the payoff/tension is stored, triggered, and cashed; if there is no strong payoff, state the main tension function this arc carries.
 
-角色与关系变化：写清主要角色的行动、动机、后果，以及角色之间关系和态度的前后变化。
+Character and relationship change: Write major characters' actions, motives, and consequences, and how relationships and attitudes change from before to after.
 
-收获与代价：写清物质、实力、身份、认知和关系收获，以及付出的代价与遗留风险。
+Gains and costs: Write material, power, status, knowledge, and relationship gains, plus the costs paid and leftover risk.
 
-伏笔与下个困境：写清新增与回收的伏笔、信息差（谁知道、谁不知道、读者知道到什么程度）和下一情节钩子。
+Foreshadowing and next bind: Write newly planted and paid-off foreshadowing, information gaps (who knows, who does not, how much the reader knows), and the hook into the next arc.

@@ -1,103 +1,105 @@
-你是一个专业的小说情节设计师。请根据本卷卷纲和世界观，为本卷指定章节范围生成批次摘要。
+You are a professional novel-plot designer. From this volume's outline and worldview, generate a batch summary for the specified chapter range of this volume.
 
-批次摘要是一个多章范围内的核心情节的概括性描述，用于指导后续的逐章章纲生成。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【优先级】
-生成时必须按以下优先级处理信息：
-1. 本卷卷纲
-2. 本卷世界观
-3. 换皮映射表
-4. 前序批次摘要
-5. 适配后的参考批次草稿
-6. 原参考故事情节单元/旧版批次摘要
+A batch summary is a high-level description of the core plot across a multi-chapter range. It is used to guide later chapter-by-chapter outline generation.
 
-如果低优先级材料与高优先级材料冲突，必须以高优先级材料为准。
+【Priority】
+When generating, process information in the following priority order:
+1. Volume outline for this volume
+2. Worldview for this volume
+3. Rewrite map
+4. Previous batch summaries
+5. Adapted reference-batch draft
+6. Original reference story units / old batch summaries
 
-【本卷卷纲】
+If lower-priority material conflicts with higher-priority material, the higher-priority material wins.
+
+【Volume outline for this volume】
 {volume_outline}
 
-【本卷世界观】
+【Worldview for this volume】
 {volume_worldview}
 
-【换皮映射表】（后续所有情节必须遵守）
+【Rewrite map】(all later plot must obey this)
 {rewrite_map}
 
-【剧情合理性约束】
+【Plot-reasonability constraints】
 {forbidden_terms}
 
-【当前批次】第 {batch_index} 批次，覆盖第 {start_chapter} 章 - 第 {end_chapter} 章
+【Current batch】 Batch {batch_index}, covering Chapter {start_chapter} - Chapter {end_chapter}
 
-【前序批次摘要】（当前批次的直接前驱，须承接）
+【Previous batch summary】(the immediate predecessor of the current batch; it must be continued)
 {previous_batch}
 
-【适配后的参考批次草稿】（目标世界可用的节奏草稿）
+【Adapted reference-batch draft】(a pacing draft usable in the target world)
 {adapted_reference_batch}
 
-【原参考小说对应故事情节单元/旧版批次摘要】（只用于核对节奏，不可直接继承设定）
+【Corresponding reference-novel story unit / old batch summary】(used only to check pacing; settings must not be inherited directly)
 {reference_batch}
 
 {audit_feedback}
 
 {previous_result}
 
-【生成要求】
-你的任务是为当前批次生成一份完整的情节摘要。须承接前序批次的情节发展，同时参考“适配后的参考批次草稿”的节奏和张力曲线。
+【Generation requirements】
+Your task is to generate a complete plot summary for the current batch. It must continue the plot development of the previous batch, while referring to the pacing and tension curve of the "adapted reference-batch draft".
 
-参考小说原故事情节单元/旧版批次摘要只允许用于学习以下内容：
-1. 情节功能
-2. 起承转合结构
-3. 片段长度
-4. 节奏曲线
-5. 爽点、危机、反转、伏笔的位置
+The original reference-novel story unit / old batch summary may be used only to learn the following:
+1. Plot function
+2. Setup-development-turn-resolution structure
+3. Segment length
+4. Pacing curve
+5. Placement of payoffs, crises, reversals, and foreshadowing
 
-禁止继承参考材料中与当前新小说大纲、本卷卷纲、本卷世界观冲突的：
-1. 原世界历史事件和主线任务
-2. 原世界阵营关系、阶段身份和宗教/势力因果
-3. 与当前阶段不匹配的跨世界内容
-4. 只改名字但保留原事件逻辑的硬换皮
+Do not inherit from the reference material anything that conflicts with the current new-novel outline, this volume's outline, or this volume's worldview:
+1. Original-world historical events and mainline tasks
+2. Original-world faction relations, stage identities, and religious / faction causality
+3. Cross-world content that does not match the current stage
+4. Hard reskins that only change names while keeping the original event logic
 
-注意：同人文、诸天流或神话题材中，人物、法宝、世界名称本身可能合法出现。不要因为名字与参考小说相同就判定不可用；关键是它在当前新书设定和当前阶段中是否合理。
+Note: in fanfic, all-heavens, or mythic works, character names, artifact names, and world names themselves may appear legally. Do not judge something unusable merely because a name matches the reference novel; the key is whether it is reasonable in the current new-book setting and the current stage.
 
-如果参考材料中的某个情节在目标世界没有自然对应物，必须保留其情节功能，用新世界观中合理的事件替代，或将其合并、删除、延后。
+If a plot in the reference material has no natural counterpart in the target world, you must keep its plot function and replace it with an event that makes sense in the new worldview, or merge, delete, or defer it.
 
-输出格式：
-将批次内容按故事片段组织。故事片段必须根据当前新小说的自然情节边界判断，构成一个相对完整的起承转合小弧；不要按固定章数机械切分，也不要逐章拆分。
+Output format:
+Organize the batch by story segments. Story segments must be judged from the natural plot boundaries of the current new novel, forming a relatively complete small arc of setup, development, turn, and resolution. Do not cut by a fixed chapter count, and do not split chapter by chapter.
 
-每个片段以【片段N：第X-Y章】开头（N从1开始），包含以下字段（每个字段都必须完整填写）：
+Each segment begins with 【Segment N: Chapters X-Y】 (N starts at 1) and contains the following fields (every field must be filled in completely):
 
-1. 核心事件：本片段发生了什么。写清起因、经过、结果。包含具体的角色名、势力名、地名等专有名词。体现主角的行动链路：计划→遭遇什么→结果如何→调整后如何应对。
+1. Core events: What happens in this segment. Write the cause, the course, and the result. Include concrete proper nouns such as character names, faction names, and place names. Show the protagonist's action chain: plan → what is encountered → what the result is → how they adjust and respond.
 
-2. 矛盾与情绪：本片段的矛盾方向（对外冲突或对内修炼/心理）。情绪曲线，重点标注压抑点和爆发点。标注片段结束时主角的情绪基调。
+2. Conflict and emotion: This segment's conflict direction (external conflict, or internal cultivation / psychology). The emotion curve, with emphasis on suppression points and explosion points. Mark the protagonist's emotional tone at the end of the segment.
 
-3. 角色行动：主要角色的关键行动序列，用箭头连接。重点记录谁做了什么、为什么做、导致了什么后果。
+3. Character actions: Key action sequences of the main characters, joined with arrows. Focus on who did what, why they did it, and what consequences followed.
 
-4. 主角状态：本片段结束时主角的身份、实力、处境、认知状态。与片段开始时相比有什么变化。
+4. Protagonist state: At the end of this segment, the protagonist's identity, power, situation, and cognitive state. What has changed compared with the start of the segment.
 
-5. 伏笔与线索：新埋伏笔及埋设方式、回收的前文伏笔及回收方式、信息差（谁掌握关键信息而谁不知情）。
+5. Foreshadowing and clues: Newly planted foreshadowing and how it was planted; recovered earlier foreshadowing and how it was recovered; information gaps (who holds key information and who does not know it).
 
-6. 承接关系：这个片段与上一个片段的衔接方式（因果承接、时间跳跃、场景切换等）。本片段末尾为后续设置的悬念或铺垫。
+6. Continuity: How this segment connects to the previous segment (causal continuation, time skip, scene switch, and so on). The suspense or setup this segment leaves at the end for what follows.
 
-所有片段之后，按以下板块输出整批汇总信息。每个板块必须完整，不得跳过。无相关内容的板块写"无"。
+After all segments, output whole-batch summary information in the following blocks. Every block must be complete; none may be skipped. For a block with no relevant content, write None.
 
-# 力量体系
-本批内出现或涉及的修炼境界、功法类型、法宝等级、特殊规则、特殊能力等。每条格式：名称 | 类型 | 简要描述 | 出现章节
+# Power system
+Cultivation realms, cultivation-art types, artifact grades, special rules, special abilities, and similar items that appear or are involved in this batch. Each entry format: name | type | brief description | chapters of appearance
 
-# 新出场角色
-本批内首次出场的角色。每个角色包含：姓名 | 身份 | 能力特长 | 与主角关系 | 核心动机
+# Newly introduced characters
+Characters who first appear in this batch. Each character includes: name | identity | abilities and specialties | relationship to the protagonist | core motive
 
-# 关键角色状态
-本批结束时各关键角色的处境和变化。
+# Key character states
+The situation and changes of each key character at the end of this batch.
 
-# 主角成长
-本批内主角的变化：实力突破、地位变化、资源获取、认知提升。标注触发点和章节。
+# Protagonist growth
+The protagonist's changes in this batch: power breakthroughs, status changes, resources obtained, cognitive gains. Mark triggers and chapters.
 
-# 逐章节奏
-每章单独标注：节奏（快/中/慢） | 章末钩子类型（悬念/危机/反转/新谜团/信息揭露） | 张力等级（1-5）。汇总为本批节奏曲线（如"快-快-慢-中-快"），标注张力峰值章节。
+# Per-chapter pacing
+Annotate each chapter separately: pacing (fast / medium / slow) | chapter-end hook type (suspense / crisis / reversal / new mystery / information reveal) | tension level (1-5). Summarize as this batch's pacing curve (for example "fast-fast-slow-medium-fast"), and mark the chapter of peak tension.
 
-# 跨章因果链
-第X章的事件 → 第Y章的结果。标注因果传递链条，帮助理解事件之间的驱动关系。
+# Cross-chapter causal chain
+Event in Chapter X → result in Chapter Y. Mark the causal transmission chain to make the driving relationships among events clear.
 
-【输出要求】
-使用纯文本输出，禁止使用 Markdown 格式符号（如 *、**、-、>、| 等）。标题使用 # 标记。段落之间用空行分隔。
+【Output requirements】
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings. Separate paragraphs with blank lines.
 
-输出前必须自检：本批次事件、人物动机、势力关系、世界观元素必须符合新小说大纲、本卷卷纲、本卷世界观和当前阶段；不得把参考小说旧世界因果直接写成新小说事实。
+Before output, you must self-check: events, character motives, faction relations, and worldview elements in this batch must fit the new-novel outline, this volume's outline, this volume's worldview, and the current stage; do not write old-world causality from the reference novel as facts of the new novel.

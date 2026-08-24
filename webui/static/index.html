@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f5f7f5" />
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <title>HarnessNovel 工作台</title>
-  <link rel="stylesheet" href="/assets/wizard-v0.css?v=46" />
+    <title>HarnessNovel Workbench</title>
+  <link rel="stylesheet" href="/assets/wizard-v0.css?v=48" />
   </head>
   <body>
     <div class="wizard-shell">
@@ -16,81 +16,81 @@
           <span class="brand-name"><strong>h</strong><strong>a</strong><span>rness</span><strong>N</strong><span>ovel</span></span>
         </div>
         <div class="workspace-switch">
-          <label class="rail-label" for="workspace-select">当前作品</label>
+          <label class="rail-label" for="workspace-select">Current work</label>
           <select id="workspace-select" class="workspace-select"></select>
           <div class="rail-workspace-actions">
-            <button id="new-workspace" class="rail-new" type="button">+ 新建工作区</button>
-            <button id="delete-workspace" class="rail-delete" type="button">删除当前</button>
+            <button id="new-workspace" class="rail-new" type="button">+ New workspace</button>
+            <button id="delete-workspace" class="rail-delete" type="button">Delete current</button>
           </div>
         </div>
-        <nav class="workflow-nav" aria-label="创作流程">
-          <h2>创作流程</h2>
+        <nav class="workflow-nav" aria-label="Writing workflow">
+          <h2>Writing workflow</h2>
           <div id="workflow-list"></div>
         </nav>
-        <section class="rail-about" aria-label="项目与作者">
-          <p class="rail-about-label">项目与作者</p>
+        <section class="rail-about" aria-label="Project and author">
+          <p class="rail-about-label">Project and author</p>
           <a class="rail-project-link" href="https://github.com/XTmingyue/harnessNovel" target="_blank" rel="noopener noreferrer">
-            <span>GitHub 仓库</span>
+            <span>GitHub repository</span>
             <small>XTmingyue/harnessNovel&nbsp;↗</small>
           </a>
           <details class="rail-contact">
-            <summary><span>联系作者</span><small>微信公众号</small></summary>
+            <summary><span>Contact the author</span><small>WeChat</small></summary>
             <div class="rail-contact-body">
-              <img src="/assets/author-wechat.jpg" alt="作者微信公众号二维码" />
-              <p>扫码关注「飞鸟onTheWay」</p>
+              <img src="/assets/author-wechat.jpg" alt="Author WeChat QR code" />
+              <p>Scan to follow 飞鸟onTheWay</p>
             </div>
           </details>
         </section>
       </aside>
       <main class="stage">
         <header class="stagebar">
-          <div class="stagebar-left"><span class="stage-path">分步创作与人工确认</span><span class="stage-separator"></span><span id="step-count" class="step-count">STEP 01 / 07</span></div>
-          <div class="stagebar-right"><button id="open-settings" class="drawer-button" type="button">大模型 API 配置</button><button id="open-task-drawer" class="drawer-button" type="button">任务与日志</button></div>
+          <div class="stagebar-left"><span class="stage-path">Step-by-step writing with human review</span><span class="stage-separator"></span><span id="step-count" class="step-count">STEP 01 / 07</span></div>
+          <div class="stagebar-right"><button id="open-settings" class="drawer-button" type="button">LLM API settings</button><button id="open-task-drawer" class="drawer-button" type="button">Tasks and logs</button></div>
         </header>
         <div id="step-canvas" class="step-canvas"></div>
       </main>
     </div>
     <div id="drawer-scrim" class="drawer-scrim"></div>
-    <aside id="task-drawer" class="drawer" aria-label="任务与日志">
-      <div class="drawer-header"><h2>任务与日志</h2><button id="close-task-drawer" class="drawer-close" type="button" title="关闭">&times;</button></div>
+    <aside id="task-drawer" class="drawer" aria-label="Tasks and logs">
+      <div class="drawer-header"><h2>Tasks and logs</h2><button id="close-task-drawer" class="drawer-close" type="button" title="Close">&times;</button></div>
       <div id="drawer-tasks" class="drawer-list"></div>
       <div class="drawer-view-tabs" role="tablist">
-        <button class="active" type="button" data-task-view="log">执行日志</button>
-        <button type="button" data-task-view="prompt">模型 Prompt <span id="drawer-prompt-count">0</span></button>
+        <button class="active" type="button" data-task-view="log">Run log</button>
+        <button type="button" data-task-view="prompt">Model prompt <span id="drawer-prompt-count">0</span></button>
       </div>
       <div class="drawer-history-actions">
-        <button id="clear-workspace-prompts" type="button">清空 Prompt</button>
-        <button id="delete-current-task" class="danger" type="button">删除任务记录</button>
+        <button id="clear-workspace-prompts" type="button">Clear prompts</button>
+        <button id="delete-current-task" class="danger" type="button">Delete task record</button>
       </div>
-      <pre id="drawer-log" class="drawer-log">选择任务后，这里显示实时输出。</pre>
-      <div id="drawer-prompts" class="drawer-prompts" hidden><p class="drawer-prompt-empty">该任务尚未调用大模型。</p></div>
+      <pre id="drawer-log" class="drawer-log">Select a task to see live output here.</pre>
+      <div id="drawer-prompts" class="drawer-prompts" hidden><p class="drawer-prompt-empty">This task has not called a model yet.</p></div>
     </aside>
     <dialog id="prompt-dialog" class="prompt-dialog">
-      <header><div><p id="prompt-dialog-meta">模型调用</p><h2>实际输入 Prompt</h2></div><button id="close-prompt-dialog" class="drawer-close" type="button" title="关闭">&times;</button></header>
+      <header><div><p id="prompt-dialog-meta">Model call</p><h2>Actual input prompt</h2></div><button id="close-prompt-dialog" class="drawer-close" type="button" title="Close">&times;</button></header>
       <div id="prompt-dialog-list" class="prompt-dialog-list"></div>
-      <footer><button id="copy-current-prompt" class="secondary-button" type="button">复制当前 Prompt</button></footer>
+      <footer><button id="copy-current-prompt" class="secondary-button" type="button">Copy current prompt</button></footer>
     </dialog>
     <div id="file-scrim" class="file-scrim"></div>
-    <aside id="file-browser" class="file-browser" aria-label="工作区文件">
-      <div class="drawer-header"><h2>工作区文件</h2><button id="close-file-browser" class="drawer-close" type="button" title="关闭">&times;</button></div>
-      <label class="file-search-label" for="file-search">筛选文件<input id="file-search" type="search" placeholder="按名称或路径筛选" /></label>
+    <aside id="file-browser" class="file-browser" aria-label="Workspace files">
+      <div class="drawer-header"><h2>Workspace files</h2><button id="close-file-browser" class="drawer-close" type="button" title="Close">&times;</button></div>
+      <label class="file-search-label" for="file-search">Filter files<input id="file-search" type="search" placeholder="Filter by name or path" /></label>
       <div id="file-browser-list" class="file-browser-list"></div>
     </aside>
     <div id="settings-scrim" class="settings-scrim"></div>
-    <aside id="settings-panel" class="settings-panel" aria-label="大模型 API 配置" aria-hidden="true">
-      <header class="settings-header"><div><p>本地配置</p><h2>大模型 API 配置</h2></div><button id="close-settings" class="drawer-close" type="button" title="关闭">&times;</button></header>
+    <aside id="settings-panel" class="settings-panel" aria-label="LLM API settings" aria-hidden="true">
+      <header class="settings-header"><div><p>Local settings</p><h2>LLM API settings</h2></div><button id="close-settings" class="drawer-close" type="button" title="Close">&times;</button></header>
       <div id="settings-content" class="settings-content"></div>
     </aside>
     <div id="workspace-scrim" class="workspace-scrim"></div>
-    <section id="workspace-panel" class="workspace-panel" aria-label="新建工作区" aria-hidden="true">
-      <header class="settings-header"><div><p>新建作品</p><h2>创建工作区</h2></div><button id="close-workspace-panel" class="drawer-close" type="button" title="关闭">&times;</button></header>
+    <section id="workspace-panel" class="workspace-panel" aria-label="New workspace" aria-hidden="true">
+      <header class="settings-header"><div><p>New work</p><h2>Create workspace</h2></div><button id="close-workspace-panel" class="drawer-close" type="button" title="Close">&times;</button></header>
       <form id="new-workspace-form" class="workspace-form">
-        <label>作品名称<input id="new-workspace-name" name="workspace" maxlength="80" autocomplete="off" placeholder="例如：封神因果录" required /></label>
-        <p class="workspace-note">创建后进入“参考小说”步骤，在那里选择文件并决定拆整本还是前 N 章。</p>
-        <div class="workspace-actions"><button id="cancel-workspace" class="secondary-button" type="button">取消</button><button class="primary-button" type="submit">创建工作区</button></div>
+        <label>Work title<input id="new-workspace-name" name="workspace" maxlength="80" autocomplete="off" placeholder="e.g. The Lock at the Gate" required /></label>
+        <p class="workspace-note">After creating it you enter the Reference novel step, where you choose a file and decide whether to deconstruct the whole book or the first N chapters.</p>
+        <div class="workspace-actions"><button id="cancel-workspace" class="secondary-button" type="button">Cancel</button><button class="primary-button" type="submit">Create workspace</button></div>
       </form>
     </section>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/wizard-v0.js?v=47"></script>
+  <script src="/assets/wizard-v0.js?v=48"></script>
   </body>
 </html>

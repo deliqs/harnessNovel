@@ -1,4 +1,4 @@
-"""HarnessNovel 本地 Web 工作台的 FastAPI 应用。"""
+"""FastAPI app for the local HarnessNovel web workbench."""
 
 from __future__ import annotations
 
@@ -46,14 +46,14 @@ CONFIG_KEYS = [
     "ADAPTIVE_BUILDER_LITE_API_KEY",
 ]
 CONFIG_GROUPS = {
-    "data_builder": ("参考拆解模型", "DATA_BUILDER"),
-    "adaptive_builder": ("全书设计与舞台设计模型（推荐 Pro）", "ADAPTIVE_BUILDER"),
-    "adaptive_builder_lite": ("故事情节、章纲与正文模型（推荐 Flash）", "ADAPTIVE_BUILDER_LITE"),
+    "data_builder": ("Reference deconstruction model", "DATA_BUILDER"),
+    "adaptive_builder": ("Book design and stage design model (Pro recommended)", "ADAPTIVE_BUILDER"),
+    "adaptive_builder_lite": ("Story-arc, chapter-outline, and draft model (Flash recommended)", "ADAPTIVE_BUILDER_LITE"),
 }
 
 
 def _effective_config_path() -> Path:
-    """Web 配置始终使用 HarnessNovel 的全局配置文件。"""
+    """Web settings always use the HarnessNovel global config file."""
     return CONFIG_PATH
 
 
@@ -155,7 +155,7 @@ class WebRuntime:
 
     def set_workspace_root(self, root: str) -> None:
         if any(task["status"] in {"queued", "running"} for task in self.tasks.list()):
-            raise ValueError("有任务正在执行，结束后才能切换工作区根目录。")
+            raise ValueError("A task is running. Finish it before changing the workspace root.")
         self.store.set_root(root)
         os.environ["HARNESS_NOVEL_HOME"] = str(self.store.root)
         self.design_chat.root = Path(root)
@@ -201,7 +201,7 @@ class WebRuntime:
         name = require_workspace_name(name)
         managers = (self.design_chat, self.arcs_chat, self.chapters_chat, self.draft_chat)
         if any(self._chat_manager_busy(manager, name) for manager in managers):
-            raise ValueError("该工作区仍有内容生成任务正在执行，请先结束任务再删除。")
+            raise ValueError("This workspace still has a content-generation task. Stop it before deleting.")
         self.tasks.begin_workspace_delete(name)
         try:
             result = self.store.delete_workspace(name)
@@ -244,7 +244,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             root = str(payload.get("workspace_root") or "").strip()
             if not root:
-                raise ValueError("请填写工作区根目录。")
+                raise ValueError("Enter a workspace root directory.")
             runtime.set_workspace_root(root)
             return {"workspace_root": str(runtime.store.root)}
         except ValueError as exc:
@@ -258,22 +258,22 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     def update_config(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         raw_values = payload.get("values")
         if not isinstance(raw_values, dict):
-            raise _http_error(ValueError("配置格式无效。"))
+            raise _http_error(ValueError("Invalid config format."))
         updates: dict[str, str] = {}
         for key in CONFIG_KEYS:
             value = raw_values.get(key)
             if value is None:
                 continue
             value = str(value).strip()
-            # API Key 留空即保持已有值，避免浏览器无法回显密钥时误清空。
+            # Leaving API Key blank keeps the existing value so the browser cannot wipe a hidden key.
             if key.endswith("_API_KEY") and not value:
                 continue
             if value:
                 updates[key] = value
         if updates:
             _update_env(updates)
-            # 同步更新当前 Web 进程。ConfigLoader 默认优先读取 os.environ，
-            # 仅写 .env 会导致同进程聊天和后续子进程仍沿用启动时的旧值。
+            # Also update the current web process. ConfigLoader prefers os.environ,
+            # so writing only .env would leave in-process chat and later subprocesses on the old startup values.
             from core.config import ConfigLoader
             ConfigLoader.activate(updates)
         return _config_for_client()
@@ -287,7 +287,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             return runtime.store.summary(name)
         except FileNotFoundError as exc:
-            raise _http_error(ValueError("工作区不存在。"), 404) from exc
+            raise _http_error(ValueError("Workspace does not exist."), 404) from exc
         except ValueError as exc:
             raise _http_error(exc) from exc
 
@@ -296,7 +296,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             return runtime.delete_workspace(name)
         except FileNotFoundError as exc:
-            raise _http_error(ValueError("工作区不存在。"), 404) from exc
+            raise _http_error(ValueError("Workspace does not exist."), 404) from exc
         except ValueError as exc:
             raise _http_error(exc) from exc
 
@@ -305,7 +305,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             return {"items": runtime.store.tree(name)}
         except FileNotFoundError as exc:
-            raise _http_error(ValueError("工作区不存在。"), 404) from exc
+            raise _http_error(ValueError("Workspace does not exist."), 404) from exc
         except ValueError as exc:
             raise _http_error(exc) from exc
 
@@ -314,7 +314,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             return runtime.store.read_file(name, path)
         except FileNotFoundError as exc:
-            raise _http_error(ValueError("文件不存在。"), 404) from exc
+            raise _http_error(ValueError("File does not exist."), 404) from exc
         except ValueError as exc:
             raise _http_error(exc) from exc
 
@@ -324,7 +324,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             path = str(payload.get("path") or "")
             content = payload.get("content")
             if not isinstance(content, str):
-                raise ValueError("保存内容必须是文本。")
+                raise ValueError("Saved content must be text.")
             runtime.store.write_file(name, path, content)
             return {"saved": True}
         except ValueError as exc:
@@ -335,7 +335,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             return runtime.store.reference_arc_chapters(name, path)
         except FileNotFoundError as exc:
-            raise _http_error(ValueError("文件不存在。"), 404) from exc
+            raise _http_error(ValueError("File does not exist."), 404) from exc
         except ValueError as exc:
             raise _http_error(exc) from exc
 
@@ -354,7 +354,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     def arcs_chat(name: str, volume: int, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         message = str(payload.get("message") or "").strip()
         if not message:
-            raise _http_error(ValueError("请输入内容后再发送。"))
+            raise _http_error(ValueError("Enter content before sending."))
         try:
             return runtime.arcs_chat.start_message(name, volume, message)
         except Exception as exc:
@@ -421,7 +421,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     def chapters_chat(name: str, volume: int, arc_idx: int, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         message = str(payload.get("message") or "").strip()
         if not message:
-            raise _http_error(ValueError("请输入内容后再发送。"))
+            raise _http_error(ValueError("Enter content before sending."))
         try:
             return runtime.chapters_chat.start_message(name, volume, arc_idx, message)
         except Exception as exc:
@@ -565,7 +565,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
                 return runtime.draft_chat.stop(name, volume, arc_idx)
             if action == "continue":
                 return runtime.draft_chat.continue_incomplete(name, volume, arc_idx)
-            raise ValueError("不支持的正文任务操作。")
+            raise ValueError("Unsupported draft-task action.")
         except Exception as exc:
             raise _http_error(exc) from exc
 
@@ -590,7 +590,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     @app.post("/api/workspaces/{name}/design/{scope}/generate")
     def design_generate(name: str, scope: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         try:
             ws = init_workspace(name)
             from training.adaptive_builder import gen_design_concept, gen_stage_design
@@ -608,7 +608,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     @app.post("/api/workspaces/{name}/design/{scope}/chat")
     def design_chat(name: str, scope: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         message = str(payload.get("message") or "").strip()
         raw_attachments = payload.get("attachments") or []
         attachments = []
@@ -617,7 +617,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
                 if not isinstance(item, dict):
                     continue
                 attachments.append({
-                    "name": str(item.get("name") or "附件"),
+                    "name": str(item.get("name") or "attachment"),
                     "content": str(item.get("content") or ""),
                 })
         if (
@@ -626,7 +626,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             and not bool(payload.get("use_new_reference"))
             and not bool(payload.get("sync_updated_design"))
         ):
-            raise _http_error(ValueError("请输入灵感或上传文件后再发送。"))
+            raise _http_error(ValueError("Enter inspiration or upload a file before sending."))
         try:
             return runtime.design_chat.start_message(
                 name, scope, message, attachments,
@@ -634,19 +634,19 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
                 sync_updated_design=bool(payload.get("sync_updated_design")),
             )
         except Exception as exc:
-            # 参数问题才是 400；模型调用、输出校验等服务端生成失败应返回 500。
+            # Parameter errors are 400; model calls, output checks, and other server generation failures should return 500.
             raise _http_error(exc, 500 if isinstance(exc, RuntimeError) else 400) from exc
 
     @app.get("/api/workspaces/{name}/design/{scope}/job")
     def design_job(name: str, scope: str) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         return runtime.design_chat.job_status(name, scope)
 
     @app.get("/api/workspaces/{name}/design/{scope}/prompts")
     def design_prompts(name: str, scope: str) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         return runtime.design_chat.prompts(name, scope)
 
     @app.post("/api/workspaces/{name}/design/{scope}/pause")
@@ -680,7 +680,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     @app.post("/api/workspaces/{name}/design/{scope}/reset")
     def design_reset(name: str, scope: str) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         try:
             return runtime.design_chat.reset(name, scope)
         except Exception as exc:
@@ -689,20 +689,20 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     @app.get("/api/workspaces/{name}/design/{scope}/conversation")
     def design_conversation(name: str, scope: str) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         return runtime.design_chat.get(name, scope).history()
 
     @app.delete("/api/workspaces/{name}/design/{scope}/conversation")
     def design_conversation_clear(name: str, scope: str) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
-            raise _http_error(ValueError("设计步骤只能是 concept 或 stage。"))
+            raise _http_error(ValueError("Design step must be concept or stage."))
         return runtime.design_chat.clear(name, scope)
 
     @app.post("/api/uploads")
     async def upload_file(file: UploadFile = File(...)) -> dict[str, Any]:
         suffix = Path(file.filename or "").suffix.lower()
         if suffix not in UPLOAD_EXTENSIONS:
-            raise _http_error(ValueError("仅支持 txt、md、json、csv、yaml 等文本资料。"))
+            raise _http_error(ValueError("Only text sources such as txt, md, json, csv, and yaml are supported."))
         filename = _safe_filename(file.filename)
         destination = runtime.uploads.root / f"{os.urandom(8).hex()}_{filename}"
         size = 0
@@ -711,7 +711,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
                 while (chunk := await file.read(1024 * 1024)):
                     size += len(chunk)
                     if size > MAX_UPLOAD_BYTES:
-                        raise ValueError("上传文件超过 80MB。")
+                        raise ValueError("Uploaded file exceeds 80MB.")
                     handle.write(chunk)
         except Exception:
             destination.unlink(missing_ok=True)
@@ -728,7 +728,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             workspace = str(payload.get("workspace") or "")
             args = payload.get("args") or {}
             if not isinstance(args, dict):
-                raise ValueError("任务参数格式无效。")
+                raise ValueError("Invalid task arguments.")
             task = runtime.tasks.create(task_type, workspace, args)
             return task.public()
         except ValueError as exc:
@@ -742,7 +742,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     def get_task(task_id: str) -> dict[str, Any]:
         task = runtime.tasks.get(task_id)
         if not task:
-            raise _http_error(ValueError("任务不存在。"), 404)
+            raise _http_error(ValueError("Task does not exist."), 404)
         return task.public()
 
     @app.get("/api/tasks/{task_id}/logs")
@@ -750,21 +750,21 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         try:
             return runtime.tasks.logs(task_id, offset)
         except KeyError as exc:
-            raise _http_error(ValueError("任务不存在。"), 404) from exc
+            raise _http_error(ValueError("Task does not exist."), 404) from exc
 
     @app.get("/api/tasks/{task_id}/prompts")
     def task_prompts(task_id: str) -> dict[str, Any]:
         try:
             return runtime.tasks.prompts(task_id)
         except KeyError as exc:
-            raise _http_error(ValueError("任务不存在。"), 404) from exc
+            raise _http_error(ValueError("Task does not exist."), 404) from exc
 
     @app.delete("/api/tasks/{task_id}")
     def delete_task(task_id: str) -> dict[str, Any]:
         try:
             return runtime.tasks.delete(task_id)
         except KeyError as exc:
-            raise _http_error(ValueError("任务不存在。"), 404) from exc
+            raise _http_error(ValueError("Task does not exist."), 404) from exc
         except ValueError as exc:
             raise _http_error(exc) from exc
 

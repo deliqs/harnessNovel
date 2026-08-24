@@ -1,4 +1,4 @@
-"""可恢复的参考小说三阶段拆解：单章卡 -> 故事片段 -> 全书结构。"""
+"""Resumable three-stage reference-novel deconstruction: chapter cards -> story segments -> book structure."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def _file_digest(path: Path) -> str:
 
 
 def _chapter_digest(content: str) -> str:
-    """章节级稳定指纹；忽略下载站造成的空白差异，但保留正文字符差异。"""
+    """Stable chapter-level fingerprint; ignore whitespace from download sites, keep character differences in the prose."""
     canonical = re.sub(r"\s+", "", normalize_text(content or ""))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -88,7 +88,7 @@ def _compact_text(value: Any, limit: int = 1000) -> str:
 
 
 class ReferenceAnalyzer:
-    """以可独立保存的单章事实卡作为故事片段提取的事实底座。"""
+    """Use independently saved single-chapter fact cards as the factual base for story-segment extract."""
 
     def __init__(
         self,
@@ -184,7 +184,7 @@ class ReferenceAnalyzer:
         }
 
     def _load_chapters(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        # 延迟导入，避免 outline_builder 调用本模块时形成模块初始化循环。
+        # Delayed import so outline_builder calling this module does not create an init cycle.
         from training.outline_builder import split_chapters
 
         return split_chapters(str(self.txt_path))
@@ -227,10 +227,10 @@ class ReferenceAnalyzer:
         self.outlines_dir.mkdir(parents=True, exist_ok=True)
 
     def _restore_resegmented_working_volume(self) -> None:
-        """作者更新后，将智能分卷产物还原为可继续滚动拆解的全书工作卷。
+        """After an author update, restore smart-split artifacts into a whole-book working volume that can keep rolling deconstruction.
 
-        智能分卷只改变文件归属，故事片段文件中的章节范围仍是全书章节号，因此可以
-        无损汇回一个工作卷；新增片段完成后，外层流程会再次检查并执行智能分卷。
+        Smart split only changes file ownership; chapter ranges in story-segment files stay whole-book numbers, so they can
+        be merged back into one working volume losslessly; after new segments finish, the outer flow rechecks and smart-splits again.
         """
         arc_items: dict[tuple[int, int], str] = {}
         for path in self.outlines_dir.glob("vol_*/story_arcs/arc_*_ch*_*.md"):
@@ -329,7 +329,7 @@ class ReferenceAnalyzer:
                 content_digest = _chapter_digest(chapter_data.get("content", ""))
                 card = self._load_card(global_chapter, source_digest, content_digest)
                 if card:
-                    # 文件整体摘要变化不影响章节事实卡复用；同步到当前快照。
+                    # Whole-file digest change does not block chapter-card reuse; sync to the current snapshot.
                     card["source_digest"] = source_digest
                     card["content_digest"] = content_digest
                     _write_json(self._card_path(global_chapter), card)
@@ -340,7 +340,7 @@ class ReferenceAnalyzer:
                     "volume_index": spec["index"],
                     "volume_title": spec["title"],
                     "volume_chapter": local,
-                    "title": chapter_data.get("title", f"第{global_chapter}章"),
+                    "title": chapter_data.get("title", f"Chapter {global_chapter}"),
                     "content": chapter_data.get("content", ""),
                     "content_digest": content_digest,
                 })
@@ -358,8 +358,8 @@ class ReferenceAnalyzer:
                     item = futures[future]
                     try:
                         card = future.result()
-                    except Exception as exc:  # noqa: BLE001 - 保留已成功的断点资产。
-                        errors.append(f"第{item['chapter']}章：{exc}")
+                    except Exception as exc:  # noqa: BLE001 - keep already-successful checkpoint assets.
+                        errors.append(f"Chapter {item['chapter']}: {exc}")
                         continue
                     existing[int(card["chapter"])] = card
                     print(f"    -> Chapter {item['chapter']} fact card saved")
@@ -378,7 +378,7 @@ class ReferenceAnalyzer:
             title=item["title"],
             chapter_text=item["content"],
         )
-        payload = self._generate_json(prompt, f"第{item['chapter']}章事实卡")
+        payload = self._generate_json(prompt, f"chapter {item['chapter']} fact card")
         card = self._normalize_card(payload, item, source_digest)
         _write_json(self._card_path(int(card["chapter"])), card)
         return card
@@ -395,14 +395,14 @@ class ReferenceAnalyzer:
                 if isinstance(payload, dict):
                     return payload
                 raise ValueError("The model did not return a JSON object")
-            except Exception as exc:  # noqa: BLE001 - 需要针对模型格式容错重试。
+            except Exception as exc:  # noqa: BLE001 - retry with format tolerance for model output.
                 last_error = exc
                 if attempt < 2:
                     current_prompt = (
                         prompt
                         + "\n\n[Previous output could not be parsed]\n"
                         + f"Error: {exc}\n"
-                        + "请只返回合法 JSON 对象，不要包含 Markdown 或解释。"
+                        + "Return a valid JSON object only. Do not include Markdown or explanation."
                     )
         raise RuntimeError(f"{label} JSON parse failed: {last_error}")
 
@@ -527,11 +527,11 @@ class ReferenceAnalyzer:
                 previous_tail_context="(none; this round uses a normal rolling window.)",
                 chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
             )
-            payload = self._generate_json(prompt, f"卷{spec['index']}故事片段")
+            payload = self._generate_json(prompt, f"volume {spec['index']} story segments")
             segments = self._normalize_segments(payload, window)
             if not segments:
                 if is_final_window or len(window) >= self.max_chapters_per_segment:
-                    segments = [self._fallback_segment(window[: self.max_chapters_per_segment], "窗口达到上限或当前范围结束，使用事实卡兜底收束。")]
+                    segments = [self._fallback_segment(window[: self.max_chapters_per_segment], "Window hit the cap or the current range ended; close with a fact-card fallback.")]
                 else:
                     carryover = window
                     continue
@@ -564,7 +564,7 @@ class ReferenceAnalyzer:
         arc_dir: Path,
         existing: list[dict[str, Any]],
     ) -> None:
-        """用旧末片段和新增前10章重新判断一次自然边界。"""
+        """Re-judge a natural boundary from the old tail segment plus the first 10 newly added chapters."""
         if not existing or not getattr(self, "previous_target", 0):
             return
         previous_local_end = self.previous_target - int(spec["global_start"]) + 1
@@ -597,7 +597,7 @@ class ReferenceAnalyzer:
             previous_tail_context=tail["content"],
             chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
         )
-        payload = self._generate_json(prompt, f"卷{spec['index']}末故事片段边界重评")
+        payload = self._generate_json(prompt, f"volume {spec['index']} tail-segment boundary re-eval")
         segments = self._normalize_segments(payload, window)
         if not segments or int(segments[-1]["end_chapter"]) < int(tail["end_chapter"]):
             print("    -> Re-evaluation did not form a reliable new boundary; keeping the original tail segment.")
@@ -613,7 +613,7 @@ class ReferenceAnalyzer:
             )
             next_index += 1
         print(
-            f"    -> 已重新划分末尾边界，当前重评覆盖至第{segments[-1]['end_chapter']}章。"
+            f"    -> Tail boundary re-split; current re-eval covers through chapter {segments[-1]['end_chapter']}."
         )
 
     def _load_arc_items(self, arc_dir: Path) -> list[dict[str, Any]]:
@@ -662,7 +662,7 @@ class ReferenceAnalyzer:
             accepted.append({
                 "start_chapter": start,
                 "end_chapter": end,
-                "title": _compact_text(raw.get("title") or f"第{start}-{end}章情节", 180),
+                "title": _compact_text(raw.get("title") or f"Chapters {start}-{end} plot", 180),
                 "narrative_function": _compact_text(raw.get("narrative_function"), 600),
                 "boundary_reason": _compact_text(raw.get("boundary_reason"), 700),
                 "structure": _compact_text(raw.get("structure"), 1400),
@@ -682,19 +682,19 @@ class ReferenceAnalyzer:
         return {
             "start_chapter": start,
             "end_chapter": end,
-            "title": f"第{start}-{end}章过渡情节",
-            "narrative_function": "基于已保存单章事实卡的阶段推进。",
+            "title": f"Chapters {start}-{end} transition plot",
+            "narrative_function": "Phase advance based on saved single-chapter fact cards.",
             "boundary_reason": reason,
             "structure": "；".join(card.get("chapter_outline_600", "") or card.get("summary", "") for card in cards),
             "protagonist_action": "；".join(card.get("story_line", "") for card in cards if card.get("story_line")),
             "emotion_rhythm": " -> ".join(
                 (card.get("chapter_rhythm") or {}).get("emotion_tone", "") for card in cards if (card.get("chapter_rhythm") or {}).get("emotion_tone")
             ),
-            "satisfaction_point": "待后续片段或人工补充。",
+            "satisfaction_point": "To be filled by later segments or by hand.",
             "character_changes": "；".join(
                 (card.get("chapter_rhythm") or {}).get("beat_detail", "") for card in cards if (card.get("chapter_rhythm") or {}).get("beat_detail")
             ),
-            "gains_costs": "待后续片段或人工补充。",
+            "gains_costs": "To be filled by later segments or by hand.",
             "foreshadowing": "；".join("；".join(card.get("highlights", [])) for card in cards if card.get("highlights")),
         }
 
@@ -757,7 +757,7 @@ class ReferenceAnalyzer:
             state = self.state.setdefault("volumes", {}).setdefault(str(spec["index"]), {})
             outline_path = spec["directory"] / "volume_outline.md"
             if state.get("structure_digest") != digest or not outline_path.is_file():
-                suffix = "已完成本卷" if closed >= spec["total_count"] else f"当前仅覆盖本卷第1-{closed}章"
+                suffix = "this volume is complete" if closed >= spec["total_count"] else f"currently covers only chapters 1-{closed} of this volume"
                 prompt = PromptLoader.load(
                     "volume_merge",
                     volume_title=f"{spec['title']}（{suffix}）",
@@ -767,7 +767,7 @@ class ReferenceAnalyzer:
                     total_batches=len(arc_texts),
                     batch_summaries="\n\n---\n\n".join(arc_texts),
                 )
-                outline = normalize_text(self._generate_text(prompt, f"卷{spec['index']}结构梳理"))
+                outline = normalize_text(self._generate_text(prompt, f"volume {spec['index']} structure extract"))
                 _write_text(outline_path, outline)
                 state["structure_digest"] = digest
             volume_outlines.append({"title": spec["title"], "outline": _read_text(outline_path)})
@@ -784,7 +784,7 @@ class ReferenceAnalyzer:
                 f"【{item['title']}】\n{item['outline']}" for item in volume_outlines
             )
             prompt = PromptLoader.load("novel_extract", all_volume_outlines=all_outlines)
-            generated = normalize_text(self._generate_text(prompt, "参考小说整体结构梳理"))
+            generated = normalize_text(self._generate_text(prompt, "reference-novel whole-book structure extract"))
             coverage = self._coverage_header(target, total, segmented_global)
             _write_text(novel_outline_path, coverage + "\n\n" + generated)
             structure.update({
@@ -806,17 +806,17 @@ class ReferenceAnalyzer:
     def _coverage_header(target: int, total: int, segmented_global: list[int]) -> str:
         ranges = _ranges(segmented_global)
         range_text = "、".join(
-            f"第{item['start']}章" if item["start"] == item["end"] else f"第{item['start']}-{item['end']}章"
+            f"chapter {item['start']}" if item["start"] == item["end"] else f"chapters {item['start']}-{item['end']}"
             for item in ranges
-        ) or "暂无"
-        state = "最终结构" if target == total and ranges and ranges[-1]["end"] >= total else "阶段性结构"
+        ) or "none yet"
+        state = "final structure" if target == total and ranges and ranges[-1]["end"] >= total else "staged structure"
         return "\n".join([
-            "# 拆解覆盖状态",
+            "# Deconstruction coverage",
             "",
-            f"结构类型：{state}",
-            f"单章事实卡覆盖：第1-{target}章 / 全书{total}章",
-            f"已闭合故事片段覆盖：{range_text}",
-            "说明：未闭合尾部不会被强行纳入结构，后续拆解会在保持已闭合片段不变的前提下继续补齐。",
+            f"Structure type: {state}",
+            f"Single-chapter fact-card coverage: chapters 1-{target} / {total} in the book",
+            f"Closed story-segment coverage: {range_text}",
+            "Note: an unclosed tail is not forced into the structure; later deconstruction continues to fill it without changing closed segments.",
         ])
 
 
@@ -829,7 +829,7 @@ def run_reference_analysis(
     resume: bool = False,
     rebuild: bool = False,
 ) -> dict[str, Any]:
-    """CLI 入口：使用参考拆解模型运行新的三阶段分析。"""
+    """CLI entry: run the three-stage analysis with the reference-deconstruction model."""
     config = ConfigLoader.get_data_builder_config()
     if not config.get("api_key"):
         config["api_key"] = os.getenv("OPENAI_API_KEY")
@@ -850,7 +850,7 @@ def run_reference_analysis(
 
 
 def mark_resegmented(output_dir: str | Path) -> None:
-    """记录旧版虚拟分卷已重组，后续完整重试不再回写原始单卷目录。"""
+    """Record that a legacy virtual split was regrouped; a later full retry must not write back original single-volume dirs."""
     state_path = Path(output_dir) / "analysis_state.json"
     state = _read_json(state_path, {})
     if not isinstance(state, dict) or state.get("pipeline_version") != PIPELINE_VERSION:

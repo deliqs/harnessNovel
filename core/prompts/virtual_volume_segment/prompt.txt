@@ -1,31 +1,33 @@
-你是一个专业的玄幻小说结构分析专家。以下是一部无分卷标记的玄幻小说的全部故事情节单元摘要（或旧版批次摘要）。每个故事情节单元都有章节范围（如【情节N：第X-Y章】）。请根据情节边界和大弧线，将整部小说划分为若干卷。
+You are a professional xuanhuan-novel structure analyst. Below are all story-unit summaries (or old batch summaries) of a xuanhuan novel with no volume markers. Each story unit has a chapter range (for example 【ArcN: Chapters X-Y】). Divide the whole novel into several volumes according to plot boundaries and large arcs.
 
-【全部故事情节单元/摘要】
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【All story units / summaries】
 {batch_summaries}
 
-【分卷依据】
+【Volume-division basis】
 
-优先利用故事情节单元边界。情节单元（【情节N：第X-Y章】）本身就是故事弧的自然切分，卷边界应优先落在情节单元边界上。
+Prefer story-unit boundaries. A plot unit (【ArcN: Chapters X-Y】) is itself a natural cut of the story arc, so volume boundaries should fall on plot-unit boundaries first.
 
-在此基础上，参考以下信号判断卷边界：
-1. 大型矛盾解决：一场持续多个片段的核心冲突得到阶段性收束
-2. 新阶段开启：进入新地图、新境界、新势力范围
-3. 重要角色退场或入场：核心配角离开或新核心角色出现
-4. 时间跳跃：故事时间有明显跳过
-5. 主角身份或地位发生质变：从外门弟子变内门、从散修变宗主等
-6. 矛盾方向切换：对外冲突转为对内修炼，或反过来
+On that basis, use the following signals to judge volume boundaries:
+1. A large conflict is resolved: a core conflict that lasted across multiple segments reaches a staged close
+2. A new stage begins: entering a new map, a new realm, or a new faction's range
+3. An important character exits or enters: a core supporting character leaves, or a new core character appears
+4. A time skip: story time clearly jumps
+5. A qualitative change in the protagonist's identity or status: from outer-sect disciple to inner-sect, from rogue cultivator to sect master, and so on
+6. A switch in conflict direction: external conflict turns to internal cultivation, or the reverse
 
-【分卷要求】
+【Volume-division requirements】
 
-1. 每卷不少于60章，通常为60-150章，以情节弧线完整性优先，不强制等长
-2. 每卷应包含一段相对完整的大弧（开端、发展、高潮、收束），由多个情节单元组成
-3. 卷边界应优先落在情节单元边界上，不能把一个情节单元劈成两卷
-4. 给每卷起一个3-8字的卷名，概括本卷核心事件或意象
+1. Each volume is no fewer than 60 chapters, usually 60-150 chapters. Completeness of the plot arc comes first; equal length is not required
+2. Each volume should contain a relatively complete large arc (opening, development, climax, close), made of multiple plot units
+3. Volume boundaries should fall on plot-unit boundaries first. Do not split one plot unit across two volumes
+4. Give each volume a 3-8-word volume title that summarizes this volume's core event or image
 
-【输出格式】
+【Output format】
 
-严格按以下格式输出，每行一卷，不要输出其他内容：
+Output strictly in the following format, one volume per line, and output nothing else:
 
-卷1：卷名 | 第1-78章
-卷2：卷名 | 第79-155章
-卷3：卷名 | 第156-230章
+Volume 1: volume name | Chapters 1-78
+Volume 2: volume name | Chapters 79-155
+Volume 3: volume name | Chapters 156-230

@@ -1,44 +1,46 @@
-你是长篇网文的长线主线与舞台设计师。全书设计已经吸收了新增拆书内容，现在需要把变化同步到后续舞台。
+You are a long-form web-novel long-mainline and stage designer. The book design has already absorbed newly added deconstruction content. The changes now need to be synced into later stages.
 
-硬性边界：
-1. 当前已有舞台必须原样保留，不得改写、删除、重排或重新编号。
-2. 只能补充长线主线的后续发展，并从指定编号开始追加新舞台。
-3. 新舞台必须承接当前最后一个舞台，同时服从更新后的粗略大纲与世界观。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【用户本轮指令】
+Hard boundaries:
+1. Existing stages must be kept as they are. Do not rewrite, delete, reorder, or renumber them.
+2. You may only supplement later development of the long mainline, and append new stages starting from the specified number.
+3. New stages must inherit the current last stage, and must obey the updated rough outline and worldview.
+
+[User instruction this round]
 {instruction}
 
-【更新后的粗略大纲】
+[Updated rough outline]
 {rough_outline}
 
-【更新后的世界观】
+[Updated worldview]
 {worldview}
 
-【当前长线主线】
+[Current long mainline]
 {long_mainline}
 
-【当前舞台路线图（不可修改）】
+[Current stage roadmap (must not be modified)]
 {stage_roadmap}
 
-【尚未映射的新增参考故事片段】
+[Newly added reference story segments not yet mapped]
 {reference_arcs}
 
-【目标世界知识库】
+[Target world knowledge base]
 {world_knowledge}
 
-【新舞台起始编号】
+[Starting number for new stages]
 {next_stage_number}
 
-请只输出合法 JSON：
+Output valid JSON only:
 {{
-  "long_mainline_append": "只写需要追加到现有长线主线末尾的新发展；没有则为空字符串",
-  "stage_roadmap_append": "# 舞台N：名称\n\n...",
-  "referenced_arc_paths": ["本轮实际参考或映射到的片段ID"],
-  "adjustment_note": "一句话说明同步新增了什么"
+  "long_mainline_append": "Write only new development that should be appended to the end of the existing long mainline; if none, an empty string",
+  "stage_roadmap_append": "# Stage N: Name\n\n...",
+  "referenced_arc_paths": ["segment IDs actually referenced or mapped this round"],
+  "adjustment_note": "One sentence describing what was synced and added"
 }}
 
-要求：
-1. stage_roadmap_append 必须从“# 舞台{next_stage_number}：”开始，只包含新增舞台。
-2. 每个舞台保留预计章节数、阶段功能、玩法价值、长线推进、规则、短线、资源、压力、角色节点、结束状态、后患与钩子。
-3. referenced_arc_paths 只能填写输入中存在且本轮实际使用的片段ID。
-4. 不得复述或输出任何已有舞台。
+Requirements:
+1. stage_roadmap_append must start with "# Stage {next_stage_number}:" and contain only newly added stages.
+2. Each stage keeps Planned chapters, Stage function, Gameplay value, Long mainline advance, Stage rules, Short lines inside the stage, Main resources, Main enemies/pressure, Character nodes, End state, Aftermath and hooks.
+3. referenced_arc_paths may only contain segment IDs that exist in the input and that this round actually used.
+4. Do not recap or output any existing stage.

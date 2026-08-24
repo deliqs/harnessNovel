@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""harness-novel 统一 CLI 入口"""
+"""harness-novel unified CLI entry"""
 
 import sys
 import os
@@ -9,44 +9,44 @@ import re
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 
 def cmd_config(args):
-      """初始化全局配置文件 ~/.harnessNovel/.env"""
+      """Initialize the global config file ~/.harnessNovel/.env"""
       import os
       config_dir = os.path.join(os.path.expanduser("~"), ".harnessNovel")
       env_path = os.path.join(config_dir, ".env")
       if os.path.exists(env_path) and not args.force:
-          print(f"配置文件已存在：{env_path}")
-          print("使用 --force 覆盖")
+          print(f"Config file already exists: {env_path}")
+          print("Use --force to overwrite")
           return
       os.makedirs(config_dir, exist_ok=True)
-      template = """# 参考小说故事情节单元提取（init 流程，建议 flash 模型）
+      template = """# Reference novel story-arc extraction (init flow; flash model recommended)
   DATA_BUILDER_MODEL=deepseek-v4-flash
   DATA_BUILDER_BASE_URL=https://api.deepseek.com
   DATA_BUILDER_API_KEY=your-api-key
 
-  # 全书设计与舞台设计（建议 pro 模型）
+  # Book design and stage design (pro model recommended)
   ADAPTIVE_BUILDER_MODEL=deepseek-v4-pro
   ADAPTIVE_BUILDER_BASE_URL=https://api.deepseek.com
   ADAPTIVE_BUILDER_API_KEY=your-api-key
 
-  # 故事情节、逐章章纲、正文及轻量辅助任务（建议 flash 模型）
+  # Story arcs, chapter outlines, drafts, and lightweight tasks (flash model recommended)
   ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
   ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
   ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
   """
       with open(env_path, "w", encoding="utf-8") as f:
           f.write(template)
-      print(f"配置文件已创建：{env_path}")
-      print("请编辑该文件，填入你的 API Key")
+      print(f"Config file created: {env_path}")
+      print("Edit the file and fill in your API key")
 
 def cmd_list(args):
     from core.workspace import list_novels
     novels = list_novels()
     if novels:
-        print("已有工作区：")
+        print("Existing workspaces:")
         for name in novels:
             print(f"  - {name}")
     else:
-        print("暂无工作区。")
+        print("No workspaces yet.")
 
 
 def _reference_state_path(ws):
@@ -54,7 +54,7 @@ def _reference_state_path(ws):
 
 
 def _uploaded_source_name(path):
-    """移除 Web 临时上传文件的随机前缀，保留用户看到的原始文件名。"""
+    """Strip the random prefix from a web temp upload and keep the original filename."""
     return re.sub(r"^[0-9a-f]{16}_", "", os.path.basename(path), flags=re.IGNORECASE)
 
 
@@ -81,7 +81,7 @@ def _save_reference_state(ws, state):
 
 
 def _saved_reference_story_arc_end(ws):
-    """返回已落盘故事片段覆盖的总章数，用于可恢复的参考拆解。"""
+    """Return total chapters covered by saved story arcs, for resumable reference deconstruction."""
     import json
     import re
 
@@ -117,10 +117,10 @@ def _saved_reference_story_arc_end(ws):
 
 
 def _reference_card_complete_count(ws):
-    """读取 analysis_state 中已完成的单章事实卡数量，作为真实拆解进度的可靠下界。
+    """Read completed chapter-card count from analysis_state as a reliable lower bound on deconstruction progress.
 
-    单章事实卡是拆解的事实底座：没有卡的章节不可能已被拆解。比 story-arc 的分卷 meta.json
-    更可靠——后者在换源/部分拆解后可能残留旧值。
+    Chapter fact cards are the factual base of deconstruction: a chapter without a card cannot have been deconstructed. More reliable than story-arc volume meta.json,
+    which can keep stale values after a source change or partial deconstruction.
     """
     import json
 
@@ -142,7 +142,7 @@ def _reference_card_complete_count(ws):
 
 
 def _canonical_chapter_digest(chapter):
-    """生成与拆解器一致的章节指纹，用于识别新版整本快照的公共前缀。"""
+    """Build the same chapter digest as the deconstructor, to find the shared prefix of a new full-book snapshot."""
     import hashlib
     import re
     from core.text_utils import normalize_text
@@ -153,7 +153,7 @@ def _canonical_chapter_digest(chapter):
 
 
 def _replace_reference_with_latest_snapshot(ws, incoming_path):
-    """用作者最新整本快照替换源文件，并复用公共前缀的事实卡。"""
+    """Replace the source file with the author's latest full-book snapshot and reuse fact cards for the shared prefix."""
     import hashlib
     import json
     import tempfile
@@ -171,7 +171,7 @@ def _replace_reference_with_latest_snapshot(ws, incoming_path):
     finally:
         os.unlink(temporary_path)
     if not new_chapters:
-        raise ValueError("上传文件中未识别到有效章节。")
+        raise ValueError("No valid chapters were found in the uploaded file.")
 
     reusable_limit = min(_reference_card_complete_count(ws), len(old_chapters))
     common_prefix = 0
@@ -181,12 +181,12 @@ def _replace_reference_with_latest_snapshot(ws, incoming_path):
         common_prefix += 1
     if common_prefix < reusable_limit:
         raise ValueError(
-            f"新版小说从第 {common_prefix + 1} 章开始与已拆解内容不一致，"
-            f"无法安全复用前 {reusable_limit} 章。若作者修改了旧章节，请使用重新拆解。"
+            f"The new novel diverges from deconstructed content starting at chapter {common_prefix + 1},"
+            f"so the first {reusable_limit} chapters cannot be reused safely. If older chapters were edited, rebuild the deconstruction."
         )
     if len(new_chapters) < reusable_limit:
         raise ValueError(
-            f"新版小说仅识别到 {len(new_chapters)} 章，少于已拆解的 {reusable_limit} 章。"
+            f"The new novel only has {len(new_chapters)} chapters, fewer than the {reusable_limit} already deconstructed."
         )
 
     with open(ws.reference_sample, "w", encoding="utf-8") as handle:
@@ -240,7 +240,7 @@ def _replace_reference_with_latest_snapshot(ws, incoming_path):
 
 def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, source_name=None, source_encoding=None,
                             rebuild_reference=False):
-    """执行参考小说拆解；续拆时只处理已有片段覆盖范围之后的章节。"""
+    """Run reference deconstruction; resume only processes chapters after the saved coverage."""
     import re
     from datetime import datetime
     from training.outline_builder import run_outline_build, split_chapters, split_chapters_to_files
@@ -248,33 +248,33 @@ def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, sou
     _, all_chapters = split_chapters(ws.reference_sample)
     total_chapters = len(all_chapters)
     if not total_chapters:
-        print("错误：未识别到有效章节，无法拆解。请检查小说章节标题格式。")
+        print("Error: no valid chapters were found, so deconstruction cannot run. Check the novel's chapter-heading format.")
         return False
 
     target_chapters = min(max_chapters or total_chapters, total_chapters)
     previous_state = _load_reference_state(ws)
     state_progress = int(previous_state.get("processed_chapters") or 0)
     arc_progress = _saved_reference_story_arc_end(ws)
-    # 容错：残留旧分卷 meta.json 的 end_ch 会把 arc_progress 顶高（换源 / 部分拆解后未重算）。
-    # 单章事实卡是拆解的真实底座，且已拆解数不可能超过源文件总章节数；据此封顶，避免续拆被误拦、提示失真。
+    # Tolerance: a stale volume meta.json end_ch can inflate arc_progress (after a source change or partial deconstruction).
+    # Chapter fact cards are the true deconstruction base, and processed chapters cannot exceed the source chapter count; cap here so resume is not blocked and messages stay accurate.
     arc_progress = min(arc_progress, total_chapters, _reference_card_complete_count(ws) or total_chapters)
     previous_chapters = max(state_progress, arc_progress)
     if rebuild_reference:
-        print("  已请求重新拆解，将清除已有参考拆解资产。")
+        print("  Rebuild requested; existing reference deconstruction assets will be cleared.")
         previous_chapters = 0
     if resume and target_chapters < previous_chapters:
-        print(f"当前已拆解至第 {previous_chapters} 章；目标章节数不能小于当前进度。")
+        print(f"Already deconstructed through chapter {previous_chapters}; the target chapter count cannot be smaller.")
         return False
 
     if target_chapters < total_chapters:
-        print(f"  拆解范围：前 {target_chapters}/{total_chapters} 章（可稍后继续拆解）")
+        print(f"  Deconstruction range: first {target_chapters}/{total_chapters} chapters (you can continue later)")
     else:
-        print(f"  拆解范围：整本书（共 {total_chapters} 章）")
+        print(f"  Deconstruction range: whole book ({total_chapters} chapters)")
 
     if resume and target_chapters == previous_chapters and not rebuild_reference:
-        print(f"  将从第 {previous_chapters} 章的已保存结果重试，补齐未完成的派生步骤。")
+        print(f"  Retrying from the saved result at chapter {previous_chapters} to finish remaining derived steps.")
 
-    # 先落盘进行中状态。即使模型调用或进程中断，Web 端仍能知道总范围并从已有片段续跑。
+    # Write in-progress state first. Even if a model call or process stops, the web UI still knows the full range and can resume from saved arcs.
     _save_reference_state(ws, {
         "source_name": source_name or previous_state.get("source_name") or os.path.basename(ws.reference_sample),
         "source_encoding": source_encoding or previous_state.get("source_encoding") or "UTF-8",
@@ -299,7 +299,7 @@ def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, sou
         rebuild_reference=rebuild_reference,
     )
     if not analysis_result:
-        raise RuntimeError("参考小说拆解未生成有效结果。")
+        raise RuntimeError("Reference deconstruction did not produce a valid result.")
 
     outlines_dir = os.path.join(ws.reference, "outlines")
     is_partial = target_chapters < total_chapters
@@ -309,7 +309,7 @@ def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, sou
             if re.match(r"^vol_\d+_.+$", name) and os.path.isdir(os.path.join(outlines_dir, name))
         ]
         if len(vol_dirs) <= 1:
-            print("\n检测到仅有一个分卷，执行智能分卷...")
+            print("\nOnly one volume was detected; running intelligent volume split...")
             from training.outline_builder import resegment
             from training.reference_analyzer import mark_resegmented
             resegment(outlines_dir)
@@ -320,11 +320,11 @@ def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, sou
             if resulting_dirs and not any("全书" in name for name in resulting_dirs):
                 mark_resegmented(ws.reference)
             else:
-                print("  智能分卷未完成，保留当前拆解状态以便下次重试。")
+                print("  Intelligent volume split did not finish; keeping the current deconstruction state for the next retry.")
         else:
-            print(f"\n检测到 {len(vol_dirs)} 个分卷，跳过智能分卷。")
+            print(f"\nDetected {len(vol_dirs)} volumes; skipping intelligent volume split.")
     elif is_partial:
-        print("\n当前为部分拆解，保留现有情节单元；完成整本拆解后再执行智能分卷。")
+        print("\nThis is a partial deconstruction; keeping existing story arcs. Run intelligent volume split after the whole book is deconstructed.")
 
     _save_reference_state(ws, {
         "source_name": source_name or previous_state.get("source_name") or os.path.basename(ws.reference_sample),
@@ -336,12 +336,12 @@ def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, sou
         "batch_size": batch_size,
         "updated_at": datetime.now().isoformat(timespec="seconds"),
     })
-    print(f"\n工作空间目录：{ws.root}")
+    print(f"\nWorkspace directory: {ws.root}")
     return True
 
 
 def cmd_init(args):
-    """创建工作空间。novel init <name> --txt <path>"""
+    """Create a workspace. novel init <name> --txt <path>"""
     from core.workspace import init_workspace
     from core.text_encoding import copy_as_utf8
 
@@ -350,33 +350,33 @@ def cmd_init(args):
     txt_path = args.txt
 
     if not txt_path:
-        print(f"工作空间「{args.workspace}」已创建：{ws.root}")
-        print("提示：使用 --txt 添加参考小说文件，例如：novel init <name> --txt 小说.txt")
+        print(f"Workspace '{args.workspace}' created: {ws.root}")
+        print("Tip: use --txt to add a reference novel, for example: novel init <name> --txt novel.txt")
         return
 
     if not os.path.exists(txt_path):
-        print(f"错误：文件不存在：{txt_path}")
+        print(f"Error: file does not exist: {txt_path}")
         return
     if args.max_chapters is not None and args.max_chapters < 1:
-        print("错误：--max-chapters 必须是正整数。")
+        print("Error: --max-chapters must be a positive integer.")
         return
 
     dest = ws.reference_sample
     try:
         source_encoding = copy_as_utf8(txt_path, dest)
     except ValueError as exc:
-        print(f"错误：{exc}")
+        print(f"Error: {exc}")
         return
     name = os.path.splitext(os.path.basename(txt_path))[0]
-    print(f"工作空间「{args.workspace}」已创建")
-    print(f"  参考小说：{name}")
-    print(f"  文件位置：{dest}")
+    print(f"Workspace '{args.workspace}' created")
+    print(f"  Reference novel: {name}")
+    print(f"  File location: {dest}")
     if source_encoding == "UTF-8":
-        print("  文件编码：UTF-8")
+        print("  File encoding: UTF-8")
     else:
-        print(f"  文件编码：检测到 {source_encoding}，已转换为 UTF-8")
+        print(f"  File encoding: detected {source_encoding}, converted to UTF-8")
     if args.no_analyze:
-        print("  参考小说已导入。请在参考小说步骤选择拆解整本书或前 N 章后开始拆解。")
+        print("  Reference novel imported. In the reference step, choose whole-book or first-N deconstruction, then start.")
         return
     _run_reference_pipeline(
         ws,
@@ -389,30 +389,30 @@ def cmd_init(args):
 
 
 def cmd_reference_resume(args):
-    """继续拆解；上传文件视为作者最新的整本小说快照。"""
+    """Resume deconstruction; an uploaded file is treated as the author's latest full-book snapshot."""
     from core.workspace import init_workspace
 
     ws = init_workspace(args.workspace)
     if not os.path.isfile(ws.reference_sample):
-        print("错误：当前工作区尚未导入参考小说。请先执行 novel init <工作区> --txt <小说.txt>。")
+        print("Error: this workspace has not imported a reference novel. Run novel init <workspace> --txt <novel.txt> first.")
         return
     if args.max_chapters is not None and args.max_chapters < 1:
-        print("错误：--max-chapters 必须是正整数。")
+        print("Error: --max-chapters must be a positive integer.")
         return
     snapshot_source_name = None
     snapshot_source_encoding = None
     if args.txt:
         if not os.path.isfile(args.txt):
-            print(f"错误：新版小说文件不存在：{args.txt}")
+            print(f"Error: the new novel file does not exist: {args.txt}")
             return
         try:
             snapshot = _replace_reference_with_latest_snapshot(ws, args.txt)
         except ValueError as exc:
-            print(f"错误：{exc}")
+            print(f"Error: {exc}")
             return
         print(
-            f"  已识别新版整本小说（{snapshot['encoding']}）：共 {snapshot['total_chapters']} 章；"
-            f"复用前 {snapshot['reused_cards']} 章拆解结果，待拆新增 {snapshot['new_chapters']} 章。"
+            f"  Recognized a new full-book novel ({snapshot['encoding']}): {snapshot['total_chapters']} chapters;"
+            f" reusing deconstruction for the first {snapshot['reused_cards']} chapters, with {snapshot['new_chapters']} new chapters to deconstruct."
         )
         snapshot_source_name = _uploaded_source_name(args.txt)
         snapshot_source_encoding = snapshot["encoding"]
@@ -433,17 +433,17 @@ def _ws(name):
 
 
 def _resolve_volume_arg(args):
-    """解析新流程卷号。--stage 仅保留为旧命令兼容别名。"""
+    """Resolve the new-flow volume number. --stage is kept only as a compatibility alias."""
     volume = getattr(args, "volume", None)
     stage = getattr(args, "stage", None)
     if volume is not None and stage is not None and volume != stage:
-        print("错误：当前流程中“舞台”等同于卷号，不支持同时指定不同的 --volume 和 --stage。")
-        print("请使用 --volume N；--stage 仅为兼容旧命令保留。")
+        print("Error: in the current flow a stage is the same as a volume; different --volume and --stage values cannot be set together.")
+        print("Use --volume N; --stage is kept only for older commands.")
         return None
     return volume if volume is not None else (stage if stage is not None else 1)
 
 
-# ── 仿写流程 ──────────────────────────────────────────────
+# ── Imitation flow ──────────────────────────────────────────────
 
 def cmd_novel_outline(args):
     from training.adaptive_builder import gen_novel_outline
@@ -469,7 +469,7 @@ def cmd_world_import(args):
             primary_source=args.primary,
         )
         if not result:
-            raise RuntimeError("目标世界资料已导入，但资料库构建失败，请检查任务日志后重试。")
+            raise RuntimeError("Target-world sources were imported, but knowledge-base build failed. Check the task log and retry.")
 
 
 def cmd_world_build(args):
@@ -485,7 +485,7 @@ def cmd_world_build(args):
         merge_only=args.merge_only,
     )
     if not result:
-        raise RuntimeError("目标世界资料库构建失败，请检查任务日志后重试。")
+        raise RuntimeError("Target-world knowledge-base build failed. Check the task log and retry.")
 
 
 def cmd_novel_name_synopsis(args):
@@ -530,7 +530,7 @@ def cmd_stage_insert(args):
     from training.adaptive_builder import insert_stage
     ws = _ws(args.workspace)
     if args.after_stage is not None and args.before_stage is not None:
-        print("错误：--after-stage 和 --before-stage 不能同时使用。")
+        print("Error: --after-stage and --before-stage cannot be used together.")
         return
     insert_stage(
         ws,
@@ -592,168 +592,168 @@ def cmd_write(args):
 
 
 def cmd_web(args):
-    """启动本地可视化工作台。"""
+    """Start the local visual workbench."""
     try:
         import uvicorn
         from webui.app import create_app
     except ImportError as exc:
-        print("错误：Web 工作台依赖未安装。请重新执行 pip install --upgrade harnessNovel。")
-        print(f"详情：{exc}")
+        print("Error: web workbench dependencies are not installed. Run pip install --upgrade harnessNovel again.")
+        print(f"Details: {exc}")
         return
 
     app = create_app(workspace_root=args.workspace_root)
-    print(f">>> HarnessNovel Web 工作台已启动：http://{args.host}:{args.port} <<<")
-    print("按 Ctrl+C 停止服务。")
+    print(f">>> HarnessNovel web workbench started: http://{args.host}:{args.port} <<<")
+    print("Press Ctrl+C to stop the server.")
     uvicorn.run(app, host=args.host, port=args.port)
 
 
-# ── 主入口 ──────────────────────────────────────────────
+# ── Main entry ──────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
         prog="novel",
-        description="harness-novel 统一 CLI",
+        description="harness-novel unified CLI",
     )
-    sub = parser.add_subparsers(dest="command", help="子命令")
+    sub = parser.add_subparsers(dest="command", help="subcommands")
 
     # config
-    p = sub.add_parser("config", help="初始化全局配置文件")
-    p.add_argument("--force", action="store_true", help="覆盖已有配置")
+    p = sub.add_parser("config", help="Initialize the global config file")
+    p.add_argument("--force", action="store_true", help="Overwrite existing config")
 
     # list
-    sub.add_parser("list", help="列出所有工作区")
+    sub.add_parser("list", help="List all workspaces")
 
     # init
-    p = sub.add_parser("init", help="创建工作空间")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--txt", help="参考小说文件路径")
-    p.add_argument("--batch-size", type=int, default=20, help="每次读取章节数，用于识别故事情节单元（默认20）")
-    p.add_argument("--max-chapters", type=int, default=None, help="只拆解前 N 章（默认整本）")
-    p.add_argument("--no-analyze", action="store_true", help="仅导入参考小说，不立即开始拆解")
-    p.add_argument("--rebuild-reference", action="store_true", help="清除已有参考拆解资产后重新拆解")
+    p = sub.add_parser("init", help="Create a workspace")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--txt", help="Reference novel file path")
+    p.add_argument("--batch-size", type=int, default=20, help="Chapters per read window for story-arc detection (default 20)")
+    p.add_argument("--max-chapters", type=int, default=None, help="Deconstruct only the first N chapters (default: whole book)")
+    p.add_argument("--no-analyze", action="store_true", help="Import the reference novel only; do not start deconstruction yet")
+    p.add_argument("--rebuild-reference", action="store_true", help="Clear existing reference deconstruction assets and deconstruct again")
 
     # reference-resume
-    p = sub.add_parser("reference-resume", help="继续拆解已导入的参考小说，不重复上传文件")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--txt", help="作者更新后重新下载的完整小说 TXT 文件")
-    p.add_argument("--batch-size", type=int, default=20, help="每次读取章节数，用于识别故事情节单元（默认20）")
-    p.add_argument("--max-chapters", type=int, default=None, help="将拆解范围扩展到前 N 章（默认整本）")
-    p.add_argument("--rebuild-reference", action="store_true", help="清除已有参考拆解资产后重新拆解")
+    p = sub.add_parser("reference-resume", help="Resume deconstruction of an imported reference novel without re-uploading")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--txt", help="Full novel TXT re-downloaded after the author updated it")
+    p.add_argument("--batch-size", type=int, default=20, help="Chapters per read window for story-arc detection (default 20)")
+    p.add_argument("--max-chapters", type=int, default=None, help="Extend deconstruction through the first N chapters (default: whole book)")
+    p.add_argument("--rebuild-reference", action="store_true", help="Clear existing reference deconstruction assets and deconstruct again")
 
     # novel-outline
-    p = sub.add_parser("novel-outline", help="生成核心玩法、长线主线、舞台路线图和角色线")
-    p.add_argument("workspace", help="工作区名称")
+    p = sub.add_parser("novel-outline", help="Generate core gameplay, long mainline, stage roadmap, and character arcs")
+    p.add_argument("workspace", help="Workspace name")
     p.add_argument("--force", action="store_true")
-    p.add_argument("--direction", help="创作方向（字符串）")
-    p.add_argument("--direction-file", help="创作方向文件路径")
+    p.add_argument("--direction", help="Creative direction (string)")
+    p.add_argument("--direction-file", help="Creative-direction file path")
 
     # world-import
-    p = sub.add_parser("world-import", help="导入目标题材资料")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("paths", nargs="+", help="资料文件或目录路径，可传多个")
-    p.add_argument("--force", action="store_true", help="覆盖已导入的同源文件")
-    p.add_argument("--build", action="store_true", help="导入完成后立即构建目标世界资料库")
-    p.add_argument("--chunk-size", type=int, default=36000, help="构建时的资料分片字符数（默认36000）")
-    p.add_argument("--chapter-batch-size", type=int, default=20, help="构建时每批最多处理章节数（默认20，同时受分片字符数限制）")
-    p.add_argument("--max-workers", type=int, default=4, help="章节批次并行提取数（默认4）")
-    p.add_argument("--primary", default=None, help="指定主资料；不指定时默认使用最大文件")
+    p = sub.add_parser("world-import", help="Import target-genre sources")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("paths", nargs="+", help="Source file or directory paths; multiple allowed")
+    p.add_argument("--force", action="store_true", help="Overwrite already imported files from the same source")
+    p.add_argument("--build", action="store_true", help="Build the target-world knowledge base immediately after import")
+    p.add_argument("--chunk-size", type=int, default=36000, help="Source chunk size in characters when building (default 36000)")
+    p.add_argument("--chapter-batch-size", type=int, default=20, help="Max chapters per batch when building (default 20, also capped by chunk size)")
+    p.add_argument("--max-workers", type=int, default=4, help="Parallel extraction workers for chapter batches (default 4)")
+    p.add_argument("--primary", default=None, help="Set the primary source; if omitted, the largest file is used")
 
     # world-build
-    p = sub.add_parser("world-build", help="结构化梳理目标题材资料")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--force", action="store_true", help="强制重新结构化和汇总")
-    p.add_argument("--chunk-size", type=int, default=36000, help="资料分片字符数（默认36000）")
-    p.add_argument("--chapter-batch-size", type=int, default=20, help="章节资料每批章节数（默认20）")
-    p.add_argument("--max-workers", type=int, default=4, help="章节批次并行提取数（默认4）")
-    p.add_argument("--primary", default=None, help="指定主资料，可填文件名、路径或资料ID；不指定时默认最大文件")
-    p.add_argument("--merge-only", action="store_true", help="只基于已有 worlds/<资料名>/*.md 重建 worlds/_final 和审计，跳过 cards/canon/source worlds")
+    p = sub.add_parser("world-build", help="Structure target-genre sources")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--force", action="store_true", help="Force restructuring and aggregation")
+    p.add_argument("--chunk-size", type=int, default=36000, help="Source chunk size in characters (default 36000)")
+    p.add_argument("--chapter-batch-size", type=int, default=20, help="Chapters per batch for chapter-like sources (default 20)")
+    p.add_argument("--max-workers", type=int, default=4, help="Parallel extraction workers for chapter batches (default 4)")
+    p.add_argument("--primary", default=None, help="Primary source as file name, path, or source ID; if omitted, the largest file is used")
+    p.add_argument("--merge-only", action="store_true", help="Rebuild worlds/_final and audits from existing worlds/<source>/*.md only; skip cards/canon/source worlds")
 
     # novel-name-synopsis
-    p = sub.add_parser("novel-name-synopsis", help="推荐书名与简介")
-    p.add_argument("workspace", help="工作区名称")
+    p = sub.add_parser("novel-name-synopsis", help="Suggest title and synopsis")
+    p.add_argument("workspace", help="Workspace name")
     p.add_argument("--force", action="store_true")
 
     # story-design
-    p = sub.add_parser("story-design", help="生成核心玩法、长线主线、舞台路线图和角色成长线")
-    p.add_argument("workspace", help="工作区名称")
+    p = sub.add_parser("story-design", help="Generate core gameplay, long mainline, stage roadmap, and character arcs")
+    p.add_argument("workspace", help="Workspace name")
     p.add_argument("--force", action="store_true")
-    p.add_argument("--direction", help="创作方向（字符串）")
-    p.add_argument("--direction-file", help="创作方向文件路径")
+    p.add_argument("--direction", help="Creative direction (string)")
+    p.add_argument("--direction-file", help="Creative-direction file path")
 
-    # design-concept (第一步：全书设计)
-    p = sub.add_parser("design-concept", help="生成粗略大纲与世界观（全书设计第一步）")
-    p.add_argument("workspace", help="工作区名称")
+    # design-concept (step 1: book design)
+    p = sub.add_parser("design-concept", help="Generate rough outline and worldview (book-design step 1)")
+    p.add_argument("workspace", help="Workspace name")
     p.add_argument("--force", action="store_true")
-    p.add_argument("--direction", help="创作方向（字符串）")
-    p.add_argument("--direction-file", help="创作方向文件路径")
+    p.add_argument("--direction", help="Creative direction (string)")
+    p.add_argument("--direction-file", help="Creative-direction file path")
 
-    # stage-design (第二步：舞台设计)
-    p = sub.add_parser("stage-design", help="基于粗略大纲与世界观生成长线主线与舞台路线图")
-    p.add_argument("workspace", help="工作区名称")
+    # stage-design (step 2: stage design)
+    p = sub.add_parser("stage-design", help="Generate long mainline and stage roadmap from the rough outline and worldview")
+    p.add_argument("workspace", help="Workspace name")
     p.add_argument("--force", action="store_true")
-    p.add_argument("--direction", help="创作方向（字符串）")
-    p.add_argument("--direction-file", help="创作方向文件路径")
+    p.add_argument("--direction", help="Creative direction (string)")
+    p.add_argument("--direction-file", help="Creative-direction file path")
 
     # story-design-extend
-    p = sub.add_parser("story-design-extend", help="保留已有设计，追加长线、角色线和后续舞台")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--use-reference", action="store_true", help="读取上次全书设计后新增的参考拆解内容")
-    p.add_argument("--direction", help="可选的续写方向（字符串）")
-    p.add_argument("--direction-file", help="可选的续写方向文件路径")
+    p = sub.add_parser("story-design-extend", help="Keep existing design and append the mainline, character arcs, and later stages")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--use-reference", action="store_true", help="Read reference deconstruction added since the last book design")
+    p.add_argument("--direction", help="Optional extend direction (string)")
+    p.add_argument("--direction-file", help="Optional extend-direction file path")
 
     # stage-insert
-    p = sub.add_parser("stage-insert", help="基于灵感设计新舞台并插入舞台路线图")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--direction", help="新舞台灵感（字符串）")
-    p.add_argument("--direction-file", help="新舞台灵感文件路径")
-    p.add_argument("--after-stage", type=int, default=None, help="优先插入在指定舞台之后")
-    p.add_argument("--before-stage", type=int, default=None, help="优先插入在指定舞台之前")
+    p = sub.add_parser("stage-insert", help="Design a new stage from inspiration and insert it into the stage roadmap")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--direction", help="New-stage inspiration (string)")
+    p.add_argument("--direction-file", help="New-stage inspiration file path")
+    p.add_argument("--after-stage", type=int, default=None, help="Prefer inserting after the given stage")
+    p.add_argument("--before-stage", type=int, default=None, help="Prefer inserting before the given stage")
 
     # mechanics-init
-    p = sub.add_parser("mechanics-init", help="初始化可选机制层（系统/面板/数值/轻量状态追踪）")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--force", action="store_true", help="覆盖已有机制层")
-    p.add_argument("--direction", help="机制设定方向（字符串）")
-    p.add_argument("--direction-file", help="机制设定方向文件路径")
-    p.add_argument("--file", help="机制设定文件路径，优先级高于 --direction")
-    p.add_argument("--none", action="store_true", help="显式关闭机制层")
+    p = sub.add_parser("mechanics-init", help="Initialize the optional mechanics layer (system/panel/numbers/light state tracking)")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--force", action="store_true", help="Overwrite an existing mechanics layer")
+    p.add_argument("--direction", help="Mechanics direction (string)")
+    p.add_argument("--direction-file", help="Mechanics-direction file path")
+    p.add_argument("--file", help="Mechanics settings file path; takes priority over --direction")
+    p.add_argument("--none", action="store_true", help="Explicitly disable the mechanics layer")
 
     # volume-outline
-    p = sub.add_parser("volume-outline", help="仿写生成卷纲")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--volume", type=int, default=None, help="指定卷号")
+    p = sub.add_parser("volume-outline", help="Imitate and generate a volume outline")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--volume", type=int, default=None, help="Volume number")
     p.add_argument("--force", action="store_true")
-    p.add_argument("--direction", help="创作方向")
+    p.add_argument("--direction", help="Creative direction")
 
     # story-arcs
-    p = sub.add_parser("story-arcs", help="生成故事情节单元")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--volume", type=int, default=None, help="卷号（默认1；新流程中一卷对应一个舞台）")
-    p.add_argument("--stage", type=int, default=None, help="兼容旧别名：等同于 --volume，不表示卷内 stage")
-    p.add_argument("--force", action="store_true", help="强制重新生成")
+    p = sub.add_parser("story-arcs", help="Generate story arcs")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--volume", type=int, default=None, help="Volume number (default 1; in the current flow one volume is one stage)")
+    p.add_argument("--stage", type=int, default=None, help="Compatibility alias equal to --volume; not a stage inside a volume")
+    p.add_argument("--force", action="store_true", help="Force regeneration")
 
     # chapter-outlines
-    p = sub.add_parser("chapter-outlines", help="基于故事情节单元串行逐章生成章纲")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--volume", type=int, default=None, help="卷号（默认1；新流程中一卷对应一个舞台）")
-    p.add_argument("--stage", type=int, default=None, help="兼容旧别名：等同于 --volume，不表示卷内 stage")
-    p.add_argument("--force", action="store_true", help="强制重新生成")
+    p = sub.add_parser("chapter-outlines", help="Generate chapter outlines serially from story arcs")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--volume", type=int, default=None, help="Volume number (default 1; in the current flow one volume is one stage)")
+    p.add_argument("--stage", type=int, default=None, help="Compatibility alias equal to --volume; not a stage inside a volume")
+    p.add_argument("--force", action="store_true", help="Force regeneration")
 
     # write
-    p = sub.add_parser("write", help="串行生成正文")
-    p.add_argument("workspace", help="工作区名称")
-    p.add_argument("--volume", type=int, default=None, help="卷号（默认1；新流程中一卷对应一个舞台）")
-    p.add_argument("--stage", type=int, default=None, help="兼容旧别名：等同于 --volume，不表示卷内 stage")
-    p.add_argument("--start", type=int, default=1, help="起始章节号")
-    p.add_argument("--max", type=int, default=None, help="最大章节数")
-    p.add_argument("--no-humanize", action="store_true", help="关闭正文生成后的自动去AI味后处理")
-    p.add_argument("--humanize-existing", action="store_true", help="对已存在的正文执行去AI味；默认只处理本次新生成章节")
+    p = sub.add_parser("write", help="Generate draft serially")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--volume", type=int, default=None, help="Volume number (default 1; in the current flow one volume is one stage)")
+    p.add_argument("--stage", type=int, default=None, help="Compatibility alias equal to --volume; not a stage inside a volume")
+    p.add_argument("--start", type=int, default=1, help="Starting chapter number")
+    p.add_argument("--max", type=int, default=None, help="Maximum number of chapters")
+    p.add_argument("--no-humanize", action="store_true", help="Disable automatic humanization after draft generation")
+    p.add_argument("--humanize-existing", action="store_true", help="Humanize existing chapter files; by default only newly generated chapters are humanized")
 
     # web
-    p = sub.add_parser("web", help="启动本地可视化工作台")
-    p.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，仅本机访问）")
-    p.add_argument("--port", type=int, default=8765, help="监听端口（默认 8765）")
-    p.add_argument("--workspace-root", help="工作区根目录；不传时优先使用 ~/Documents/my-novels")
+    p = sub.add_parser("web", help="Start the local visual workbench")
+    p.add_argument("--host", default="127.0.0.1", help="Listen address (default 127.0.0.1, local only)")
+    p.add_argument("--port", type=int, default=8765, help="Listen port (default 8765)")
+    p.add_argument("--workspace-root", help="Workspace root; if omitted, ~/Documents/my-novels is preferred")
 
     args = parser.parse_args()
 

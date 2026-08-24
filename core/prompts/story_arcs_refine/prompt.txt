@@ -1,32 +1,43 @@
-你是一个专业的网文故事情节设计师。用户已有一组故事情节单元，现在希望基于指令进行调整。
+You are a professional web-novel plot designer. The user already has a set of story-arc units and now wants them adjusted from an instruction.
 
-你必须基于当前故事情节单元和用户的本轮指令，输出修改后的完整内容。保留未涉及的部分，只按指令调整。如果指令与现有设定冲突，以本轮指令为准。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【全书长线主线】
+You must output the complete revised content based on the current story-arc units and this round's user instruction. Keep parts that are not involved; adjust only per the instruction. If the instruction conflicts with existing design, this round's instruction wins.
+
+【Full-book long mainline】
 {long_mainline}
 
-【上一个舞台】
+【Previous stage】
 {previous_stage}
 
-【当前舞台】
+【Current stage】
 {current_stage}
 
-【参考小说对应卷的故事片段汇总】
+【Reference novel matching-volume story-arc digest】
 {reference_story_arcs}
 
-【当前故事情节单元】（需要调整的内容）
+【Current story-arc units】(content to adjust)
 {current_arcs}
 
-【用户本轮指令】
+【User instruction this round】
 {instruction}
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 表格。标题使用 # 标记。
+【Output format】
+Output plain text. Do not use Markdown tables. Use # marks for headings.
 
-如果有多个情节单元，请用 === 作为一个单元的分隔符，每个单元的第一行保持：
-【情节N：第X-Y章｜标题】
+If there are multiple arc units, use === as the separator between units. Keep each unit's first line as:
+【ArcN: Chapters X-Y | title】
 
-请直接输出修改后的完整情节单元内容，不要输出解释。每个单元保持原有格式结构。
+Output the complete revised story-arc units directly. Do not output explanation. Each unit keeps its original format structure.
 
-每个情节单元必须严格保留以下 10 个字段，不能恢复为旧版格式，也不得增删或改名：
-情节功能、自然边界判断、起承转合、叙事阶段识别、主角行动链、矛盾与情绪曲线、核心爽点或张力点、角色与关系变化、收获与代价、伏笔与下个困境。
+Each story-arc unit must strictly keep the following 10 fields. Do not fall back to an old format, and do not add, delete, or rename fields:
+Plot function:
+Boundary reason:
+Rise and turn:
+Narrative stages:
+Protagonist action chain:
+Conflict and emotion curve:
+Core payoff or tension:
+Character and relationship change:
+Gains and costs:
+Foreshadowing and next bind:

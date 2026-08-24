@@ -1,70 +1,72 @@
-你是一个长篇网文分卷舞台策划。请为当前卷生成“舞台/副本计划”。
+You are a long-form web-novel volume-stage planner. Generate a "stage / instance plan" for the current volume.
 
-当前卷不应只是传统卷纲，而应是一个可运行的舞台：有什么规则、资源、敌人、盟友、角色节点、情绪循环，以及如何展示核心玩法。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【当前卷】
-第 {volume_index} 卷
+The current volume should not be only a traditional volume outline. It should be a runnable stage: what rules, resources, enemies, allies, character beats, and emotion loops it has, and how it shows the core gameplay.
 
-【核心玩法文档】
+【Current volume】
+Volume {volume_index}
+
+【Core gameplay document】
 {core_gameplay}
 
-【全书舞台路线图】
+【Full-book stage roadmap】
 {stage_roadmap}
 
-【角色成长线】
+【Character growth lines】
 {character_arcs}
 
-【新小说全书大纲】
+【Full-book outline of the new novel】
 {novel_outline}
 
-【新小说全书世界观】
+【Full-book worldview of the new novel】
 {new_novel_worldview}
 
-【本卷卷纲】
+【Volume outline for this volume】
 {volume_outline}
 
-【本卷世界观】
+【Worldview for this volume】
 {volume_worldview}
 
-【换皮映射表】
+【Rewrite map】
 {rewrite_map}
 
-【生成要求】
-请把当前卷设计成一个或多个可执行舞台/副本。重点不是复述卷纲，而是明确后续 story arc 和章纲如何围绕舞台规则运转。
+【Generation requirements】
+Design the current volume as one or more executable stages / instances. The point is not to restate the volume outline. It is to make clear how later story arcs and chapter outlines should run around the stage rules.
 
-必须包含：
-1. 当前卷的核心玩法展示目标。
-2. 舞台入口、舞台规则、可获得资源、主要敌人和盟友。
-3. 主角在本卷的成长目标和代价。
-4. 重要角色在本卷的关键节点。
-5. 情绪反馈循环：本卷如何反复制造压迫、笑点、爽点、悬念和收获。
-6. 本卷必须埋设和回收的伏笔。
-7. 本卷不能提前揭露的后续信息。
+Must include:
+1. This volume's core-gameplay showcase goal.
+2. Stage entry, stage rules, obtainable resources, main enemies and allies.
+3. The protagonist's growth goal and cost in this volume.
+4. Key beats of important characters in this volume.
+5. Emotion-feedback loop: how this volume repeatedly creates pressure, jokes, payoffs, suspense, and gains.
+6. Foreshadowing this volume must plant and recover.
+7. Later information this volume must not reveal early.
 
-【输出格式】
-使用纯文本输出，标题使用 # 标记，禁止 Markdown 表格。
+【Output format】
+Use plain text. Use # for headings. Do not use Markdown tables.
 
-# 当前卷舞台一句话
+# Current volume stage in one sentence
 
-# 舞台规则
+# Stage rules
 
-# 舞台入口与退出条件
+# Stage entry and exit conditions
 
-# 本卷核心玩法展示
+# Core gameplay showcase for this volume
 
-# 主要资源与奖励
+# Main resources and rewards
 
-# 主要敌人/压力来源
+# Main enemies / pressure sources
 
-# 盟友/见证者/情绪角色
+# Allies / witnesses / emotional characters
 
-# 角色关键节点
+# Character key beats
 
-# 情绪循环设计
+# Emotion-loop design
 
-# Story Arc 设计边界
-说明后续每个故事情节单元应该如何使用本舞台，哪些内容必须推进，哪些内容不能提前。
+# Story Arc design boundaries
+Explain how each later story unit should use this stage, what content must advance, and what content must not come early.
 
-# 伏笔与信息差
+# Foreshadowing and information gaps
 
-# 本卷结束状态
+# Volume end state

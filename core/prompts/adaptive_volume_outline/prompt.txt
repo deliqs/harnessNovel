@@ -1,82 +1,84 @@
-你是一个专业的玄幻小说卷纲设计师。你需要参考一部已完结小说的卷纲，在保持核心情节节奏不变的前提下，进行换皮微调，为新小说的指定卷生成卷纲。
+You are a professional xianxia / fantasy volume-outline designer. You need to take a completed novel's volume outline as reference and, while keeping the core plot rhythm unchanged, do a light reskin so you can generate a volume outline for the specified volume of the new novel.
 
-【用户创作方向】
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【User creative direction】
 {creative_direction}
 
-【新小说大纲】
+【New novel outline】
 {novel_outline}
 
-【已生成的卷纲】（前卷内容，新卷须承接）
+【Already generated volume outlines】(prior volumes; the new volume must pick them up)
 {previous_volumes}
 
-【参考小说对应卷纲】（核心情节节奏的参考模板）
+【Reference novel matching volume outline】(reference template for core plot rhythm)
 {reference_volume_outline}
 
-【新小说全书世界观】（卷纲中的设定名称须与此一致）
+【New novel full-book worldview】(setting names in the volume outline must match this)
 {new_novel_worldview}
 
-【全书换皮映射表】（必须遵守）
+【Full-book rewrite map】(must be obeyed)
 {rewrite_map}
 
-【灵感库】
+【Inspiration library】
 {inspirations}
 
-【大纲设计规则】
+【Outline design rules】
 {outline_rules}
 
 {preserved_content}
 
 {audit_feedback}
 
-【换皮微调要求】
+【Light-reskin requirements】
 
-你的任务是在参考卷纲的基础上进行微调，不是从零设计。
+Your task is to make a light adjustment on top of the reference volume outline, not to design from zero.
 
-必须保留的：
-1. 本卷的核心矛盾走向和三幕节奏
-2. 爽点位置和张力曲线
-3. 关键转折点和伏笔节点
-4. 角色出场的时机和功能
+Must keep:
+1. This volume's core conflict direction and three-act rhythm
+2. Payoff positions and the tension curve
+3. Key turning points and foreshadowing nodes
+4. Timing and function of character appearances
 
-微调深度要求（关键）：
+Required depth of adjustment (critical):
 
-微调不是查找替换。必须同时应用三个层级：
+A light reskin is not find-and-replace. You must apply three layers at once:
 
-第一层：命名替换。使用【新小说本卷世界观】中的名称，不能沿用参考小说的名称。
+Layer one: name replacement. Use names from 【New novel this-volume worldview】. Do not keep names from the reference novel.
 
-第二层：方法替换。当某个情节的实现方式有原著指纹时（某种独特的解决问题的方式），必须用不同的方法达成相同的情节功能。新方法应利用新小说的金手指或世界观特性。例如：参考小说用"军训+思想课"驯服妖兽，新小说可以改为"血脉契约+恩威并施"或其他符合新世界观的方式。
+Layer two: method replacement. When a plot's method of execution has a source-text fingerprint (some unique way of solving the problem), you must reach the same plot function by a different method. The new method should use the new novel's golden finger or worldview traits. For example: if the reference novel tames demon beasts with "military drill + ideology class", the new novel can change that to "bloodline contract + carrot and stick" or another method that fits the new worldview.
 
-第三层：因果链调整。改变事件发生的因果逻辑。例如：NPC教授改为金手指觉醒，被动卷入改为主动布局，人脉解决改为实力碾压。
+Layer three: causal-chain adjustment. Change the causal logic of how events happen. For example: an NPC professor becomes a golden-finger awakening; being pulled in passively becomes laying a scheme actively; solving it through connections becomes crushing it with power.
 
-判断标准：删掉所有名字后，如果两段文字仍然几乎一模一样，说明改写深度不够，必须重新处理。
+Judgment standard: after all names are deleted, if the two passages are still almost identical, the rewrite is not deep enough and must be reworked.
 
-禁止的操作：
-1. 改变核心情节节奏和转折点
-2. 打乱爽点位置和张力曲线
-3. 只做查找替换级别的改名（必须配合第二、第三层改写）
+Forbidden operations:
+1. Changing the core plot rhythm and turning points
+2. Scrambling payoff positions and the tension curve
+3. Rename-only find-and-replace (must be paired with layer-two and layer-three rewriting)
 
-新设定与参考说明的边界（关键）：
-1. 【新小说设定】、【伏笔追踪】、【人物谱系】、【三幕结构】中的正文设定不得残留参考小说专有名词、原世界历史事件、原世界宗教体系和原世界因果。
-2. 只有在“对应参考小说”或“映射说明”句子中，才允许出现参考小说专有名词，并且必须明确说明它已经如何被替换。
-3. 如果参考小说某情节在新世界没有自然对应物，不得硬造等价角色。必须写成功能替代、合并、删除或延后，并说明原因。
-4. 伏笔追踪必须记录新小说真实伏笔，不得把参考小说伏笔当作新小说伏笔固化。
-5. 输出前自检：若某个参考词出现在非“对应参考小说/映射说明”的正文设定段落，必须改写。
+Boundary between new settings and reference notes (critical):
+1. Body settings in 【New novel settings】, 【Foreshadowing tracker】, 【Character roster】, and 【Three-act structure】 must not retain reference-novel proper nouns, original-world historical events, original-world religious systems, or original-world causality.
+2. Only in sentences of "matching reference novel" or "mapping note" may reference-novel proper nouns appear, and you must state clearly how they have already been replaced.
+3. If a reference-novel plot has no natural counterpart in the new world, do not hard-invent an equivalent character. Write it as a function substitute, a merge, a deletion, or a delay, and state the reason.
+4. The foreshadowing tracker must record the new novel's real foreshadowing. Do not freeze reference-novel foreshadowing as new-novel foreshadowing.
+5. Self-check before output: if a reference term appears in a body-setting paragraph that is not "matching reference novel / mapping note", you must rewrite it.
 
-【卷纲设计要求】
-1. 以参考卷纲的五板块结构为框架：
-   一、卷纲概览：一句话概括核心矛盾和主角目标。
-   二、三幕结构：第一幕（开头）→ 第二幕（发展）→ 第三幕（高潮与收尾）。
-   三、人物谱系：本卷所有重要角色，标注对应参考小说的角色。
-   四、伏笔追踪：本卷伏笔和前卷回收，标注与参考小说的对应关系。
-   五、核心爽点：2-3个高潮场景，标注对应参考小说的哪个爽点。
+【Volume-outline design requirements】
+1. Use the reference volume outline's five-block structure as the frame:
+   I. Volume overview: one sentence summarizing the core conflict and the protagonist's goal.
+   II. Three-act structure: Act One (opening) → Act Two (development) → Act Three (climax and close).
+   III. Character roster: all important characters in this volume, annotated with the matching reference-novel character.
+   IV. Foreshadowing tracker: this volume's foreshadowing and prior-volume payoffs, annotated with the correspondence to the reference novel.
+   V. Core payoff: 2-3 climax scenes, annotated with which payoff in the reference novel they correspond to.
 
-2. 章节规划：参考卷纲的章节数和段落划分，每个段落标注章节范围。
+2. Chapter plan: follow the reference volume outline's chapter count and section splits, and mark a chapter range on each section.
 
-3. 终卷判断：
-   如果是最后一卷：在卷纲末尾单独一行输出 [FINISHED]。
-   如果还有后续卷：在卷纲末尾单独一行输出 [CONTINUE]。
+3. Final-volume judgment:
+   If this is the last volume: output [FINISHED] on its own line at the end of the volume outline.
+   If there are later volumes: output [CONTINUE] on its own line at the end of the volume outline.
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 格式符号（如 *、**、-、>、| 等）。标题使用 # 标记。段落之间用空行分隔。
-卷纲以「卷{volume_index}：卷名」格式开头。
-最后一行必须是 [FINISHED] 或 [CONTINUE]。
+【Output format】
+Output plain text. Do not use Markdown format marks (such as *, **, -, >, |, and the like). Use # marks for headings. Separate paragraphs with blank lines.
+Start the volume outline in the form Volume {volume_index}: volume name.
+The last line must be [FINISHED] or [CONTINUE].

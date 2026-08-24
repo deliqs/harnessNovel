@@ -1,60 +1,62 @@
-你是一个长篇网文舞台/副本设计师。请基于核心玩法和全书长线主线，为新小说设计“全书舞台路线图”。
+You are a long-form web-novel stage / instance designer. Based on the core gameplay and the book-length long mainline, design the "book-length stage roadmap" for the new novel.
 
-这里的“舞台”不是传统卷纲，而是适合展示核心玩法的副本环境：新手村、学院、秘境、战场、城市、宗门、宫廷、遗迹、跨世界区域等。每个舞台都有规则、资源、敌人、盟友、目标、奖励和后患。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【用户创作方向】
+A "stage" here is not a traditional volume outline. It is an instance environment suited to showing the core gameplay: starter village, academy, secret realm, battlefield, city, sect, court, ruin, cross-world region, and so on. Every stage has rules, resources, enemies, allies, a goal, rewards, and aftermath.
+
+[User creative direction]
 {creative_direction}
 
-【核心玩法文档】
+[Core gameplay document]
 {core_gameplay}
 
-【全书长线主线】
+[Book-length long mainline]
 {long_mainline}
 
-【目标世界知识库】（可选）
+[Target world knowledge base] (optional)
 {world_knowledge}
 
-【设计要求】
-请把全书理解为主角连续挑战多个舞台/副本。不要写成传统“第几章发生什么”的剧情复述。
+[Design requirements]
+Treat the whole book as the protagonist challenging a sequence of stages / instances. Do not write it as a traditional "what happens in chapter N" plot recap.
 
-每个舞台就是后续生成故事情节单元时的一级单位。每个舞台必须说明：
-1. 舞台的玩法价值：它展示核心玩法的哪一面。
-2. 舞台和长线主线的关系：本舞台推进、误导、遮蔽或回收哪条长线。
-3. 舞台规则：什么限制主角，什么制造压力。
-4. 舞台短线：多个能刺激读者情绪的小目标、小危机、小反转、小爽点、小收获、小钩子。
-5. 舞台资源：主角能获得什么。
-6. 舞台敌人与盟友：谁阻碍、谁见证、谁被绑定。
-7. 舞台结束后的状态变化：主角实力、身份、资源、认知、关系如何变化。
-8. 不能提前揭露或提前完成什么。
+Each stage is the top-level unit for later story-arc generation. Every stage must state:
+1. The stage's gameplay value: which face of the core gameplay it shows.
+2. The stage's relation to the long mainline: which long line this stage advances, misdirects, conceals, or pays off.
+3. Stage rules: what limits the protagonist, and what creates pressure.
+4. Short lines inside the stage: several small goals, small crises, small reversals, small payoffs, small gains, and small hooks that can move the reader's emotions.
+5. Stage resources: what the protagonist can obtain.
+6. Stage enemies and allies: who blocks, who witnesses, who becomes bound.
+7. State change after the stage ends: how the protagonist's power, identity, resources, cognition, and relationships change.
+8. What must not be revealed or completed yet.
 
-【结构要求】
-1. 不要写任何文档总标题（例如“# 舞台路线图”“# 舞台设计”）。正文第一个舞台直接从一级标题开始，不要先写总标题。
-2. 每个舞台必须用一级标题组织，且顶格、只有一个 #，格式严格为：# 舞台N：舞台名称（N 从 1 开始递增）。不要用 ## / ###、不要用加粗 **舞台N**、不要用编号列表或表格表示舞台；舞台标题必须独占一行。
-3. 每个舞台必须写“预计章节数”，供后续 story-arcs 推断本舞台章节量；格式为：预计章节数：12-15章（写明数字）。
-4. 不要输出“后续舞台储备”。
-5. 不要输出“舞台迭代规则”。
-6. 如果以后需要新舞台，会通过独立命令基于新灵感插入。
+[Structure requirements]
+1. Do not write any document-level title (for example "# Stage roadmap" or "# Stage design"). The first stage in the body starts directly at a level-1 heading; do not write a general title first.
+2. Each stage must be organized with a level-1 heading, flush left, with only one #. The format must be exactly: # Stage N: Stage name (N increases from 1). Do not use ## / ###, do not use bold **Stage N**, and do not use a numbered list or a table to represent stages; the stage heading must occupy its own line.
+3. Each stage must include "Planned chapters", so later story-arcs can infer this stage's chapter count; the format is: Planned chapters: 12-15 chapters (write the numbers).
+4. Do not output "reserve stages for later".
+5. Do not output "stage iteration rules".
+6. If a new stage is needed later, it will be inserted by a separate command from new inspiration.
 
-【输出格式】
-使用纯文本输出，舞台标题使用 # 标记，禁止 Markdown 表格，禁止用代码块包裹整篇内容。
+[Output format]
+Output plain text. Use # for stage headings. Do not use Markdown tables. Do not wrap the whole document in a code fence.
 
-# 舞台1：名称
-预计章节数：
-阶段功能：
-玩法价值：
-长线主线推进：
-舞台规则：
-舞台内短线：
-主要资源：
-主要敌人/压力：
-盟友/见证者：
-角色节点：
-结束状态：
-后患与钩子：
-不能提前：
+# Stage 1: Name
+Planned chapters:
+Stage function:
+Gameplay value:
+Long mainline advance:
+Stage rules:
+Short lines inside the stage:
+Main resources:
+Main enemies/pressure:
+Allies/witnesses:
+Character nodes:
+End state:
+Aftermath and hooks:
+Must not happen yet:
 
-# 舞台2：名称
-按同样格式输出。
+# Stage 2: Name
+Output in the same format.
 
-# 舞台3：名称
-按同样格式输出。
+# Stage 3: Name
+Output in the same format.

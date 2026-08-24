@@ -1,4 +1,4 @@
-"""按故事情节串行生成正文的异步对话管理。"""
+"""Async conversation management for serial draft generation by story arc."""
 from __future__ import annotations
 
 import json
@@ -70,12 +70,12 @@ class DraftChatManager:
         custom = Path(ws.file_system) / "writing" / "system_prompt.md"
         return {
             "custom": custom.is_file() and bool(custom.read_text(encoding="utf-8").strip()),
-            "name": "自定义生文规范" if custom.is_file() else "项目默认 system_prompt.md",
+            "name": "Custom writing guide" if custom.is_file() else "Project default system_prompt.md",
         }
 
     def save_writing_guide(self, workspace, content, source_name):
         if not content.strip():
-            raise ValueError("生文规范文件为空。")
+            raise ValueError("The writing-guide file is empty.")
         ws = init_workspace(workspace)
         target = Path(ws.file_system) / "writing" / "system_prompt.md"
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -97,18 +97,18 @@ class DraftChatManager:
     ):
         display = message.strip()
         if not display:
-            raise ValueError("请输入内容后再发送。")
+            raise ValueError("Enter content before sending.")
         key = (workspace, volume, arc_idx)
         with self._lock:
             old = self._jobs.get(key)
             if old and old["status"] in {"running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前故事情节已有正文任务正在进行。")
+                raise ValueError("This story arc already has a draft task running.")
             pause, stop, cancel = threading.Event(), threading.Event(), threading.Event()
             pause.set()
             job = {
                 "id": uuid.uuid4().hex, "status": "running", "phase": "queued",
                 "completed": 0, "total": 0, "progress_kind": "drafts",
-                "message": "任务已创建，正在启动", "pause_event": pause,
+                "message": "Task created, starting", "pause_event": pause,
                 "stop_event": stop, "cancel_event": cancel,
                 "prompt_history": [], "prompt_count": 0, "error": "",
             }
@@ -149,7 +149,7 @@ class DraftChatManager:
                 ws = init_workspace(workspace)
                 arc = next((item for item in _list_novel_story_arcs(ws, volume) if item["idx"] == arc_idx), None)
                 if not arc:
-                    raise ValueError("未找到故事情节单元。")
+                    raise ValueError("Story arc not found.")
                 resume = chapter_draft_resume_status(ws, volume, arc_idx)
                 any_existing = resume["completed"] > 0
                 if resume_incomplete or not any_existing:
@@ -158,7 +158,7 @@ class DraftChatManager:
                 else:
                     with self._lock:
                         self._jobs[key]["progress_kind"] = "serial_draft_refine"
-                    update("routing", 0, resume["total"], "正在判断最早受影响章节")
+                    update("routing", 0, resume["total"], "Finding the earliest affected chapter")
                     while True:
                         try:
                             start, refinement_mode, reason = route_chapter_draft_refinement(
@@ -169,11 +169,11 @@ class DraftChatManager:
                             if stop.is_set():
                                 start = None
                                 break
-                            update("paused", 0, resume["total"], "范围分析已暂停；继续后重新分析")
+                            update("paused", 0, resume["total"], "Range analysis paused; resume to analyze again")
                             pause.wait()
                             cancel.clear()
                     if start is None:
-                        result = {"stopped": True, "artifacts": [], "adjustment_note": "已结束本轮正文调整。"}
+                        result = {"stopped": True, "artifacts": [], "adjustment_note": "This draft-adjustment round has ended."}
                     else:
                         start = max(
                             start,
@@ -195,8 +195,8 @@ class DraftChatManager:
                         progress_callback=update, pause_event=pause, stop_event=stop, cancel_event=cancel,
                     )
                 if not result:
-                    raise RuntimeError("没有可生成的正文，请确认所选范围已有逐章章纲。")
-                note = str(result.get("adjustment_note") or "正文处理完成。")
+                    raise RuntimeError("No draft can be generated. Confirm the selected range already has chapter outlines.")
+                note = str(result.get("adjustment_note") or "Draft processing completed.")
                 conv.turns.append({"role": "assistant", "content": note, "artifacts": result.get("artifacts") or [], "at": datetime.now().isoformat(timespec="seconds")})
                 conv.save()
                 with self._lock:
@@ -208,7 +208,7 @@ class DraftChatManager:
                 with self._lock:
                     active = self._jobs.get(key)
                     if active and active["id"] == job["id"]:
-                        active.update(status="failed", phase="failed", message="生成失败", error=str(exc))
+                        active.update(status="failed", phase="failed", message="Generation failed", error=str(exc))
             finally:
                 trace_context.__exit__(None, None, None)
 
@@ -236,16 +236,16 @@ class DraftChatManager:
         with self._lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing", "paused"}:
-                raise ValueError("当前没有可控制的正文任务。")
+                raise ValueError("There is no controllable draft task.")
             if action == "pause":
                 job["pause_event"].clear(); job["cancel_event"].set()
-                job.update(status="pausing", message="正在暂停当前模型请求")
+                job.update(status="pausing", message="Pausing the current model request")
             elif action == "resume":
                 job["cancel_event"].clear(); job["pause_event"].set()
-                job.update(status="running", phase="generating", message="已继续生成")
+                job.update(status="running", phase="generating", message="Resumed generation")
             else:
                 job["stop_event"].set(); job["cancel_event"].set(); job["pause_event"].set()
-                job.update(status="stopping", phase="stopping", message="正在结束本轮生成")
+                job.update(status="stopping", phase="stopping", message="Ending this generation round")
         return self.job_status(workspace, volume, arc_idx)
 
     def pause(self, *args): return self._control(*args, "pause")
@@ -255,8 +255,8 @@ class DraftChatManager:
     def continue_incomplete(self, workspace, volume, arc_idx):
         from training.adaptive_builder import chapter_draft_resume_status
         if not chapter_draft_resume_status(init_workspace(workspace), volume, arc_idx).get("can_resume"):
-            raise ValueError("当前故事情节没有可继续的未完成正文。")
-        return self.start_message(workspace, volume, arc_idx, "继续生成未完成正文", True)
+            raise ValueError("This story arc has no unfinished draft to continue.")
+        return self.start_message(workspace, volume, arc_idx, "Continue generating unfinished draft", True)
 
     def clear(self, workspace, volume, arc_idx):
         conv = self.get(workspace, volume, arc_idx)
@@ -264,12 +264,12 @@ class DraftChatManager:
         return {"cleared": True, "conversation": conv.history()}
 
     def reset(self, workspace, volume, arc_idx):
-        """删除当前情节单元的正式正文、精修前快照、历史版本和最终版标记。"""
+        """Delete this story arc's final draft, pre-humanize snapshots, history versions, and finalized markers."""
         key = (workspace, volume, arc_idx)
         with self._lock:
             job = self._jobs.get(key)
             if job and job["status"] in {"running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前故事情节正在生成正文，请先结束任务再重置。")
+                raise ValueError("This story arc is still generating draft. Stop the task before resetting.")
             if job:
                 job["prompt_history"] = []
                 job["prompt_count"] = 0
@@ -286,7 +286,7 @@ class DraftChatManager:
             None,
         )
         if not arc:
-            raise ValueError("未找到当前故事情节单元。")
+            raise ValueError("Current story arc not found.")
 
         chapters = list(range(arc["start_ch"], arc["end_ch"] + 1))
         refined_dir = Path(ws.file_system) / "chapters" / f"vol_{volume:02d}"

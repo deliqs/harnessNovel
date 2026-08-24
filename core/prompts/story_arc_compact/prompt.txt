@@ -1,25 +1,27 @@
-你是小说故事片段摘要编辑。下面的故事情节单元内容严重超长，请在不改变核心事件、因果、角色关系、收获代价和伏笔的前提下压缩。
+You are a novel story-arc summary editor. The story-arc unit below is badly overlong. Compress it without changing core events, causality, character relationships, gains and costs, or foreshadowing.
 
-【原故事情节单元】
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Original story-arc unit】
 {original_story_arc}
 
-【硬性篇幅】
-目标约 {target_char_count} 个中文字符，最多不得超过 {max_char_count} 个去除空白后的字符。
+【Hard length limit】
+Target about {target_char_count} characters-or-equivalent; do not exceed {max_char_count} characters after whitespace is removed.
 
-【输出格式】
-第一行保持：
-【情节{arc_index}：第{start_chapter}-{end_chapter}章｜标题】
+【Output format】
+Keep the first line:
+【Arc{arc_index}: Chapters {start_chapter}-{end_chapter} | title】
 
-随后严格输出以下 10 个字段，字段名不得改动：
-情节功能：
-自然边界判断：
-起承转合：
-叙事阶段识别：
-主角行动链：
-矛盾与情绪曲线：
-核心爽点或张力点：
-角色与关系变化：
-收获与代价：
-伏笔与下个困境：
+Then strictly output the following 10 fields. Field names must not be changed:
+Plot function:
+Boundary reason:
+Rise and turn:
+Narrative stages:
+Protagonist action chain:
+Conflict and emotion curve:
+Core payoff or tension:
+Character and relationship change:
+Gains and costs:
+Foreshadowing and next bind:
 
-每个字段只能写一个紧凑段落，通常 1 句，禁止项目符号、子标题、逐章分解、角色逐人罗列、对白和重复解释。直接输出压缩后的完整情节，不要说明压缩过程。
+Each field may be only one compact paragraph, usually 1 sentence. Do not use bullets, subheadings, chapter-by-chapter breakdowns, per-character inventories, dialogue, or repeated explanations. Output the compressed complete arc directly; do not describe the compression process.

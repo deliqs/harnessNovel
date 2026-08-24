@@ -1,64 +1,66 @@
-你是一个专业的小说分析专家。请根据以下章节内容，按故事片段提取结构化摘要。
+You are a professional novel-analysis expert. From the chapter content below, extract a structured summary organized by story segments.
 
-故事片段是指一段有完整起承转合的情节弧，通常覆盖2-5章。不要逐章拆分，而是按情节的自然段落组织。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-该素材将用于后续的卷纲生成和大纲生成。因此需要信息完整、覆盖多个维度。
+A story segment is a plot arc with a complete setup, development, turn, and resolution, usually covering 2-5 chapters. Do not split chapter by chapter. Organize by the natural paragraphs of the plot.
 
-【章节内容】（第{start_chapter}章 - 第{end_chapter}章）
+This material will be used later for volume-outline generation and outline generation. It therefore needs to be complete and to cover multiple dimensions.
+
+【Chapter content】(Chapter {start_chapter} - Chapter {end_chapter})
 {chapters_text}
 
-【提取要求】
+【Extraction requirements】
 
-按故事片段组织，每个片段必须以【片段N：第X-Y章】开头（N从1开始，X和Y是章节号，必须使用中文方括号【】）。
+Organize by story segment. Each segment must begin with 【Segment N: Chapters X-Y】 (N starts at 1; X and Y are chapter numbers; you must use the Chinese square brackets 【】).
 
-每个片段包含以下字段（所有字段都必须填写，不得省略）：
+Each segment contains the following fields (every field must be filled in; none may be omitted):
 
-1. 核心事件：本片段发生了什么。写清起因、经过、结果。包含具体的角色名、势力名、地名、法宝名、功法名等专有名词，不要概括化。体现主角的行动链路：计划→遭遇什么→结果如何→调整后如何应对。
+1. Core events: What happens in this segment. Write the cause, the course, and the result. Include concrete proper nouns such as character names, faction names, place names, artifact names, and cultivation-art names; do not generalize them away. Show the protagonist's action chain: plan → what is encountered → what the result is → how they adjust and respond.
 
-2. 矛盾与情绪：标注本片段的矛盾方向（对外冲突或对内修炼/心理）和情绪曲线。情绪曲线重点标注压抑点和爆发点。如果有多次压抑后爆发的节奏（如被质疑→再被质疑→彻底爆发），标注压抑累积的过程。标注片段结束时主角/读者的情绪基调。
+2. Conflict and emotion: Mark this segment's conflict direction (external conflict, or internal cultivation / psychology) and the emotion curve. On the emotion curve, emphasize suppression points and explosion points. If the pacing is repeated suppression then explosion (for example questioned → questioned again → full explosion), mark the accumulation of suppression. Mark the emotional tone of the protagonist / reader at the end of the segment.
 
-3. 角色行动：主要角色的关键行动序列，用箭头连接。重点记录谁做了什么、为什么做、导致了什么后果。
+3. Character actions: Key action sequences of the main characters, joined with arrows. Focus on who did what, why they did it, and what consequences followed.
 
-4. 主角状态：本片段结束时主角的身份、实力、处境、认知状态。与片段开始时相比有什么变化。
+4. Protagonist state: At the end of this segment, the protagonist's identity, power, situation, and cognitive state. What has changed compared with the start of the segment.
 
-5. 伏笔与线索：新埋的伏笔及埋设方式、回收的伏笔及回收方式、信息差（谁掌握关键信息而谁不知情）。
+5. Foreshadowing and clues: Newly planted foreshadowing and how it was planted; recovered foreshadowing and how it was recovered; information gaps (who holds key information and who does not know it).
 
-6. 承接关系：这个片段与上一个片段的衔接方式（因果承接、时间跳跃、场景切换、视角转换等）。本片段末尾为后续设置的悬念或铺垫。
+6. Continuity: How this segment connects to the previous segment (causal continuation, time skip, scene switch, viewpoint shift, and so on). The suspense or setup this segment leaves at the end for what follows.
 
 
-在所有片段之后，按以下板块输出整批汇总信息。每个板块必须完整，不得跳过。无相关内容的板块写"无"。
+After all segments, output whole-batch summary information in the following blocks. Every block must be complete; none may be skipped. For a block with no relevant content, write None.
 
-# 力量体系
-本批内出现或涉及的修炼境界、功法类型、法宝等级、特殊规则、特殊能力等。每条格式：名称 | 类型 | 简要描述（含效果/作用） | 出现章节
+# Power system
+Cultivation realms, cultivation-art types, artifact grades, special rules, special abilities, and similar items that appear or are involved in this batch. Each entry format: name | type | brief description (including effect / function) | chapters of appearance
 
-角色使用的技能/法术/功法，每条格式：
-技能名 | 类型（功法/法术/神通/体术/阵法/法宝/其他） | 持有者 | 效果描述 | 修炼条件（如有提及） | 成长阶段变化（如有） | 出现章节
+Skills / spells / cultivation arts used by characters, each entry format:
+skill name | type (cultivation art / spell / divine ability / body technique / formation / artifact / other) | holder | effect description | cultivation conditions (if mentioned) | growth-stage changes (if any) | chapters of appearance
 
-# 新出场角色
-本批内首次出场的角色。每个角色包含：姓名 | 身份 | 性格特征 | 能力特长 | 与主角关系 | 核心动机 | 首次出场章节
+# Newly introduced characters
+Characters who first appear in this batch. Each character includes: name | identity | personality traits | abilities and specialties | relationship to the protagonist | core motive | first-appearance chapter
 
-# 已有角色更新
-本批中已有角色的新信息：新能力觉醒、技能成长（已有技能的新表现、新阶段、新用法）、身份揭露、关系变化、情感进展、信息获取等。按角色名分条，标注变化发生的章节。
+# Updates to existing characters
+New information about already introduced characters in this batch: newly awakened abilities, skill growth (new performance, new stages, or new uses of existing skills), identity reveals, relationship changes, emotional progress, information gained, and so on. Split by character name, and mark the chapter where the change happens.
 
-# 地图场景
-本批涉及的地理环境和关键场所。每条：地点名 | 类型（城镇/宗门/秘境/洞府/水域/其他） | 特征/功能 | 涉及事件 | 出现章节
+# Map and locations
+Geographic environments and key places involved in this batch. Each entry: place name | type (town / sect / secret realm / cave-dwelling / waters / other) | features / function | involved events | chapters of appearance
 
-# 势力分布
-本批的势力/组织动态。每条：势力名 | 与主角关系 | 势力间关系 | 内部权力状态 | 出场章节
+# Faction distribution
+Faction / organization dynamics in this batch. Each entry: faction name | relationship to the protagonist | relationships among factions | internal power state | chapters of appearance
 
-# 主角成长
-按维度记录主角变化：
-实力（境界突破、功法进阶）、地位（身份、声望变化）、资源（获得的关键物品）、认知（对世界的理解突破）。没有变化的维度不写。标注每个变化的触发点和章节。
+# Protagonist growth
+Record protagonist changes by dimension:
+power (realm breakthroughs, cultivation-art advancement), status (identity and reputation changes), resources (key items obtained), cognition (breakthroughs in understanding the world). Do not write dimensions with no change. Mark the trigger and chapter of each change.
 
-# 逐章节奏
-每章单独标注：节奏（快/中/慢） | 章末钩子类型（悬念/危机/反转/新谜团/信息揭露） | 张力等级（1-5）。汇总为本批节奏曲线（如"快-快-慢-中-快"），标注张力峰值和谷值章节。
+# Per-chapter pacing
+Annotate each chapter separately: pacing (fast / medium / slow) | chapter-end hook type (suspense / crisis / reversal / new mystery / information reveal) | tension level (1-5). Summarize as this batch's pacing curve (for example "fast-fast-slow-medium-fast"), and mark the chapters of peak and trough tension.
 
-# 跨章因果链
-第X章的事件 → 第Y章的结果。标注因果传递链条，帮助理解事件之间的驱动关系。
+# Cross-chapter causal chain
+Event in Chapter X → result in Chapter Y. Mark the causal transmission chain to make the driving relationships among events clear.
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 格式符号（如 *、**、-、>、| 等）。
+【Output format】
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like).
 
-格式要求：
-每个片段必须以【片段N：第X-Y章】开头，N从1开始递增。片段之间必须空一行。每个字段名使用中文冒号。
-汇总信息用 # 标题开头。
+Format requirements:
+Each segment must begin with 【Segment N: Chapters X-Y】, with N increasing from 1. There must be a blank line between segments. Use a colon after each field name.
+Summary information begins with # headings.

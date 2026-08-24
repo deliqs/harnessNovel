@@ -1,52 +1,54 @@
-你是一个严谨的小说剧情合理性审校编辑。请判断“新生成的故事情节单元”是否符合当前新小说的大纲、世界观和阶段设定，并判断它是否退回成对参考故事的硬换皮。
+You are a strict novel-plot reasonability editor. Judge whether the "newly generated story-arc unit" fits the current new novel's outline, worldview, and stage design, and whether it has collapsed back into a hard reskin of the reference story.
 
-注意：你的任务不是简单查禁用词。很多同人文、诸天流、神话题材中会合法出现参考小说或其他世界的元素。核心判断标准是：这些元素在当前新小说设定、当前卷阶段、当前情节位置中是否合理。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【当前舞台故事情节生成上下文】（已压缩核心玩法、长线主线、当前舞台、角色线和参考转译边界）
+Note: your task is not a simple banned-word check. In fanfiction, all-heavens, and mythic subjects, elements from the reference novel or other worlds can appear legally. The core criterion is whether those elements are reasonable in the current new-novel design, the current volume stage, and the current arc position.
+
+【Current-stage story-arc generation context】(already compressed: core gameplay, long mainline, current stage, character lines, and reference-translation boundary)
 {arc_context}
 
-【当前故事情节单元】
-情节单元 {arc_index}，覆盖第 {start_chapter} 章 - 第 {end_chapter} 章
+【Current story-arc unit】
+Story-arc unit {arc_index}, covering Chapter {start_chapter} - Chapter {end_chapter}
 
-【前序故事情节单元】
+【Previous story-arc unit】
 {previous_story_arc}
 
-【叙事模式】
+【Narrative pattern】
 {story_pattern}
 
-【原参考故事情节单元】（只用于判断是否硬换皮，不作为新书事实）
+【Original reference story-arc unit】(used only to judge hard reskin; not new-book fact)
 {reference_story_arc}
 
-【新生成的故事情节单元】
+【Newly generated story-arc unit】
 {story_arc}
 
-【审计标准】
-请重点判断：
-1. 是否符合当前卷故事情节生成上下文中的全书硬约束、本卷阶段、章节范围节奏和世界观边界。
-2. 是否符合上下文中的势力关系、力量体系、角色状态、当前可用资产和禁止提前内容。
-3. 是否只是把参考故事中的人物、地点、任务目标、历史因果、事件链条换名搬运。
-4. 是否只继承了叙事模式中的结构功能，而重新设计了新小说自己的事件、原因、冲突和结果。
-5. 是否与前序故事情节单元连续，主角目标、实力、资源、认知和关系是否断裂。
-6. 如果出现跨世界、同人或共通神话元素，它在当前阶段是否已有铺垫；如果中后期才合理，当前情节不能提前当作本世界事实。
+【Audit criteria】
+Focus on:
+1. Whether it fits the full-book hard constraints, this volume's stage, chapter-range rhythm, and worldview boundary in the current-volume story-arc generation context.
+2. Whether it fits the faction relations, power system, character states, currently available assets, and content that must not appear early.
+3. Whether it is only a rename-and-move of characters, places, quest goals, historical causality, and event chains from the reference story.
+4. Whether it inherited only the structural functions in the narrative pattern, and redesigned the new novel's own events, causes, conflicts, and results.
+5. Whether it is continuous with the previous story-arc unit, or whether the protagonist's goals, power, resources, knowledge, and relationships break.
+6. If cross-world, fanfiction, or shared-myth elements appear, whether they have already been planted in the current stage; if they only become reasonable in mid or late volumes, the current arc must not treat them as this-world fact ahead of time.
 
-【输出格式】
-只输出 JSON，不要输出 Markdown，不要输出额外解释。
+【Output format】
+Output JSON only. Do not output Markdown. Do not output extra explanation.
 
-字段：
+Fields:
 {{
-  "pass": true 或 false,
-  "score": 0 到 100 的整数,
+  "pass": true or false,
+  "score": an integer from 0 to 100,
   "violations": [
     {{
       "type": "worldview_conflict / source_causality_residue / hard_reskin / stage_mismatch / continuity_error / weak_pattern_transformation / other",
-      "text": "问题片段或概括",
-      "reason": "为什么不合理",
-      "suggestion": "应该如何改"
+      "text": "problem excerpt or summary",
+      "reason": "why it is unreasonable",
+      "suggestion": "how it should be changed"
     }}
   ],
-  "rewrite_instruction": "如果 pass=false，给出给生成器的重写指令；如果 pass=true，写空字符串"
+  "rewrite_instruction": "if pass=false, give a rewrite instruction for the generator; if pass=true, write an empty string"
 }}
 
-判定尺度：
-- pass=true：允许继承叙事模式、节奏曲线、情绪结构、功能位和爽点机制，但具体事件、因果链、人物关系必须属于新小说。
-- pass=false：存在明显世界观冲突、旧世界因果残留、当前阶段不该出现的跨世界内容、前后不连续，或只是把参考故事换名搬运。
+Judgment scale:
+- pass=true: it may inherit narrative pattern, rhythm curve, emotion structure, function slots, and payoff mechanics, but concrete events, causal chains, and character relationships must belong to the new novel.
+- pass=false: there is a clear worldview conflict, leftover old-world causality, cross-world content that should not appear at this stage, a continuity break, or it is only a renamed copy of the reference story.

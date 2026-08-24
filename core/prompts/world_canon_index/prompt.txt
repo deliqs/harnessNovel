@@ -1,41 +1,43 @@
-你是一个目标世界公共知识索引整理员。请根据已有基准索引和本轮新增的主资料卡片，整理出更新后的完整“主资料基准索引”。
+You are a target-world shared-knowledge index organizer. From the existing baseline index and this round's newly added primary-source cards, produce the updated complete "primary-source baseline index".
 
-这个索引会被后续补充资料提取阶段使用，用来判断补充资料中的内容哪些属于目标世界公共设定，哪些更可能是样本小说原创内容。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【主资料名称】
+This index will be used in the later supplement-source extraction stage, to judge which content in supplement sources belongs to the target world's shared setting, and which is more likely original content of a sample novel.
+
+【Primary-source name】
 {source_name}
 
-【已有基准索引】
+【Existing baseline index】
 {previous_index}
 
-【本轮新增的主资料卡片】
+【Newly added primary-source cards this round】
 {knowledge_cards}
 
-【整理要求】
-1. 每次都输出合并后的完整索引，保留已有索引中未被本轮资料否定的内容。
-2. 只整理主资料中明确出现或能直接推断的公共知识。
-3. 输出要短而稳定，便于后续模型快速判断“是否属于目标世界公共设定”。
-4. 不要写成长篇摘要，不要复述原文；同一元素跨批次出现时合并去重。
-5. 对于主资料中没有写清楚但能形成类别的内容，可以写“待补充类别”，例如“部分法宝属性待补充”。
-6. 这个索引是基准，不是最终知识库；重点是列出公共人物、势力、物品、技能、地点、事件和时间线。
+【Organization requirements】
+1. Each time, output the complete merged index. Keep content from the existing index that this round's material does not contradict.
+2. Organize only shared knowledge that clearly appears in the primary source or can be inferred directly.
+3. Output should be short and stable, so later models can quickly judge "whether this belongs to the target world's shared setting".
+4. Do not write a long summary, and do not restate the source text; when the same element appears across batches, merge and deduplicate.
+5. For content the primary source does not make clear but that can form a category, you may write a "to-be-filled category", for example "some artifact attributes to be filled".
+6. This index is a baseline, not the final knowledge base; the point is to list shared characters, factions, items, skills, places, events, and timelines.
 
-【输出格式】
-使用纯文本输出，标题必须完全使用以下结构。每个板块无内容时写“无”。
+【Output format】
+Use plain text. Headings must use exactly the following structure. For a block with no content, write None.
 
-# 公共人物
+# Shared characters
 
-# 公共势力
+# Shared factions
 
-# 公共地点
+# Shared places
 
-# 公共事件与历史线
+# Shared events and history
 
-# 公共物品与法宝
+# Shared items and artifacts
 
-# 公共技能与法术
+# Shared skills and spells
 
-# 力量体系关键词
+# Power-system keywords
 
-# 世界观规则关键词
+# Worldview-rule keywords
 
-# 待补充类别
+# To be filled

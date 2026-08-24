@@ -4,7 +4,7 @@ setup(
     name="harnessNovel",
     version="2.0.2",
     author="飞鸟 one the way",
-    description="长篇网络小说写作 AI Agent",
+    description="AI agent for long-form web novel writing",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/XTmingyue/harnessNovel",
@@ -12,7 +12,7 @@ setup(
     packages=find_packages(),
     py_modules=["novel_cli"],
     package_data={
-        "core": ["prompts/*/prompt.txt", "prompts/*/prompt.en.txt"],
+        "core": ["prompts/*/prompt.txt"],
         "webui": ["static/*"],
     },
     entry_points={

@@ -1,7 +1,8 @@
-"""故事情节单元的对话管理。
+"""Story-arc conversation management.
 
-每个工作区 + 卷号独立维护一段对话。首条消息生成整卷情节单元，
-后续消息基于当前情节单元进行调整。历史对话仅作展示，不限制轮数。
+Each workspace + volume keeps its own conversation. The first message generates
+all arcs for the volume; later messages refine the current arcs. History is
+display-only and is not limited.
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ def _read_text(path) -> str:
 
 
 def _arc_files_exist(ws, volume: int) -> bool:
-    """检查指定卷是否已有故事情节单元文件。"""
+    """Return whether the volume already has story-arc files."""
     arc_dir = os.path.join(ws.file_system, "story_arcs", f"vol_{volume:02d}")
     if not os.path.isdir(arc_dir):
         return False
@@ -100,49 +101,49 @@ class ArcsChatManager:
         return self._cache[key]
 
     def history(self, workspace: str, volume: int) -> dict[str, Any]:
-        """返回对话，并附带当前舞台是否存在实际情节文件。"""
+        """Return the conversation plus whether the current stage has real arc files."""
         ws = init_workspace(workspace)
         history = self.get(workspace, volume).history()
         history["has_arcs"] = _arc_files_exist(ws, volume)
         return history
 
     def run_message(self, workspace: str, volume: int, message: str) -> dict[str, Any]:
-        """统一对话入口：首条消息生成整卷情节，后续消息调整。"""
+        """Unified chat entry: the first message generates the volume's arcs; later messages refine them."""
         ws = init_workspace(workspace)
         conv = self.get(workspace, volume)
         display_text = message.strip()
         if not display_text:
-            raise ValueError("请输入内容后再发送。")
+            raise ValueError("Enter content before sending.")
 
         conv.append_user(display_text)
         from training.adaptive_builder import gen_story_arcs, refine_story_arcs
 
         is_initial = not _arc_files_exist(ws, volume)
         if is_initial:
-            # 用消息内容生成整卷情节单元
-            # gen_story_arcs 内部完成串行生成
+            # Generate all story arcs for the volume from the message
+            # gen_story_arcs runs serial generation internally
             result = gen_story_arcs(ws, volume=volume)
             mode = "initial"
             if isinstance(result, dict) and result.get("error"):
                 raise RuntimeError(str(result["error"]))
             if not isinstance(result, dict) or not result.get("artifacts"):
                 raise RuntimeError(
-                    f"生成失败：未产生任何故事情节单元。请确认舞台{volume}已设计完成（stage_roadmap.md 中存在对应舞台且包含预计章节数），且已配置大模型 API。"
+                    f"Generation failed: no story arcs were produced. Confirm stage {volume} is designed (the matching stage exists in stage_roadmap.md and includes Planned chapters) and that an LLM API is configured."
                 )
         else:
             result = refine_story_arcs(ws, volume, instruction=display_text)
             mode = "refine"
         if not result:
-            raise RuntimeError("未配置可用模型，请先在右上角配置大模型 API。")
+            raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
 
         note = str(result.get("adjustment_note") or "").strip()
         if not note:
-            note = f"已生成卷{volume}的故事情节单元。" if mode == "initial" else "已按指令调整。"
+            note = f"Generated story arcs for volume {volume}." if mode == "initial" else "Adjusted from the instruction."
 
-        # 提取 artifact 链接
+        # Extract artifact links
         artifacts = result.get("artifacts") or []
         if not artifacts:
-            # 从文件系统扫描该卷的 arc 文件
+            # Scan the volume's arc files from disk
             arc_dir = os.path.join(ws.file_system, "story_arcs", f"vol_{volume:02d}")
             if os.path.isdir(arc_dir):
                 for fname in sorted(os.listdir(arc_dir)):
@@ -155,22 +156,22 @@ class ArcsChatManager:
                             e_ch = int(m.group(3))
                             artifacts.append({
                                 "path": f"file_system/story_arcs/vol_{volume:02d}/{fname}",
-                                "label": f"情节单元{arc_idx}（第{s_ch}-{e_ch}章）",
+                                "label": f"Arc {arc_idx} (chapters {s_ch}-{e_ch})",
                             })
         conv.append_assistant(note, artifacts)
         conv.save()
         return {"mode": mode, "result": result, "conversation": conv.history()}
 
     def start_message(self, workspace: str, volume: int, message: str, resume_incomplete: bool = False) -> dict[str, Any]:
-        """在后台执行聊天生成，使前端可以读取进度并暂停。"""
+        """Run chat generation in the background so the UI can read progress and pause."""
         key = (workspace, volume)
         display_text = message.strip()
         if not display_text:
-            raise ValueError("请输入内容后再发送。")
+            raise ValueError("Enter content before sending.")
         with self._jobs_lock:
             current = self._jobs.get(key)
             if current and current["status"] in {"running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前舞台已有生成任务正在进行。")
+                raise ValueError("This stage already has a generation task running.")
             pause_event = threading.Event()
             pause_event.set()
             stop_event = threading.Event()
@@ -182,7 +183,7 @@ class ArcsChatManager:
                 "completed": 0,
                 "total": 0,
                 "progress_kind": "story_arcs",
-                "message": "任务已创建，正在启动",
+                "message": "Task created, starting",
                 "pause_event": pause_event,
                 "stop_event": stop_event,
                 "cancel_event": cancel_event,
@@ -253,11 +254,11 @@ class ArcsChatManager:
                 if isinstance(result, dict) and result.get("error"):
                     raise RuntimeError(str(result["error"]))
                 if not result:
-                    raise RuntimeError("未配置可用模型，请先在右上角配置大模型 API。")
+                    raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
                 artifacts = result.get("artifacts") or []
                 note = str(result.get("adjustment_note") or "").strip()
                 if not note:
-                    note = f"已生成卷{volume}的故事情节单元。" if mode == "initial" else "已按指令调整。"
+                    note = f"Generated story arcs for volume {volume}." if mode == "initial" else "Adjusted from the instruction."
                 conv.append_assistant(note, artifacts)
                 conv.save()
                 with self._jobs_lock:
@@ -274,7 +275,7 @@ class ArcsChatManager:
                 with self._jobs_lock:
                     active = self._jobs.get(key)
                     if active and active["id"] == job["id"]:
-                        active.update(status="failed", phase="failed", message="生成失败", error=str(exc))
+                        active.update(status="failed", phase="failed", message="Generation failed", error=str(exc))
             finally:
                 trace_context.__exit__(None, None, None)
 
@@ -312,9 +313,9 @@ class ArcsChatManager:
         ws = init_workspace(workspace)
         resume = story_arc_resume_status(ws, volume)
         if not resume.get("can_resume"):
-            raise ValueError("当前舞台没有可继续的未完成故事情节。")
+            raise ValueError("This stage has no unfinished story arcs to continue.")
         return self.start_message(
-            workspace, volume, "继续生成未完成的故事情节",
+            workspace, volume, "Continue generating unfinished story arcs",
             resume_incomplete=True,
         )
 
@@ -323,10 +324,10 @@ class ArcsChatManager:
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing"}:
-                raise ValueError("当前没有可暂停的生成任务。")
+                raise ValueError("There is no pausable generation task.")
             job["pause_event"].clear()
             job["cancel_event"].set()
-            job.update(status="pausing", message="正在暂停当前模型请求")
+            job.update(status="pausing", message="Pausing the current model request")
         return self.job_status(workspace, volume)
 
     def resume(self, workspace: str, volume: int) -> dict[str, Any]:
@@ -334,10 +335,10 @@ class ArcsChatManager:
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"paused", "pausing"}:
-                raise ValueError("当前没有已暂停的生成任务。")
+                raise ValueError("There is no paused generation task.")
             job["cancel_event"].clear()
             job["pause_event"].set()
-            job.update(status="running", phase="generating", message="已继续生成")
+            job.update(status="running", phase="generating", message="Resumed generation")
         return self.job_status(workspace, volume)
 
     def stop(self, workspace: str, volume: int) -> dict[str, Any]:
@@ -345,21 +346,21 @@ class ArcsChatManager:
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing", "paused"}:
-                raise ValueError("当前没有可结束的生成任务。")
+                raise ValueError("There is no generation task to stop.")
             job["stop_event"].set()
             job["cancel_event"].set()
             job["pause_event"].set()
-            job.update(status="stopping", phase="stopping", message="正在结束本轮生成")
+            job.update(status="stopping", phase="stopping", message="Ending this generation round")
         return self.job_status(workspace, volume)
 
     def reset(self, workspace: str, volume: int) -> dict[str, Any]:
-        """只清空当前舞台的对话和故事情节单元，不影响其他舞台。"""
+        """Clear only this stage's conversation and story arcs; other stages are unchanged."""
         import re
         key = (workspace, volume)
         with self._jobs_lock:
             job = self._jobs.get(key)
             if job and job.get("status") in {"running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前舞台仍在生成，请先结束任务再重置。")
+                raise ValueError("This stage is still generating. Stop the task before resetting.")
             if job:
                 job["prompt_history"] = []
                 job["prompt_count"] = 0

@@ -1,1 +1,1 @@
-"""HarnessNovel 本地 Web 工作台。"""
+"""Local HarnessNovel web workbench."""

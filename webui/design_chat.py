@@ -1,7 +1,8 @@
-"""全书设计 / 舞台设计的对话管理。
+"""Book design / stage design conversation management.
 
-每个工作区 + 步骤（concept / stage）独立维护一段对话。每次输入都会基于当前
-最新产物重新生成，历史对话仅作展示用途，不限制轮数、不压缩。
+Each workspace + step (concept / stage) keeps its own conversation. Every
+input regenerates from the latest artifacts; history is display-only and is
+not limited or compressed.
 """
 from __future__ import annotations
 
@@ -19,8 +20,19 @@ from core.workspace import init_workspace
 from core.prompt_trace import capture_prompts
 
 
-# 路由 3 关键词：匹配任一即走续写追加路径（仅 scope=stage 生效）
-_EXTEND_KEYWORDS = ("续写", "新增", "继续添加", "往后加", "加舞台", "追加舞台", "下一个舞台", "新舞台")
+# Route 3 keywords: any match takes the extend/append path (scope=stage only).
+_EXTEND_KEYWORDS = (
+    "extend", "continue", "add stage", "append stage", "next stage", "new stage",
+    "续写", "新增", "继续添加", "往后加", "加舞台", "追加舞台", "下一个舞台", "新舞台",
+)
+PHASE_HEADING_RE = re.compile(
+    r"^#{1,6}\s*(?:第\s*)?(?:阶段|phase)\s*0*(\d+)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+STAGE_HEADING_RE = re.compile(
+    r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 _SCOPE_FILES = {
     "concept": ("worldview.md", "rough_outline.md", "stage_outline.md"),
@@ -36,11 +48,13 @@ def _read_text(path) -> str:
 
 
 def _is_real_content(text: str) -> bool:
-    """判断文件内容是否是真实设计，而非空值或模型未返回的占位符。"""
+    """Return whether file text is real design rather than empty or a model placeholder."""
     if not text or not text.strip():
         return False
     t = text.strip()
-    if "模型未返回" in t and "请重试或人工补充" in t:
+    if ("模型未返回" in t and "请重试或人工补充" in t) or (
+        "Model did not return" in t and "please retry or fill in manually" in t
+    ):
         return False
     return True
 
@@ -60,18 +74,12 @@ def _design_files_exist(ws, scope: str) -> bool:
         stage_outline = _read_text(os.path.join(base, "stage_outline.md"))
         stage_roadmap = _read_text(os.path.join(base, "stage_roadmap.md"))
         expected = sorted({
-            int(value) for value in re.findall(
-                r"^#{1,6}\s*(?:第\s*)?阶段\s*0*(\d+)\b",
-                stage_outline, re.IGNORECASE | re.MULTILINE,
-            )
+            int(value) for value in PHASE_HEADING_RE.findall(stage_outline)
         })
         generated = [
-            int(value) for value in re.findall(
-                r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)\b",
-                stage_roadmap, re.IGNORECASE | re.MULTILINE,
-            )
+            int(value) for value in STAGE_HEADING_RE.findall(stage_roadmap)
         ]
-        # 中途结束留下的是有效断点，不应被当成完整舞台设计后进入微调路径。
+        # Stopping mid-way is a valid breakpoint and must not be treated as a complete stage design that enters refine.
         if not expected or generated != list(range(1, len(expected) + 1)):
             return False
     return True
@@ -82,7 +90,7 @@ def _design_dir(ws) -> str:
 
 
 def _clear_system_panel_artifacts(ws) -> None:
-    """清理依赖全书/舞台设计生成的系统面板定义与章节快照。"""
+    """Clear system-panel definitions and chapter snapshots derived from book/stage design."""
     try:
         os.remove(os.path.join(ws.file_system, "mechanics", "system_panel.json"))
     except FileNotFoundError:
@@ -93,21 +101,15 @@ def _clear_system_panel_artifacts(ws) -> None:
 
 
 def _stage_resume_status(ws) -> dict[str, Any]:
-    """根据已落盘的连续舞台判断是否存在可恢复断点。"""
+    """Decide from consecutive on-disk stages whether a resume breakpoint exists."""
     base = _design_dir(ws)
     stage_outline = _read_text(os.path.join(base, "stage_outline.md"))
     stage_roadmap = _read_text(os.path.join(base, "stage_roadmap.md"))
     expected = len({
-        int(value) for value in re.findall(
-            r"^#{1,6}\s*(?:第\s*)?阶段\s*0*(\d+)\b",
-            stage_outline, re.IGNORECASE | re.MULTILINE,
-        )
+        int(value) for value in PHASE_HEADING_RE.findall(stage_outline)
     })
     generated = [
-        int(value) for value in re.findall(
-            r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)\b",
-            stage_roadmap, re.IGNORECASE | re.MULTILINE,
-        )
+        int(value) for value in STAGE_HEADING_RE.findall(stage_roadmap)
     ]
     completed = 0
     for number in generated:
@@ -170,23 +172,23 @@ class DesignConversation:
         self.save()
 
 
-# 生成产物 → 审阅路径 + 展示标签
+# Generated artifacts -> review path + display label
 _RESULT_ARTIFACTS = {
     "concept": {
-        "worldview": ("file_system/story_design/worldview.md", "世界观"),
-        "rough_outline": ("file_system/story_design/rough_outline.md", "粗略大纲"),
-        "stage_outline": ("file_system/story_design/stage_outline.md", "阶段粗纲"),
+        "worldview": ("file_system/story_design/worldview.md", "Worldview"),
+        "rough_outline": ("file_system/story_design/rough_outline.md", "Rough outline"),
+        "stage_outline": ("file_system/story_design/stage_outline.md", "Phase outline"),
     },
     "stage": {
-        "long_mainline": ("file_system/story_design/long_mainline.md", "长线主线"),
-        "stage_roadmap": ("file_system/story_design/stage_roadmap.md", "舞台路线图"),
-        "name_synopsis": ("file_system/novel_name_synopsis.md", "书名与简介"),
+        "long_mainline": ("file_system/story_design/long_mainline.md", "Long mainline"),
+        "stage_roadmap": ("file_system/story_design/stage_roadmap.md", "Stage roadmap"),
+        "name_synopsis": ("file_system/novel_name_synopsis.md", "Title and synopsis"),
     },
 }
 
 
 def _extract_artifacts(scope: str, result: dict) -> list:
-    """从生成/微调结果里提取本次保存的产物（路径 + 标签）。"""
+    """Extract artifacts saved by this generate/refine result (path + label)."""
     mapping = _RESULT_ARTIFACTS.get(scope, {})
     artifacts = []
     for key, (path, label) in mapping.items():
@@ -222,10 +224,10 @@ class DesignChatManager:
         progress_callback=None, pause_event=None, stop_event=None,
         cancel_event=None,
     ) -> dict[str, Any]:
-        """统一对话入口：首条消息生成初版，后续消息在上一版基础上增量微调。
+        """Unified chat entry: the first message generates the first draft; later messages refine it.
 
-        attachments 为 [{name, content}, ...]，内容会并入给模型的指令，
-        但对话历史只记录精简展示文本。
+        attachments is [{name, content}, ...]; content is merged into the model
+        instruction, while conversation history only stores a short display string.
         """
         ws = init_workspace(workspace)
         conv = self.get(workspace, scope)
@@ -233,27 +235,27 @@ class DesignChatManager:
 
         combined_parts = [message.strip()]
         for att in attachments:
-            name = str(att.get("name") or "附件")
+            name = str(att.get("name") or "attachment")
             content = str(att.get("content") or "").strip()
             if content:
-                combined_parts.append(f"\n\n【参考文件：{name}】\n{content}")
+                combined_parts.append(f"\n\n[Reference file: {name}]\n{content}")
         combined_for_llm = "\n".join(combined_parts).strip()
         if scope == "concept" and use_new_reference and not combined_for_llm:
-            combined_for_llm = "请读取新增拆解章节，只同步阶段粗纲的最后一个阶段或追加新阶段。"
+            combined_for_llm = "Read the newly deconstructed chapters and only sync the last phase of the phase outline or append a new phase."
         if scope == "stage" and sync_updated_design and not combined_for_llm:
-            combined_for_llm = "请同步阶段粗纲的末尾变化，只调整最后一个舞台或追加新舞台。"
+            combined_for_llm = "Sync the latest phase-outline changes and only adjust the last stage or append a new stage."
 
         if attachments:
-            names = "、".join(str(a.get("name") or "附件") for a in attachments)
-            display_text = f"{message.strip()}\n（附件：{names}）" if message.strip() else f"（附件：{names}）"
+            names = ", ".join(str(a.get("name") or "attachment") for a in attachments)
+            display_text = f"{message.strip()}\n(attachments: {names})" if message.strip() else f"(attachments: {names})"
         else:
             display_text = message.strip()
         if not display_text and scope == "stage" and sync_updated_design:
-            display_text = "同步更新后续舞台"
+            display_text = "Sync later stages"
         elif not display_text and scope == "concept" and use_new_reference:
-            display_text = "同步新增拆解到阶段粗纲"
+            display_text = "Sync new deconstruction into the phase outline"
         if not combined_for_llm:
-            raise ValueError("请输入灵感或上传文件后再发送。")
+            raise ValueError("Enter inspiration or upload a file before sending.")
 
         conv.append_user(display_text)
         from training.adaptive_builder import (
@@ -274,19 +276,19 @@ class DesignChatManager:
             return {
                 "long_mainline": _read_text(os.path.join(base, "long_mainline.md")),
                 "stage_roadmap": _read_text(os.path.join(base, "stage_roadmap.md")),
-                "adjustment_note": "已结束本轮舞台设计，已写入的长线主线和舞台均已保留。",
+                "adjustment_note": "This stage-design round has ended. Written long mainline and stages were kept.",
                 "stopped": True,
             }
 
         def run_stage_operation(operation):
-            """取消当前请求后停在断点；继续时重新执行尚未落盘的这一步。"""
+            """Cancel the current request and stop at the breakpoint; resume re-runs the step that has not been written yet."""
             while True:
                 if stop_event is not None and stop_event.is_set():
                     return stopped_stage_result()
                 if pause_event is not None and not pause_event.is_set():
                     report(
                         "paused", progress_state["completed"], progress_state["total"],
-                        "舞台设计已暂停；点击继续后从当前断点接着生成",
+                        "Stage design is paused; click Resume to continue from the current breakpoint",
                     )
                     pause_event.wait()
                     if stop_event is not None and stop_event.is_set():
@@ -300,7 +302,7 @@ class DesignChatManager:
                         return stopped_stage_result()
                     report(
                         "paused", progress_state["completed"], progress_state["total"],
-                        "当前模型请求已暂停；点击继续后重新生成当前舞台",
+                        "The current model request is paused; click Resume to regenerate the current stage",
                     )
                     if pause_event is not None:
                         pause_event.wait()
@@ -311,11 +313,11 @@ class DesignChatManager:
                     continue
                 if stop_event is not None and stop_event.is_set():
                     stopped = stopped_stage_result()
-                    # 请求已经返回且产物已写盘时，保留刚完成的写入结果。
+                    # If the request already returned and artifacts were written, keep the completed write.
                     if isinstance(result, dict):
                         stopped.update({k: v for k, v in result.items() if v})
                         stopped["stopped"] = True
-                        stopped["adjustment_note"] = "已结束本轮舞台设计，已完成内容均已保留。"
+                        stopped["adjustment_note"] = "This stage-design round has ended. Completed content was kept."
                     return stopped
                 return result
 
@@ -339,16 +341,16 @@ class DesignChatManager:
             mode = "initial"
         elif is_concept_stage_sync:
             if progress_callback:
-                progress_callback("generating", 0, 1, "正在同步新增拆解到阶段粗纲")
+                progress_callback("generating", 0, 1, "Syncing new deconstruction into the phase outline")
             result = sync_stage_outline_from_new_reference(
                 ws, instruction=combined_for_llm,
             )
             if progress_callback:
-                progress_callback("completed", 1, 1, "阶段粗纲已同步")
+                progress_callback("completed", 1, 1, "Phase outline synced")
             mode = "concept_stage_sync"
         elif is_sync_extend or is_extend:
             if progress_callback:
-                progress_callback("generating", 0, 1, "正在更新舞台路线图")
+                progress_callback("generating", 0, 1, "Updating the stage roadmap")
             result = run_stage_operation(
                 lambda: extend_stage_design(
                     ws, instruction=combined_for_llm,
@@ -357,11 +359,11 @@ class DesignChatManager:
                 )
             )
             if progress_callback:
-                progress_callback("completed", 1, 1, "舞台路线图已更新")
+                progress_callback("completed", 1, 1, "Stage roadmap updated")
             mode = "sync_extend" if is_sync_extend else "extend"
         else:
             if progress_callback and scope == "concept":
-                progress_callback("generating", 0, 1, "正在根据指令调整设计")
+                progress_callback("generating", 0, 1, "Adjusting the design from the instruction")
             if scope == "concept":
                 result = refine_design_concept(
                     ws, instruction=combined_for_llm, use_new_reference=False,
@@ -377,17 +379,17 @@ class DesignChatManager:
                     )
                 )
             if progress_callback and scope == "concept":
-                progress_callback("completed", 1, 1, "设计内容已更新")
+                progress_callback("completed", 1, 1, "Design updated")
             mode = "refine"
         if not result:
-            raise RuntimeError("未配置可用模型，请先在右上角配置大模型 API。")
+            raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
 
         note = str(result.get("adjustment_note") or "").strip()
         if not note:
-            note = ("已生成初版，可继续输入调整要求。" if mode == "initial"
-                    else "已根据新增拆解内容同步末尾阶段粗纲。" if mode == "concept_stage_sync"
-                    else "已同步新版全书设计并追加后续舞台。" if mode == "sync_extend"
-                    else "已追加后续舞台。" if mode == "extend" else "已按指令更新。")
+            note = ("First draft generated. You can keep sending adjustment requests." if mode == "initial"
+                    else "Synced the last phase of the phase outline from the newly deconstructed chapters." if mode == "concept_stage_sync"
+                    else "Synced the updated book design and appended later stages." if mode == "sync_extend"
+                    else "Later stages appended." if mode == "extend" else "Updated from the instruction.")
         artifacts = _extract_artifacts(scope, result)
         conv.append_assistant(note, artifacts)
         conv.save()
@@ -398,9 +400,9 @@ class DesignChatManager:
         self, workspace: str, scope: str, message: str, attachments=None,
         use_new_reference=False, sync_updated_design=False,
     ) -> dict[str, Any]:
-        """在后台执行设计对话，供前端轮询三段式全书设计进度。"""
+        """Run design chat in the background so the UI can poll three-step book-design progress."""
         if scope not in _SCOPE_FILES:
-            raise ValueError("设计步骤只能是 concept 或 stage。")
+            raise ValueError("Design step must be concept or stage.")
         key = (workspace, scope)
         ws = init_workspace(workspace)
         is_initial = not _design_files_exist(ws, scope)
@@ -408,7 +410,7 @@ class DesignChatManager:
         with self._jobs_lock:
             current = self._jobs.get(key)
             if current and current.get("status") in {"queued", "running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前设计步骤已有生成任务正在进行。")
+                raise ValueError("This design step already has a generation task running.")
             pause_event = threading.Event()
             pause_event.set()
             stop_event = threading.Event()
@@ -420,7 +422,7 @@ class DesignChatManager:
                 "completed": 0,
                 "total": total,
                 "progress_kind": "design_concept" if scope == "concept" else "stage_design",
-                "message": "任务已创建，正在启动",
+                "message": "Task created, starting",
                 "pause_event": pause_event,
                 "stop_event": stop_event,
                 "cancel_event": cancel_event,
@@ -481,8 +483,8 @@ class DesignChatManager:
                                 else active.get("total", total)
                             ),
                             message=(
-                                "已结束本轮舞台设计" if stopped else
-                                "全书设计已生成" if scope == "concept" else "舞台设计已生成"
+                                "This stage-design round has ended" if stopped else
+                                "Book design generated" if scope == "concept" else "Stage design generated"
                             ),
                             result={"mode": response.get("mode")},
                         )
@@ -492,7 +494,7 @@ class DesignChatManager:
                     if active and active.get("id") == job["id"]:
                         active.update(
                             status="failed", phase="failed",
-                            message="生成失败", error=str(exc),
+                            message="Generation failed", error=str(exc),
                         )
             finally:
                 trace_context.__exit__(None, None, None)
@@ -531,61 +533,61 @@ class DesignChatManager:
 
     def continue_incomplete(self, workspace: str, scope: str) -> dict[str, Any]:
         if scope != "stage":
-            raise ValueError("当前仅舞台设计支持断点继续。")
+            raise ValueError("Only stage design supports resume from a breakpoint.")
         resume = _stage_resume_status(init_workspace(workspace))
         if not resume.get("can_resume"):
-            raise ValueError("当前没有可继续的未完成舞台。")
+            raise ValueError("There is no unfinished stage to continue.")
         return self.start_message(
-            workspace, scope, "继续生成未完成的舞台设计",
+            workspace, scope, "Continue generating unfinished stage design",
         )
 
     def pause(self, workspace: str, scope: str) -> dict[str, Any]:
         if scope != "stage":
-            raise ValueError("当前仅舞台设计支持暂停。")
+            raise ValueError("Only stage design supports pause.")
         key = (workspace, scope)
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing"}:
-                raise ValueError("当前没有可暂停的舞台设计任务。")
+                raise ValueError("There is no pausable stage-design task.")
             job["pause_event"].clear()
             job["cancel_event"].set()
-            job.update(status="pausing", phase="pausing", message="正在暂停当前模型请求")
+            job.update(status="pausing", phase="pausing", message="Pausing the current model request")
         return self.job_status(workspace, scope)
 
     def resume(self, workspace: str, scope: str) -> dict[str, Any]:
         if scope != "stage":
-            raise ValueError("当前仅舞台设计支持继续。")
+            raise ValueError("Only stage design supports resume.")
         key = (workspace, scope)
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"paused", "pausing"}:
-                raise ValueError("当前没有已暂停的舞台设计任务。")
+                raise ValueError("There is no paused stage-design task.")
             job["cancel_event"].clear()
             job["pause_event"].set()
-            job.update(status="running", phase="generating", message="已继续生成舞台设计")
+            job.update(status="running", phase="generating", message="Resumed stage design")
         return self.job_status(workspace, scope)
 
     def stop(self, workspace: str, scope: str) -> dict[str, Any]:
         if scope != "stage":
-            raise ValueError("当前仅舞台设计支持结束。")
+            raise ValueError("Only stage design supports stop.")
         key = (workspace, scope)
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing", "paused"}:
-                raise ValueError("当前没有可结束的舞台设计任务。")
+                raise ValueError("There is no stage-design task to stop.")
             job["stop_event"].set()
             job["cancel_event"].set()
             job["pause_event"].set()
-            job.update(status="stopping", phase="stopping", message="正在结束本轮舞台设计")
+            job.update(status="stopping", phase="stopping", message="Ending this stage-design round")
         return self.job_status(workspace, scope)
 
     def reset(self, workspace: str, scope: str) -> dict[str, Any]:
-        """清空对话并删除该步骤的设计文件，使下一条消息重新作为初版生成。"""
+        """Clear the conversation and delete this step's design files so the next message generates a first draft again."""
         key = (workspace, scope)
         with self._jobs_lock:
             job = self._jobs.get(key)
             if job and job.get("status") in {"queued", "running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前设计任务仍在执行，请先结束任务再重置。")
+                raise ValueError("The current design task is still running. Stop it before resetting.")
             if job:
                 job["prompt_history"] = []
                 job["prompt_count"] = 0
@@ -598,14 +600,14 @@ class DesignChatManager:
             except FileNotFoundError:
                 pass
         if scope == "stage":
-            # 书名与简介由粗略大纲 + 长线主线派生；舞台设计重置后旧版本已失去依据。
+            # Title and synopsis are derived from the rough outline plus long mainline; after a stage-design reset the old copy is stale.
             try:
                 os.remove(os.path.join(ws.file_system, "novel_name_synopsis.md"))
             except FileNotFoundError:
                 pass
         if scope in {"concept", "stage"}:
-            # 系统面板由当前全书设计和舞台设计派生。上游重置后，旧定义和所有
-            # 章节状态都不再可信；下次生成章纲时应重新自动判断并初始化。
+            # The system panel is derived from the current book design and stage design. After an upstream reset, old definitions and all
+            # chapter state is no longer trusted; the next chapter-outline run should decide and initialize again.
             _clear_system_panel_artifacts(ws)
         state_files = (
             ("chapter_usage_state.json", "design_state.json")

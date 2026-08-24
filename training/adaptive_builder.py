@@ -531,7 +531,7 @@ _DIRECTION_MODE_LABELS = {
 
 
 def record_creative_direction(ws, direction, mode):
-    """记录一次创作方向输入到历史，供工作台回看与复用。"""
+    """Record one creative-direction input into history for the workbench to reuse."""
     text = (direction or "").strip()
     if not text:
         return
@@ -1567,7 +1567,7 @@ def _load_reference_context(ws):
 
 
 def _reference_volume_structure_context(ws, per_volume_chars=1800, max_chars=36000):
-    """仅提取各卷的卷纲概览与三幕结构，作为新书阶段粗纲的结构参考。
+    """Extract only each volume's Volume overview and Three-act structure as structure reference for the new-book phase outline.
 
     Do not concatenate character, foreshadowing, or setting blocks, so long reference material does not crowd the new-book worldview and
     rough-outline context. Per-volume and total length are both capped.
@@ -1622,7 +1622,7 @@ def _reference_volume_structure_context(ws, per_volume_chars=1800, max_chars=360
 
 
 def _reference_volume_stage_structure(ws, volume):
-    """读取单卷完整的“卷纲概览 + 三幕结构”，供末尾阶段增量同步。"""
+    """Read one volume's full Volume overview + Three-act structure for tail-phase incremental sync."""
     content = load_reference_volume_outline(
         ws.reference_outlines, volume["vol_idx"]
     ) or ""
@@ -1719,7 +1719,7 @@ def _design_structure_counts(rough, worldview):
 
 
 def _remove_stage_outline_section(rough):
-    """确保 rough_outline.md 不再夹带阶段粗纲；阶段内容由独立文件维护。"""
+    """Keep phase-outline content out of rough_outline.md; phases live in their own file."""
     lines = (rough or "").splitlines()
     output = []
     skipping = False
@@ -1743,7 +1743,7 @@ def _remove_stage_outline_section(rough):
 
 
 def _stage_outline_sections(stage_outline):
-    """把独立阶段粗纲拆为 {阶段编号: 完整阶段文本}。"""
+    """Split the standalone phase outline into {phase number: full phase text}."""
     headings = list(STAGE_OUTLINE_HEADING_RE.finditer(stage_outline or ""))
     sections = {}
     for index, heading in enumerate(headings):
@@ -1968,7 +1968,7 @@ def gen_design_concept(
                     f"Last time generated {actual_count} phases; this time must generate exactly {expected_count} phases."
                 )
             payload = parse_json_response(
-                _call_design_llm(llm, prompt, f"新小说阶段粗纲（第{attempt}次）")
+                _call_design_llm(llm, prompt, f"new-novel phase outline (attempt {attempt})")
             )
             candidate = _normalize_design_field(payload, "stage_outline_md", "# Phase outline")
             if not _is_real_design_field(candidate):
@@ -2096,7 +2096,7 @@ def gen_stage_design(
         f"Long mainline generated; preparing stage 1/{total_stages}",
     )
 
-    # 强制重建或长线刚重新生成时，从舞台1开始；服务重启后的普通重试则复用连续前缀。
+    # Force rebuild or a freshly regenerated long mainline starts at stage 1; ordinary retry after restart reuses the contiguous prefix.
     completed_parts = [] if (force or long_generated) else _completed_stage_prefix(
         existing_stage, len(stage_sections)
     )
@@ -2314,7 +2314,7 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
             reference_volume_structure=reference_structure,
         )
         payload = parse_json_response(
-            _call_design_llm(llm, prompt, f"增量同步阶段粗纲{number}/{target_count}")
+            _call_design_llm(llm, prompt, f"incremental phase-outline sync {number}/{target_count}")
         )
         candidate = _normalize_design_field(payload, "stage_outline_md", "")
         numbers = [int(value) for value in STAGE_OUTLINE_HEADING_RE.findall(candidate)]
@@ -2512,7 +2512,7 @@ def refine_stage_design(
         current_stage = (
             original_parts[number - 1]
             if mode == "revise" else
-            "（完全重新生成：不得参考当前舞台旧内容）"
+            "(full regenerate: do not use the current stage's old content)"
         )
         prompt = PromptLoader.load(
             "stage_roadmap_serial_refine",
@@ -2562,7 +2562,7 @@ def refine_stage_design(
         "adjustment_note": (
             f"Per the instruction, serially processed from stage {start_stage} "
             f"{total_stages - start_stage + 1} stages."
-            f"处理方式：{'完全重新生成' if mode == 'regenerate' else '基于当前内容调整'}。"
+            f"Handling: {'full regenerate' if mode == 'regenerate' else 'revise from current content'}."
             f"Route reason: {reason}"
         ),
         "start_stage": start_stage,
@@ -2653,7 +2653,7 @@ def _sync_later_stages_serial(ws, instruction, cancel_event=None):
         "long_mainline": long_mainline,
         "stage_roadmap": "\n\n".join(completed_parts),
         "adjustment_note": (
-            f"阶段数未增加，已仅重新生成最后一个舞台（舞台{next_stage}）。"
+            f"Phase count did not grow; only the last stage (stage {next_stage}) was regenerated."
             if adjust_last else
             f"Kept existing stages and serially filled later stages from stage {next_stage}."
         ),
@@ -3758,7 +3758,7 @@ def _adapt_reference_batch(ws, llm, volume, batch_idx, start_ch, end_ch,
 
         audit_feedback = (
             f"[Previous adapted-draft violations]\n"
-            f"仍然出现了以下禁止残留参考元素：{', '.join(violations)}。\n"
+            f"These forbidden leftover reference elements still appear: {', '.join(violations)}.\n"
             "Please re-adapt. Do not keep these old-world elements; if there is no natural counterpart, substitute by function, delete, or delay."
         )
         print(f"  Adapted reference batch still has leftovers: {', '.join(violations)}; rewriting...")
@@ -4053,7 +4053,7 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
                 if progress_callback:
                     progress_callback(
                         "paused", len(generated_items), total_arcs,
-                        "模型请求已暂停；点击继续将重新生成当前情节",
+                        "Model request paused; click continue to regenerate the current story-arc",
                     )
                 if pause_event is not None:
                     pause_event.wait()
@@ -4301,7 +4301,7 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
         action_label = (
             "revise from original content"
             if target["existed"] and refinement_mode == "revise"
-            else "完全重新生成"
+            else "full regenerate"
             if target["existed"]
             else "continue generating"
         )
@@ -4380,7 +4380,7 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
             else (
                 f"Per the instruction, serially processed {len(written)} story-arc units starting at unit {start_arc}, "
                 f"and filled later units that had not been generated. Handling: "
-                f"{'完全重新生成' if refinement_mode == 'regenerate' else '基于当前内容调整'}。"
+                f"{'full regenerate' if refinement_mode == 'regenerate' else 'revise from current content'}."
                 f"Route reason: {route_reason}"
             )
         ),
@@ -4676,7 +4676,7 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
                 if progress_callback:
                     progress_callback(
                         "paused", len(written), arc_end - arc_start + 1,
-                        f"第{ch_num}章生成已暂停；继续后重新生成本章",
+                        f"Chapter {ch_num} generation paused; continue to regenerate this chapter",
                     )
                 if pause_event is not None:
                     pause_event.wait()
@@ -4896,7 +4896,7 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
                 if progress_callback:
                     progress_callback(
                         "paused", len(written), len(targets),
-                        f"第{ch_num}章调整已暂停；继续后重新生成本章",
+                        f"Chapter {ch_num} adjust paused; continue to regenerate this chapter",
                     )
                 if pause_event is not None:
                     pause_event.wait()
@@ -4929,7 +4929,7 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
             if stopped else
             (
                 f"Per the instruction, serially processed {len(written)} chapters starting at chapter {routed_chapter}."
-                f"处理方式：{'完全重新生成' if refinement_mode == 'regenerate' else '基于当前内容调整'}。"
+                f"Handling: {'full regenerate' if refinement_mode == 'regenerate' else 'revise from current content'}."
                 f"Route reason: {route_reason}"
             )
         ),
@@ -5538,7 +5538,7 @@ def gen_serial_chapters(
             if stopped else (
                 f"Finished {completed} chapter drafts"
                 + (
-                    f"（{'完全重新生成' if refinement_mode == 'regenerate' else '基于当前内容调整'}）"
+                    f"({'full regenerate' if refinement_mode == 'regenerate' else 'revise from current content'})"
                     if regenerate_existing else ""
                 )
                 + "。"

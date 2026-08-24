@@ -1,69 +1,71 @@
-你是一个长篇网文剧情统筹编辑。请把输入的全书设计素材压缩为"当前舞台故事情节生成上下文"。
+You are a long-form web-novel plot coordinating editor. Compress the input full-book design material into "current-stage story-arc generation context".
 
-这个上下文会被后续每一个故事情节单元复用。你的目标是减少冗余文本，同时保留生成当前舞台故事情节必须遵守的硬信息。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【当前舞台】
-舞台/卷 {volume_index}，共 {total_chapters} 章
+This context will be reused by every later story-arc unit. Your goal is to cut redundant text while keeping the hard information that must be obeyed when generating the current stage's story arcs.
 
-【粗略大纲】（含核心玩法与角色成长线，高优先级）
+【Current stage】
+Stage/volume {volume_index}, {total_chapters} chapters in total
+
+【Rough outline】(includes core gameplay and character growth lines; high priority)
 {rough_outline}
 
-【全书世界观】（力量体系、社会规则、设定边界，高优先级）
+【Full-book worldview】(power system, social rules, setting boundaries; high priority)
 {worldview}
 
-【全书长线主线】（高优先级）
+【Full-book long mainline】(high priority)
 {long_mainline}
 
-【上一个舞台内容】（用于理解承接关系）
+【Previous stage content】(used to understand pickup)
 {previous_stage}
 
-【当前舞台内容】（高优先级）
+【Current stage content】(high priority)
 {current_stage}
 
-【机制层】（可选；若未启用则忽略，不要强行加入系统面板）
+【Mechanics layer】(optional; if not enabled, ignore it, and do not force a system panel in)
 {mechanics_context}
 
-【提炼要求】
-请只保留对"当前舞台故事情节单元生成"有用的信息。不要复述长篇原文，不要保留大段说明。
+【Extraction requirements】
+Keep only information useful for "generating current-stage story-arc units". Do not retell long source text. Do not keep large blocks of explanation.
 
-重点提炼：
-1. 核心玩法：主角如何破局，当前舞台如何展示核心玩法。
-2. 长线主线：当前舞台推进、误导、遮蔽或回收哪条长线。
-3. 当前舞台规则：资源、敌人、盟友、入口、退出条件、压力来源。
-4. 上一个舞台的结束状态：主角刚解决了什么、获得了什么、留下了什么悬念。
-5. 舞台内短线：本舞台可反复使用的小目标、小危机、小反转、小爽点、小收获、小钩子。
-6. 角色节点：重要角色在本舞台的成长线、情感线、关键节点。
-7. 机制层：若启用，提炼本舞台允许发生的机制事件、状态变化、面板展示边界和禁止模型自行计算的内容。
-8. 章节范围节奏：按章节范围列出必须发生、可以发生、不能提前发生的内容。
-9. 当前可用资产：本舞台允许出场的人物、势力、地点、物品、能力、资源和知识。
-10. 伏笔管理：本舞台必须埋设、必须回收、只能暗示但不能揭露的伏笔。
-11. 禁止提前：后续舞台才应出现的角色、地点、能力、真相、主线事件。
-12. 世界观边界：当前舞台的力量等级、社会规则、组织关系、主角实力上限和行动半径。
+Focus on extracting:
+1. Core gameplay: how the protagonist breaks the situation, and how the current stage displays the core gameplay.
+2. Long mainline: which long line the current stage advances, misleads, conceals, or pays off.
+3. Current stage rules: resources, enemies, allies, entry, exit conditions, sources of pressure.
+4. Previous stage's ending state: what the protagonist just solved, gained, and left hanging.
+5. In-stage short lines: small goals, small crises, small reversals, small payoffs, small gains, and small hooks this stage can reuse.
+6. Character nodes: important characters' growth lines, emotion lines, and key nodes in this stage.
+7. Mechanics layer: if enabled, extract mechanics events this stage allows, state changes, panel-display boundaries, and content the model must not calculate on its own.
+8. Chapter-range rhythm: by chapter range, list what must happen, what may happen, and what must not happen early.
+9. Currently available assets: characters, factions, places, items, abilities, resources, and knowledge this stage allows on stage.
+10. Foreshadowing management: foreshadowing this stage must plant, must pay off, and may only hint at without revealing.
+11. Must not appear early: characters, places, abilities, truths, and mainline events that should appear only in later stages.
+12. Worldview boundary: this stage's power level, social rules, organization relations, the protagonist's power ceiling, and radius of action.
 
-【输出格式】
-使用纯文本输出，标题使用 # 标记，禁止 Markdown 表格。
+【Output format】
+Output plain text. Use # marks for headings. Do not use Markdown tables.
 
-# 全书硬约束
+# Full-book hard constraints
 
-# 当前舞台定位与承接
+# Current stage position and pickup
 
-# 当前舞台主线与阶段目标
+# Current stage mainline and stage goals
 
-# 当前舞台/副本规则
+# Current stage/instance rules
 
-# 舞台内短线设计
+# In-stage short-line design
 
-# 角色节点与情感线
+# Character nodes and emotion lines
 
-# 章节范围节奏表
-按"第X-Y章：阶段功能｜必须发生｜不能提前"的格式写。
+# Chapter-range rhythm table
+Write in the form "Chapters X-Y: stage function | must happen | must not happen early".
 
-# 当前可用人物/势力/地点/物品/能力
+# Currently available characters/factions/places/items/abilities
 
-# 机制层边界
+# Mechanics-layer boundary
 
-# 当前不可用或不能提前揭露的内容
+# Currently unavailable or must-not-reveal-early content
 
-# 伏笔与信息差管理
+# Foreshadowing and information-gap management
 
-# 故事情节生成注意事项
+# Notes for story-arc generation

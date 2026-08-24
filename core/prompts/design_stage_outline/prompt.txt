@@ -1,28 +1,30 @@
-你是长篇网文结构主编。请根据新小说世界观、新小说粗略大纲，以及参考小说各卷的“卷纲概览 + 三幕结构”，为新小说生成独立的阶段粗纲。
+You are a long-form web-novel structure editor-in-chief. From the new novel's worldview, the new novel's rough outline, and each reference volume's "Volume overview + Three-act structure", generate an independent phase outline for the new novel.
 
-新小说阶段必须与参考小说卷数一一对应：参考第N卷对应新小说阶段N。这里对应的是结构位置和叙事功能，用于判断目标变化、地图迁移、身份跃升、势力层级变化与核心矛盾转换；不得照搬参考小说的专有名词、事件和因果，也不得把参考卷剧情换名复刻。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【新小说世界观】
+New-novel phases must correspond one-to-one with reference-novel volumes: reference volume N corresponds to new-novel phase N. The correspondence is structural position and narrative function, used to judge goal changes, map moves, identity jumps, faction-layer changes, and core-conflict shifts. Do not copy the reference novel's proper nouns, events, or causality, and do not rename-and-clone a reference volume's plot.
+
+[New novel worldview]
 {worldview}
 
-【新小说粗略大纲】
+[New novel rough outline]
 {rough_outline}
 
-【参考小说分卷结构】（每卷仅含卷纲概览与三幕结构）
+[Reference novel volume structure] (each volume contains only Volume overview and Three-act structure)
 {reference_volume_structures}
 
-【结构规模参考】
-参考小说共有 {reference_volume_count} 卷。存在参考分卷时，新书必须生成 {stage_range} 个阶段，阶段数量与参考卷数完全一致，不能合并、拆分、遗漏或额外增加阶段；若参考卷数为0，则按 {stage_range} 的兜底范围生成。
+[Structure-scale reference]
+The reference novel has {reference_volume_count} volumes. When reference volumes exist, the new book must generate {stage_range} phases. The phase count must match the reference volume count exactly; do not merge, split, omit, or add extra phases. If the reference volume count is 0, generate within the fallback range {stage_range}.
 
-请只输出 JSON，不要输出解释、Markdown 代码块或 JSON 外文本：
+Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
 {{
-  "stage_outline_md": "# 阶段粗纲\n\n## 阶段1：名称\n..."
+  "stage_outline_md": "# Phase outline\n\n## Phase 1: Name\n..."
 }}
 
-要求：
-1. 文档以“# 阶段粗纲”开头，每个阶段使用“## 阶段N：名称”，N从1连续递增；存在参考分卷时，必须从阶段1写到阶段{reference_volume_count}。
-2. 每个阶段写清：阶段定位、主角目标、起始状态、核心矛盾、核心玩法如何变形、地图与势力变化、主要角色变化、爽点与读者获得感、收获与代价、长线信息推进、结束状态、下一阶段钩子。
-3. 不写具体章节数，不拆成逐章内容。
-4. 各阶段必须构成连续因果，上一阶段的收获、代价或后患要成为下一阶段的输入。
-5. 阶段{reference_volume_count}必须真正回答全书长线问题并完成核心矛盾，不得在其后开启必须继续的新地图、新敌人或新任务。
-6. 每个阶段增加一行“结构映射：参考卷N的结构功能 → 本阶段采用的全新功能”，明确说明学到的只是功能；不得出现参考小说人名、地名或势力名。
+Requirements:
+1. The document starts with "# Phase outline". Each phase uses "## Phase N: Name", with N increasing continuously from 1. When reference volumes exist, you must write from phase 1 through phase {reference_volume_count}.
+2. For each phase, state: phase positioning, protagonist goal, starting state, core conflict, how core gameplay is varied, map and faction changes, main-character changes, payoff and reader gain, harvest and cost, long-mainline information advance, end state, hook into the next phase.
+3. Do not write a specific chapter count, and do not break the phase into per-chapter content.
+4. The phases must form a continuous causal chain. The harvest, cost, or aftermath of the previous phase must become input for the next phase.
+5. Phase {reference_volume_count} must actually answer the book's long-running question and complete the core conflict. Do not open a new map, new enemy, or new task after it that still has to continue.
+6. Add one line to each phase: "Structure mapping: structural function of reference volume N → entirely new function this phase adopts", making clear that only function is learned; do not include reference-novel names of people, places, or factions.

@@ -1,11 +1,11 @@
 const WIZARD_STEPS = [
-  { id: "reference", title: "参考小说", short: "拆书与结构", optional: false, heading: "参考小说拆解", lead: "全书大纲、卷纲和故事片段已结构化保存。", decision: "检查全书结构、分卷边界和故事片段，再进入新书设计。", reviewPrefixes: ["reference/outlines"], reviewHint: "查看全书大纲、卷纲与故事片段。" },
-  { id: "world", title: "目标世界", short: "可选资料库", optional: true, heading: "构建目标世界资料库", lead: "用主资料定义世界，用补充资料完善细节。", decision: "导入资料后指定主资料；不需要可跳过。", reviewPrefixes: ["file_system/world_knowledge/worlds/_final"], reviewHint: "查看世界规则、力量体系与关键角色。" },
-  { id: "design", title: "全书设计", short: "世界观与大纲", optional: false, heading: "设计世界观、粗略大纲与阶段粗纲", lead: "输入灵感后，系统会依次生成世界观、粗略大纲和独立阶段粗纲，之后可继续对话调整。", decision: "初版按三步串行生成，减少单次上下文；后续调整会同步维护三份设计。", reviewPrefixes: ["file_system/story_design/worldview.md", "file_system/story_design/rough_outline.md", "file_system/story_design/stage_outline.md", "file_system/story_design/core_gameplay.md"], reviewHint: "分别查看世界规则、核心玩法和阶段推进，可随时继续调整。" },
-  { id: "stage", title: "舞台设计", short: "长线与舞台", optional: false, heading: "设计长线主线与舞台路线图", lead: "系统先生成全书长线主线，再按阶段与对应参考卷纲逐个生成舞台；中断后可从已完成舞台继续。", decision: "每次只生成一个舞台，并以上一舞台维持连续性；生成完成后仍可通过对话微调或续写。", reviewPrefixes: ["file_system/story_design/long_mainline.md", "file_system/story_design/stage_roadmap.md", "file_system/novel_name_synopsis.md"], reviewHint: "舞台采用卷纲式结构，可查看三幕推进、人物、伏笔和核心爽点。" },
-  { id: "arcs", title: "故事情节", short: "当前舞台", optional: false, heading: "生成故事情节单元", lead: "为当前舞台产出连续推进的情节蓝图。", decision: "选择舞台，抽象参考叙事模式后生成新情节。", reviewPrefixes: ["file_system/story_arcs"], reviewHint: "查看各已生成卷的目标、冲突、情绪与钩子，可随时继续调整。" },
-  { id: "chapters", title: "逐章章纲", short: "单章卡片", optional: false, heading: "生成逐章章纲", lead: "串行生成章纲，并同步维护每章的主角系统面板状态。", decision: "选择舞台或情节单元，生成对应章节的单章卡片。", reviewPrefixes: ["file_system/chapter_outlines", "file_system/system_panels"], reviewHint: "查看章纲与独立保存的主角系统面板状态，可随时继续调整。" },
-  { id: "draft", title: "正文", short: "写作与精修", optional: false, heading: "生成正文", lead: "按章纲连续写作，并在后台保留原稿备份。", decision: "选择舞台和故事情节，通过对话串行生成正文。", reviewPrefixes: ["file_system/chapters"], reviewHint: "这里只显示精修后的正文，可在对话中继续调整。" },
+  { id: "reference", title: "Reference novel", short: "Deconstruct structure", optional: false, heading: "Reference novel deconstruction", lead: "The book outline, volume outlines, and story arcs are stored as structured assets.", decision: "Review book structure, volume boundaries, and story arcs before designing the new novel.", reviewPrefixes: ["reference/outlines"], reviewHint: "Inspect the book outline, volume outlines, and story arcs." },
+  { id: "world", title: "Target world", short: "Optional knowledge base", optional: true, heading: "Build the target-world knowledge base", lead: "Use a primary source to define the world, then refine details with supplement sources.", decision: "Import sources and pick a primary source, or skip this step.", reviewPrefixes: ["file_system/world_knowledge/worlds/_final"], reviewHint: "Inspect world rules, power systems, and key characters." },
+  { id: "design", title: "Book design", short: "Worldview and outline", optional: false, heading: "Design worldview, rough outline, and phase outline", lead: "After you enter inspiration, the system generates worldview, rough outline, and a standalone phase outline in sequence. You can keep chatting to adjust them.", decision: "The first draft is generated in three serial steps to keep context small; later adjustments keep all three files in sync.", reviewPrefixes: ["file_system/story_design/worldview.md", "file_system/story_design/rough_outline.md", "file_system/story_design/stage_outline.md", "file_system/story_design/core_gameplay.md"], reviewHint: "Review world rules, core gameplay, and phase progression, and keep adjusting anytime." },
+  { id: "stage", title: "Stage design", short: "Mainline and stages", optional: false, heading: "Design the long mainline and stage roadmap", lead: "The system first generates the book-length long mainline, then generates each stage from the matching phases and reference volume outlines. After an interruption you can resume from completed stages.", decision: "Each run generates one stage and uses the previous stage for continuity. After generation you can still refine or extend through chat.", reviewPrefixes: ["file_system/story_design/long_mainline.md", "file_system/story_design/stage_roadmap.md", "file_system/novel_name_synopsis.md"], reviewHint: "Stages use a volume-outline structure: three-act progression, characters, foreshadowing, and core payoff." },
+  { id: "arcs", title: "Story arcs", short: "Current stage", optional: false, heading: "Generate story arcs", lead: "Produce a continuous plot blueprint for the current stage.", decision: "Choose a stage, abstract reference narrative patterns, then generate new arcs.", reviewPrefixes: ["file_system/story_arcs"], reviewHint: "Review goals, conflicts, emotion, and hooks for generated volumes, and keep adjusting anytime." },
+  { id: "chapters", title: "Chapter outlines", short: "Per-chapter cards", optional: false, heading: "Generate chapter outlines", lead: "Generate chapter outlines serially and keep the protagonist system-panel state in sync for each chapter.", decision: "Choose a stage or story arc, then generate per-chapter cards.", reviewPrefixes: ["file_system/chapter_outlines", "file_system/system_panels"], reviewHint: "Review chapter outlines and independently saved protagonist system-panel snapshots, and keep adjusting anytime." },
+  { id: "draft", title: "Draft", short: "Write and refine", optional: false, heading: "Generate draft", lead: "Write continuously from chapter outlines and keep raw-draft backups in the background.", decision: "Choose a stage and story arc, then generate draft serially through chat.", reviewPrefixes: ["file_system/chapters"], reviewHint: "This view shows the refined draft only. Keep adjusting it in chat." },
 ];
 
 const CONFIG_PREFIXES = {
@@ -16,28 +16,28 @@ const CONFIG_PREFIXES = {
 
 const REVIEW_GROUPS = {
   reference: [
-    { title: "全书规划", description: "整体节奏、阶段推进与核心冲突。", matches: (path) => path.endsWith("/novel_outline.md") },
+    { title: "Book plan", description: "Overall pacing, phase progression, and core conflict.", matches: (path) => path.endsWith("/novel_outline.md") },
   ],
   world: [
-    { title: "目标世界设定", description: "后续设计可直接引用的世界公共设定。", matches: (path) => path.includes("/worlds/_final/") },
+    { title: "Target-world settings", description: "Shared world settings later design steps can cite directly.", matches: (path) => path.includes("/worlds/_final/") },
   ],
   design: [
-    { title: "创作设计", description: "决定全书玩法、期待与舞台推进。", matches: (path) => path.includes("/story_design/") },
-    { title: "书名建议", description: "根据全书设计生成的书名方向与简介。", matches: (path) => path.endsWith("/novel_name_synopsis.md") },
+    { title: "Creative design", description: "Defines gameplay, expectation, and stage progression for the book.", matches: (path) => path.includes("/story_design/") },
+    { title: "Title suggestions", description: "Title directions and synopsis generated from book design.", matches: (path) => path.endsWith("/novel_name_synopsis.md") },
   ],
   stage: [
-    { title: "长线主线与舞台路线图", description: "定义全书长线悬念、阶段目标与舞台推进顺序。", matches: (path) => path.endsWith("/long_mainline.md") || path.endsWith("/stage_roadmap.md") },
-    { title: "书名与简介", description: "基于完整全书设计生成的书名方向与平台简介。", matches: (path) => path.endsWith("/novel_name_synopsis.md") },
+    { title: "Long mainline and stage roadmap", description: "Defines book-length suspense, phase goals, and stage order.", matches: (path) => path.endsWith("/long_mainline.md") || path.endsWith("/stage_roadmap.md") },
+    { title: "Title and synopsis", description: "Title directions and platform synopsis from the complete book design.", matches: (path) => path.endsWith("/novel_name_synopsis.md") },
   ],
   arcs: [
-    { title: "舞台故事蓝图", description: "当前舞台中连续推进的故事蓝图。", matches: (path) => path.includes("/story_arcs/") },
+    { title: "Stage story blueprint", description: "A continuous story blueprint inside the current stage.", matches: (path) => path.includes("/story_arcs/") },
   ],
   chapters: [
-    { title: "章节设计资料", description: "每章的故事线、情绪节奏与描述性单章简介。", matches: (path) => path.includes("/chapter_outlines/") },
-    { title: "系统面板状态", description: "每章结束时以主角为核心的结构化状态快照。", matches: (path) => path.includes("/system_panels/") },
+    { title: "Chapter design assets", description: "Each chapter's story line, emotional pacing, and descriptive one-chapter synopsis.", matches: (path) => path.includes("/chapter_outlines/") },
+    { title: "System-panel state", description: "A structured protagonist-centered snapshot at the end of each chapter.", matches: (path) => path.includes("/system_panels/") },
   ],
   draft: [
-    { title: "已精修正文", description: "可继续修改和发布的章节正文。", matches: (path) => path.includes("/chapters/") },
+    { title: "Refined draft", description: "Chapter text that can still be edited and published.", matches: (path) => path.includes("/chapters/") },
   ],
 };
 
@@ -1831,30 +1831,30 @@ function artifactDescriptor(step, path) {
   const arcMatch = filename.match(/^arc_(\d+)_ch(\d+)_(\d+)/i);
   const chapterNumber = chapterNumberFromPath(path);
   const worldDescriptions = {
-    "世界观.md": ["世界观", "天地规则、时代背景与核心矛盾。"],
-    "力量体系.md": ["力量体系", "境界、力量来源与晋升限制。"],
-    "关键人物.md": ["关键人物", "角色身份、关系、能力与作用。"],
-    "势力描述.md": ["势力描述", "组织、利益关系与冲突格局。"],
-    "故事主线.md": ["故事主线", "主资料优先的事件因果链。"],
-    "关键物品.md": ["关键物品", "法宝、资源和剧情作用。"],
-    "技能体系.md": ["技能体系", "法术、神通、功法与使用规则。"],
+    "世界观.md": ["Worldview", "Heaven-and-earth rules, era background, and core conflicts."],
+    "力量体系.md": ["Power system", "Realms, power sources, and promotion limits."],
+    "关键人物.md": ["Key characters", "Identity, relationships, abilities, and roles."],
+    "势力描述.md": ["Factions", "Organizations, interests, and conflict structure."],
+    "故事主线.md": ["Main plot", "Event causality with the primary source taking priority."],
+    "关键物品.md": ["Key items", "Artifacts, resources, and plot function."],
+    "技能体系.md": ["Skill system", "Arts, techniques, methods, and usage rules."],
   };
   const designDescriptions = {
-    "core_gameplay.md": ["核心玩法", "读者持续追读的升级与反馈循环。"],
-    "worldview.md": ["世界观", "新小说的底层规则、力量体系与地图层级。"],
-    "rough_outline.md": ["粗略大纲", "核心故事、玩法循环、主要角色与运营风险。"],
-    "stage_outline.md": ["阶段粗纲", "独立记录全书各阶段的目标、变化与衔接。"],
-    "long_mainline.md": ["长线主线", "贯穿多个舞台的期待与悬念。"],
-    "stage_roadmap.md": ["舞台路线图", "每个舞台的目标、资源和阶段推进。"],
-    "character_arcs.md": ["角色成长线", "主要角色的关键节点与关系变化。"],
-    "design_state.json": ["设计进度", "记录全书设计已吸收的参考拆解范围。"],
-    "novel_name_synopsis.md": ["书名建议", "基于创作骨架生成的书名方向与简介。"],
+    "core_gameplay.md": ["Core gameplay", "The upgrade and feedback loop that keeps readers going."],
+    "worldview.md": ["Worldview", "Base rules, power system, and map layers of the new novel."],
+    "rough_outline.md": ["Rough outline", "Core story, gameplay loop, main characters, and operating risks."],
+    "stage_outline.md": ["Phase outline", "Standalone record of each phase's goals, changes, and links."],
+    "long_mainline.md": ["Long mainline", "Expectation and suspense that run across multiple stages."],
+    "stage_roadmap.md": ["Stage roadmap", "Each stage's goals, resources, and phase progression."],
+    "character_arcs.md": ["Character arcs", "Key nodes and relationship changes for main characters."],
+    "design_state.json": ["Design progress", "Records how much reference deconstruction book design has absorbed."],
+    "novel_name_synopsis.md": ["Title suggestions", "Title directions and synopsis generated from the creative skeleton."],
   };
   const mechanicsDescriptions = {
-    "profile.json": ["系统面板档案", "系统面板是否启用及其工作模式。"],
-    "design.md": ["机制设计", "系统或状态追踪的整体说明。"],
-    "rules.json": ["系统面板规则", "可计算事件和不可突破的约束。"],
-    "state.json": ["初始状态", "资源、技能、任务等初始数据。"],
+    "profile.json": ["System-panel profile", "Whether the system panel is enabled and which mode it uses."],
+    "design.md": ["Mechanics design", "Overall notes for the system or state tracking."],
+    "rules.json": ["System-panel rules", "Computable events and constraints that must not be broken."],
+    "state.json": ["Initial state", "Initial data for resources, skills, tasks, and more."],
   };
 
   if (step.id === "reference") {

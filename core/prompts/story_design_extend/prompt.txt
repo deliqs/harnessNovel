@@ -1,61 +1,63 @@
-你是一位长篇网文的持续运营主编。新小说已经完成初版全书设计，现在需要在**绝不改写已有设计**的前提下，继续追加后续内容。
+You are the continuing-serialization editor-in-chief of a long-form web novel. The new novel already has a first-edition book design. Now you must keep appending later content under the premise of **never rewriting existing design**.
 
-本次任务只做三件事：
-1. 为长线主线补充后续可持续运营的悬念、压力源、阶段揭露和伏笔；
-2. 为角色成长线补充新角色，或补充既有角色在新增舞台后的成长、关系和情感节点；
-3. 在既有舞台之后追加一个或多个新舞台。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-严禁改写、概括、纠正或重新编号下方已有的核心玩法、长线主线、角色成长线、舞台路线图。核心玩法和书名建议不在本次任务范围内。
+This task does only three things:
+1. Add later, still-serializable mystery, pressure sources, phase reveals, and foreshadowing to the long mainline;
+2. Add new characters to the character growth lines, or add growth, relationship, and emotional nodes for existing characters after the newly added stages;
+3. Append one or more new stages after the existing stages.
 
-【是否参考新增参考拆解】
+It is forbidden to rewrite, summarize, correct, or renumber the existing core gameplay, long mainline, character growth lines, or stage roadmap below. Core gameplay and title suggestions are out of scope for this task.
+
+[Whether to use newly added reference deconstruction]
 {use_reference}
 
-【本次参考范围】
+[Reference scope this time]
 {reference_range}
 
-【新增参考故事片段】
-只用于学习新增阶段的叙事功能、节奏与情绪推进；不可复制参考小说的角色、专有名词、世界观或具体事件。
+[Newly added reference story segments]
+Use them only to learn the narrative function, rhythm, and emotional advance of newly added phases. Do not copy the reference novel's characters, proper nouns, worldview, or concrete events.
 {reference_delta}
 
-【可选补充方向】
+[Optional extra direction]
 {creative_direction}
 
-【核心玩法】（不可修改，最高约束）
+[Core gameplay] (must not be modified; highest constraint)
 {core_gameplay}
 
-【现有长线主线】（不可修改，只能在其后续写）
+[Existing long mainline] (must not be modified; you may only write after it)
 {existing_long_mainline}
 
-【现有角色成长线】（不可修改，只能在其后续写）
+[Existing character growth lines] (must not be modified; you may only write after them)
 {existing_character_arcs}
 
-【现有舞台路线图】（不可修改，只能在末尾追加）
+[Existing stage roadmap] (must not be modified; you may only append at the end)
 {existing_stage_roadmap}
 
-【下一个舞台编号】
+[Next stage number]
 {next_stage_number}
 
-【目标世界知识库】（可选）
+[Target world knowledge base] (optional)
 {world_knowledge}
 
-【续写原则】
-1. 新内容必须让核心玩法出现新的限制、变体、收益或代价，不能只是换场景重复。
-2. 新舞台必须承接现有最后一个舞台的结束状态，并推动更后期的期待。
-3. 长线续写应补充“后续如何升级”，不能推翻已有悬念或提前公布既有文档标记为“不能提前”的内容。
-4. 角色续写优先让旧角色在新舞台出现新的功能与关系变化；需要新角色时，明确其功能位和不可替代性。
-5. 每个新舞台必须包含多个舞台内短线，制造至少不同类型的情绪刺激：压迫、反转、打脸、试探、收获、关系变化或章末钩子。
-6. 新舞台必须紧接现有舞台之后，编号从“舞台{next_stage_number}”开始，连续递增。不得修改或重复已有舞台。
-7. 没有新增参考内容时，仍可完全根据现有核心玩法、长线、角色线和舞台路线图设计后续舞台。
+[Continuation principles]
+1. New content must give the core gameplay new limits, variants, gains, or costs. It must not merely repeat the same loop in a new scene.
+2. New stages must inherit the end state of the current last stage, and push anticipation further out.
+3. Long-mainline continuation should add "how it levels up later". Do not overturn existing mysteries, and do not early-announce content existing documents mark as "Must not happen yet".
+4. Character continuation should first let old characters take on new functions and relationship changes in the new stages; when a new character is needed, state their functional role and why they cannot be replaced.
+5. Each new stage must contain multiple short lines inside the stage, manufacturing at least different kinds of emotional stimulus: pressure, reversal, face-slap, probing, gain, relationship change, or an end-of-chapter hook.
+6. New stages must follow immediately after the existing stages, numbered starting from "Stage {next_stage_number}" and increasing continuously. Do not modify or repeat existing stages.
+7. When there is no newly added reference content, you may still design later stages entirely from the existing core gameplay, long mainline, character lines, and stage roadmap.
 
-【输出协议】
-严格按以下三个标记分段输出。标记必须独占一行，不能添加任何额外的外层说明。
+[Output protocol]
+Output in exactly the following three marked segments. Each marker must occupy its own line. Do not add any extra outer commentary.
 
 <<<LONG_MAINLINE_APPEND>>>
-输出可直接追加到 long_mainline.md 的内容。使用二级或三级标题；说明新增阶段的核心悬念、压力升级、伏笔、阶段性回收和不能提前揭露的内容。
+Output content that can be appended directly to long_mainline.md. Use level-2 or level-3 headings; state the new phases' core mystery, pressure upgrade, foreshadowing, phase payoffs, and content that must not be revealed yet.
 
 <<<CHARACTER_ARCS_APPEND>>>
-输出可直接追加到 character_arcs.md 的内容。使用二级或三级标题；补充既有角色或新角色的成长线、情感线、关键节点、情绪作用和与长线的关系。
+Output content that can be appended directly to character_arcs.md. Use level-2 or level-3 headings; add growth lines, emotional lines, key nodes, emotional function, and relation to the long mainline for existing or new characters.
 
 <<<STAGE_ROADMAP_APPEND>>>
-只输出可直接追加到 stage_roadmap.md 的新舞台。第一个标题必须严格为：# 舞台{next_stage_number}：名称
-后续舞台按连续编号使用同样一级标题。每个舞台必须包含：预计章节数、阶段功能、玩法价值、长线主线推进、舞台规则、舞台内短线、主要资源、主要敌人/压力、盟友/见证者、角色节点、结束状态、后患与钩子、不能提前。
+Output only new stages that can be appended directly to stage_roadmap.md. The first heading must be exactly: # Stage {next_stage_number}: Name
+Later stages use the same level-1 heading with consecutive numbers. Each stage must include: Planned chapters, Stage function, Gameplay value, Long mainline advance, Stage rules, Short lines inside the stage, Main resources, Main enemies/pressure, Allies/witnesses, Character nodes, End state, Aftermath and hooks, Must not happen yet.

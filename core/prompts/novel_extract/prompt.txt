@@ -1,49 +1,51 @@
-你是一个专业的小说分析专家。以下是一部长篇小说各卷的卷纲，请汇总为完整的小说大纲。
+You are a professional novel-analysis expert. Below are the volume outlines of a long novel. Summarize them into a complete novel outline.
 
-【各卷卷纲】
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Volume outlines】
 {all_volume_outlines}
 
-【大纲梳理要求】
-按以下六个板块汇总全书大纲。
+【Outline-structuring requirements】
+Summarize the full-book outline in the following six blocks.
 
-一、定位与核心设定
-1. 类型定位：题材类型、目标读者画像、爽点密度风格。
-2. 世界观骨架：核心世界观、势力格局、力量体系层级。
-3. 金手指（主角核心优势）：是什么、如何运作、前中后期如何演进。
+I. Positioning and core setting
+1. Genre positioning: subject type, target-reader profile, payoff-density style.
+2. Worldview skeleton: core worldview, faction landscape, power-system hierarchy.
+3. Golden finger (the protagonist's core advantage): what it is, how it works, and how it evolves in the early, middle, and late book.
 
-二、核心爽点
-全书最重要的3-5个高潮场景，每个标注：
-1. 所在卷和章节范围。
-2. 前期的压抑铺垫（手弩理论）。
-3. 爆发时的转折机制。
-4. 爽点后的收获和成长。
+II. Core payoffs
+The 3-5 most important climax scenes in the book. For each, mark:
+1. The volume and chapter range where it occurs.
+2. The earlier suppression and setup (crossbow theory).
+3. The turning mechanism at the explosion.
+4. The gains and growth after the payoff.
 
-三、人物大纲
-1. 主角：姓名、身份背景、性格特征、核心能力体系、完整成长轨迹（从弱到强的关键节点）。
-2. 亲友团：与主角关系密切的重要配角，标注身份、作用和关系演变。
-3. 反派：主要反派和次级反派，标注核心动机、与主角的冲突本质和最终结局。
+III. Character outline
+1. Protagonist: name, identity and background, personality traits, core ability system, complete growth path (key nodes from weak to strong).
+2. Inner circle: important supporting characters close to the protagonist, with identity, function, and relationship evolution marked.
+3. Antagonists: primary antagonists and secondary antagonists, with core motive, the nature of the conflict with the protagonist, and the final outcome marked.
 
-四、剧情大纲
-1. 故事简述（100字以内概括全书主线）。
-2. 主线大矛盾：贯穿全书的终极威胁，主角为何无法逃避。
-3. 按卷划分核心剧情弧线，每卷标注：
-   核心矛盾方向、主角目标、关键提升项、成名战、巅峰战、收尾悬念。
+IV. Plot outline
+1. Story synopsis (summarize the full-book mainline in 100 words or fewer).
+2. Mainline major conflict: the ultimate threat that runs through the book, and why the protagonist cannot escape it.
+3. Core plot arcs by volume. For each volume, mark:
+   core conflict direction, protagonist goal, key upgrades, fame battle, peak battle, ending suspense.
 
-五、伏笔总表
-1. 全书最重要的5-8条长线伏笔：埋设位置、揭示位置、作用。
-2. 核心信息差设计：读者视角 vs 角色视角的关键信息不对称。
+V. Foreshadowing ledger
+1. The 5-8 most important long-line foreshadowing items in the book: planting location, reveal location, function.
+2. Core information-gap design: key information asymmetry between the reader's viewpoint and the characters' viewpoint.
 
-六、成长体系
-主角从弱到强的完整路径：境界突破、功法演进、资源获取、地位攀升的关键里程碑。
+VI. Growth system
+The protagonist's complete path from weak to strong: key milestones of realm breakthroughs, cultivation-art evolution, resource acquisition, and status climb.
 
-七、修炼体系总览
-完整的修炼/力量体系梳理：
-1. 境界划分：从低到高的所有境界名称，每个境界对应的实力表现（能做什么、不能做什么）。
-2. 突破条件：每个境界突破需要什么条件（资源、悟性、机缘等）。
-3. 功法武技：书中出现的所有功法武技名称、等级、效果。
-4. 战力参照：不同境界之间的战力差距（如越级战斗的可能性、条件）。
-5. 特殊体系：除主修炼体系外的其他力量来源（妖修、鬼修、器修等）。
-6. 寿命与境界：各境界的寿命范围。
+VII. Cultivation-system overview
+A complete survey of the cultivation / power system:
+1. Realm division: all realm names from low to high, and the power performance of each realm (what it can do, what it cannot do).
+2. Breakthrough conditions: what each realm breakthrough requires (resources, comprehension, opportunity, and so on).
+3. Cultivation arts and martial skills: names, grades, and effects of all cultivation arts and martial skills that appear in the book.
+4. Combat-power reference: combat-power gaps between realms (for example the possibility and conditions of fighting above one's realm).
+5. Special systems: other power sources besides the main cultivation system (demon cultivation, ghost cultivation, artifact cultivation, and so on).
+6. Lifespan and realm: lifespan range of each realm.
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 格式符号（如 *、**、-、>、| 等）。标题使用 # 标记。段落之间用空行分隔。内容应完整详实，可直接指导后续小说写作。
+【Output format】
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings. Separate paragraphs with blank lines. The content should be complete and detailed enough to guide later novel writing directly.

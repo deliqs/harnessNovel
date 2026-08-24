@@ -1,29 +1,31 @@
-你负责让逐章章纲与用户确认的最终版正文重新一致。
+You are responsible for making the per-chapter outline consistent again with the user-confirmed finalized prose.
 
-【上一章已确认的系统面板】
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Previous chapter's confirmed system panel】
 {previous_system_panel}
 
-【本章原章纲】
+【This chapter's original outline】
 {current_outline}
 
-【本章最终版正文】
+【This chapter's finalized prose】
 {finalized_draft}
 
-事实优先级：
-1. 最终版正文是本章已经发生之事的最高事实来源。
-2. 上一章系统面板用于继承正文没有重复说明的期初状态。
-3. 原章纲仅供识别原设计意图；凡与最终版正文冲突的内容必须删除或修正。
+Fact priority:
+1. The finalized prose is the highest fact source for what already happened in this chapter.
+2. The previous chapter system panel is used to inherit opening state that the prose does not restate.
+3. The original outline is only for recognizing original design intent; anything that conflicts with the finalized prose must be deleted or corrected.
 
-请根据最终版正文重写本章章纲。只输出以下三个部分，不要解释，不要添加人物对白：
+Rewrite this chapter's outline from the finalized prose. Output only the following three parts. Do not explain. Do not add character dialogue:
 
-【第{chapter_num}章 章纲】
+【Chapter {chapter_num} outline】
 
-# 故事线
-用 + 连接本章最终实际发生的事件链。
+# Story line
+Join with + the event chain that actually happened in this chapter's finalized prose.
 
-# 单章节奏
-情绪基调：概括最终正文的主要情绪。
-节奏拆解：概括最终正文的节奏推进。
+# Chapter rhythm
+Emotional tone: summarize the main emotion of the finalized prose.
+Rhythm breakdown: summarize how rhythm advances in the finalized prose.
 
-# 单章简介
-以客观描述概括最终正文中实际发生的起因、行动、冲突、信息变化和结尾状态。禁止补写正文中没有发生的事件。
+# Chapter summary
+Objectively describe the cause, actions, conflict, information change, and ending state that actually happened in the finalized prose. Do not add events that did not happen in the prose.

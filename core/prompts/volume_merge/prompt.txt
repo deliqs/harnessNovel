@@ -1,39 +1,41 @@
-你是一个专业的小说分析专家。以下是同一卷中的故事情节单元摘要（或旧版批次摘要），请合并为一份完整的卷纲。
+You are a professional novel-analysis expert. Below are story-unit summaries (or old batch summaries) from the same volume. Merge them into a complete volume outline.
 
-【卷标题】{volume_title}
-【本卷范围】第{start_chapter}章 - 第{end_chapter}章，共{total_chapters}章，{total_batches}个情节单元/摘要。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【各情节单元/摘要】
+【Volume title】{volume_title}
+【Range of this volume】Chapter {start_chapter} - Chapter {end_chapter}, {total_chapters} chapters in total, {total_batches} plot units / summaries.
+
+【Plot units / summaries】
 {batch_summaries}
 
-【合并要求】
-将各故事情节单元合并为结构化的卷纲，包含以下五个板块。情节单元是最小结构单位，不能为了三幕结构强行拆碎。
+【Merge requirements】
+Merge the story units into a structured volume outline containing the following five blocks. A plot unit is the smallest structural unit; do not smash it apart just to force a three-act structure.
 
-一、卷纲概览
-1. 用一句话概括本卷的核心矛盾和主角目标。
-2. 本卷的矛盾方向（对外/对内）和核心提升项（实力、地位、资源、感情等）。
+I. Volume overview
+1. In one sentence, summarize this volume's core conflict and the protagonist's goal.
+2. This volume's conflict direction (external / internal) and core upgrade items (power, status, resources, romance, and so on).
 
-二、三幕结构
-按三幕式梳理本卷剧情：
-第一幕（开头）：引入矛盾，主角应对初始挑战，第一个爽点。
-第二幕（发展）：冲突升级，意外爆发，至暗时刻。
-第三幕（高潮与收尾）：转折翻盘，高潮爆发，收尾并引出下一卷悬念。
-每幕标注涉及的章节范围。以故事片段为最小单位，不要拆碎片段。
+II. Three-act structure
+Lay out this volume's plot in three acts:
+Act I (opening): introduce the conflict, the protagonist meets the initial challenge, the first payoff.
+Act II (development): conflict escalates, an accident explodes, the darkest moment.
+Act III (climax and close): the turnaround, the climax explosion, the close and the suspense that leads into the next volume.
+Mark the chapter range of each act. Use story segments as the smallest unit; do not smash segments apart.
 
-三、人物谱系
-本卷所有重要角色的完整档案：身份、性格、能力、与主角关系脉络、在本卷中的关键行动和变化。
-区分：主角、核心配角、反派、功能性角色。
+III. Character roster
+Complete files for all important characters in this volume: identity, personality, abilities, relationship thread with the protagonist, and key actions and changes in this volume.
+Distinguish: protagonist, core supporting characters, antagonists, functional characters.
 
-四、伏笔追踪
-1. 本卷埋下的伏笔（未解决）。
-2. 本卷回收的伏笔（来自前卷）。
-3. 跨卷线索：本卷末尾为下一卷设置的悬念或铺垫。
+IV. Foreshadowing tracker
+1. Foreshadowing planted in this volume (unresolved).
+2. Foreshadowing recovered in this volume (from earlier volumes).
+3. Cross-volume clues: suspense or setup this volume leaves at the end for the next volume.
 
-五、核心爽点
-列出本卷最重要的2-3个高潮场景，每个标注：
-1. 场景前的压抑铺垫（几次压抑累积的过程）。
-2. 爆发时的转折机制。
-3. 爽点释放后的战利品和成长收获。
+V. Core payoff
+List this volume's 2-3 most important climax scenes. For each, mark:
+1. The suppression and setup before the scene (how many times suppression accumulated).
+2. The turning mechanism at the explosion.
+3. The spoils and growth gained after the payoff is released.
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 格式符号（如 *、**、-、>、| 等）。标题使用 # 标记。段落之间用空行分隔。
+【Output format】
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings. Separate paragraphs with blank lines.

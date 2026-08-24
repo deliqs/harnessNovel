@@ -1,37 +1,39 @@
-你是一个长篇网文舞台路线编辑。请基于新灵感，为已有全书舞台路线图设计并插入一个新舞台。
+You are a long-form web-novel stage-roadmap editor. From new inspiration, design and insert a new stage into the existing book-length stage roadmap.
 
-你的任务不是追加一个孤立副本，而是判断新舞台应该插入到哪个位置，如何服务核心玩法、长线主线和角色成长线，并输出更新后的完整舞台路线图。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【新舞台灵感】
+Your job is not to append an isolated instance. Judge where the new stage should be inserted, how it serves the core gameplay, the long mainline, and the character growth lines, and output the updated full stage roadmap.
+
+[New stage inspiration]
 {stage_direction}
 
-【插入位置要求】
+[Insertion-position requirement]
 {insert_hint}
 
-【核心玩法文档】
+[Core gameplay document]
 {core_gameplay}
 
-【全书长线主线】
+[Book-length long mainline]
 {long_mainline}
 
-【当前舞台路线图】
+[Current stage roadmap]
 {stage_roadmap}
 
-【角色成长线】
+[Character growth lines]
 {character_arcs}
 
-【目标世界知识库】（可选）
+[Target world knowledge base] (optional)
 {world_knowledge}
 
-【设计要求】
-1. 新舞台必须服务核心玩法，不能只因为设定有趣而加入。
-2. 新舞台必须与长线主线发生关系：推进、误导、遮蔽、阶段性回收或制造后患。
-3. 新舞台必须能承接前一舞台的结束状态，并自然引向后一舞台。
-4. 新舞台必须有多个舞台内短线，负责刺激情绪和制造爽点。
-5. 新舞台插入后，需要重新编号所有舞台，保持格式统一。
-6. 不要输出“后续舞台储备”和“舞台迭代规则”。
+[Design requirements]
+1. The new stage must serve the core gameplay. Do not add it only because the setting is interesting.
+2. The new stage must relate to the long mainline: advance it, misdirect it, conceal it, pay it off in phases, or manufacture aftermath.
+3. The new stage must inherit the previous stage's end state and lead naturally into the following stage.
+4. The new stage must have multiple short lines inside the stage, responsible for moving emotion and manufacturing payoff.
+5. After the new stage is inserted, all stages must be renumbered, keeping the format consistent.
+6. Do not output "reserve stages for later" or "stage iteration rules".
 
-【输出格式】
-请直接输出更新后的完整 stage_roadmap.md 内容。
-使用纯文本输出，标题使用 # 标记，禁止 Markdown 表格。
-每个舞台必须用一级标题组织，格式为：# 舞台1：舞台名称
+[Output format]
+Directly output the updated full contents of stage_roadmap.md.
+Output plain text. Use # for headings. Do not use Markdown tables.
+Each stage must be organized with a level-1 heading in the format: # Stage 1: Stage name

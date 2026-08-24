@@ -1,69 +1,71 @@
-你是一个长篇网文产品策划兼主编。请先为新小说设计“核心玩法文档”。
+You are a long-form web-novel product planner and editor-in-chief. First design the "core gameplay document" for the new novel.
 
-这是全书设计的第一步，早于传统大纲、舞台路线图和角色线。你的任务不是复述参考小说剧情，而是从参考小说中提炼经过验证的追读机制，再结合用户灵感和目标世界资料，设计一个能长期运转的新书玩法。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【用户创作方向】
+This is the first step of book design, before a traditional outline, stage roadmap, or character lines. Your job is not to retell the reference novel's plot. Extract the continue-reading mechanisms that have already proven they work, then combine the user's inspiration and target-world materials to design a new-book gameplay loop that can run for a long serialization.
+
+[User creative direction]
 {creative_direction}
 
-【参考小说全书大纲】（只用于学习玩法循环、节奏、爽点组织方式，不可照搬剧情）
+[Reference novel full outline] (learn only the gameplay loop, pacing, and payoff organization; do not copy the plot)
 {reference_outline}
 
-【目标世界知识库】（可选，用于约束新玩法的题材合理性）
+[Target world knowledge base] (optional; use it to keep the new gameplay genre-plausible)
 {world_knowledge}
 
-【大纲设计规则】
+[Outline design rules]
 {outline_rules}
 
-【核心判断】
-长篇网文更像游戏。核心玩法必须回答：
-1. 主角每次进入问题时，靠什么独特机制破局。
-2. 读者为什么会持续期待下一轮副本。
-3. 同一套玩法如何在不同舞台里重复但不重复。
-4. 主角成长如何带来能力、资源、认知、关系、身份和代价的螺旋上升。
-5. 哪些参考小说的玩法机制值得学习，哪些具体剧情必须丢弃。
+[Core questions]
+A long-form web novel is closer to a game. Core gameplay must answer:
+1. When the protagonist hits a problem, what unique mechanism breaks the deadlock.
+2. Why readers keep wanting the next instance.
+3. How the same gameplay can repeat across different stages without feeling like a copy.
+4. How the protagonist's growth spirals upward in ability, resources, cognition, relationships, identity, and cost.
+5. Which gameplay mechanisms from the reference novel are worth learning, and which concrete plot must be thrown away.
 
-【设计要求】
-1. 不要写传统剧情大纲，也不要写卷纲。
-2. 不要一对一映射参考小说人物、事件、地点。
-3. 必须体现用户灵感带来的新鲜点，让新书有自己的可持续卖点。
-4. 如果提供了目标世界知识库，玩法必须能自然嵌入目标世界；不能为了保留参考情节而硬造设定。
-5. 核心玩法要能支撑后续舞台设计、角色线设计、故事情节单元和章纲。
+[Design requirements]
+1. Do not write a traditional plot outline, and do not write a volume outline.
+2. Do not one-to-one map reference-novel characters, events, or locations.
+3. The user's inspiration must produce a fresh hook, so the new book has its own sustainable selling point.
+4. If a target world knowledge base is provided, the gameplay must sit naturally inside that world; do not invent settings just to keep reference plot.
+5. Core gameplay must be able to support later stage design, character-line design, story-arc units, and chapter outlines.
 
-【输出格式】
-使用纯文本输出，标题使用 # 标记，禁止 Markdown 表格。
+[Output format]
+Output plain text. Use # for headings. Do not use Markdown tables.
 
-# 核心玩法一句话
-用一句话说明这本书的主要可玩性：主角是谁，靠什么机制破局，读者持续看什么。
+# Core gameplay in one sentence
+In one sentence, state this book's main playability: who the protagonist is, what mechanism breaks deadlocks, and what the reader keeps watching for.
 
-# 主角破局方式
-写清主角遇到问题时最常用的解决路径，例如信息差、规则漏洞、资源交换、禁忌知识、战斗碾压、话术操控、社交博弈、身份错位、系统推演等。
+# How the protagonist breaks a deadlock
+State the path the protagonist most often uses when a problem appears, for example information gaps, rule exploits, resource trades, forbidden knowledge, combat crush, verbal manipulation, social games, identity mismatch, or system deduction.
 
-# 读者情绪反馈循环
-按“压迫/疑问 → 主角判断 → 试探/代价 → 爆点 → 收获/新钩子”的形式说明。必须能循环使用。
+# Reader emotion feedback loop
+Describe it in the form "pressure / question → protagonist judgment → probe / cost → burst payoff → gain / new hook". It must be reusable in a cycle.
 
-# 成长与收获循环
-说明每轮舞台后主角应该获得什么类型的成长：能力、资源、身份、关系、认知、伏笔线索、代价。
+# Growth and reward loop
+State what kinds of growth the protagonist should gain after each stage: ability, resources, identity, relationships, cognition, foreshadowing clues, cost.
 
-# 舞台/副本循环
-说明一个标准舞台如何进入、如何设定规则、如何设置敌人和资源、如何制造爆点、如何留下后患。
+# Stage / instance loop
+Describe how a standard stage is entered, how its rules are set, how enemies and resources are placed, how a burst payoff is made, and how aftermath is left behind.
 
-# 长线主线驱动
-设计一个能贯穿全部舞台的长线问题或悬念。它不需要一开始揭晓，但必须持续制造期待感。
+# Long-mainline driver
+Design a long-running question or mystery that can run through every stage. It does not have to be answered at the start, but it must keep manufacturing anticipation.
 
-# 短线情绪驱动
-说明每个舞台内部应该如何设置多个短线：小目标、小危机、小反转、小爽点、小收获、小钩子。
+# Short-line emotional driver
+Describe how each stage should set multiple short lines: small goals, small crises, small reversals, small payoffs, small gains, small hooks.
 
-# 主角不可替代性
-说明为什么这个故事必须由这个主角完成，其他角色不能替代。
+# Why the protagonist cannot be replaced
+Explain why this story must be completed by this protagonist, and why other characters cannot substitute.
 
-# 可重复爽点模块
-列出 6-10 个可在不同舞台反复变形使用的爽点模块。
+# Repeatable payoff modules
+List 6-10 payoff modules that can be reused, in varied form, across different stages.
 
-# 防腻规则
-说明如何让同一种玩法在不同舞台里发生变化，避免重复感。
+# Anti-fatigue rules
+Explain how the same gameplay should change from stage to stage so it does not feel repetitive.
 
-# 参考小说可学习项与必须丢弃项
-只写功能，不写参考专有名词。区分可迁移的玩法机制，以及必须重新发明的具体剧情。
+# What to learn from the reference novel and what to discard
+Write functions only, not reference proper nouns. Separate transferable gameplay mechanisms from concrete plot that must be reinvented.
 
-# 长线运营风险
-列出容易写崩、写腻、提前泄露、战力膨胀、角色工具化的风险。
+# Long-run operational risks
+List risks of the story collapsing, going stale, leaking too early, power inflation, or characters becoming tools.

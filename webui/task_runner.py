@@ -1,4 +1,4 @@
-"""Web 工作台的工作区读取与后台 CLI 任务执行。"""
+"""Workspace reads and background CLI tasks for the web workbench."""
 
 from __future__ import annotations
 
@@ -18,6 +18,10 @@ from typing import Any
 
 WORKSPACE_NAME_RE = re.compile(r"^[\w\u4e00-\u9fff][\w .\-\u4e00-\u9fff]{0,79}$", re.UNICODE)
 STAGE_RE = re.compile(r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)", re.IGNORECASE | re.MULTILINE)
+PHASE_HEADING_RE = re.compile(
+    r"^#{1,6}\s*(?:第\s*)?(?:阶段|phase)\s*0*(\d+)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
 REFERENCE_ARC_PATH_RE = re.compile(
     r"^reference/outlines/([^/]+)/story_arcs/arc_\d+_ch(\d+)_(\d+)\.md$",
     re.IGNORECASE,
@@ -25,23 +29,23 @@ REFERENCE_ARC_PATH_RE = re.compile(
 REFERENCE_VOLUME_DIR_RE = re.compile(r"^vol_(\d+)_")
 EDITABLE_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".tsv"}
 TASK_LABELS = {
-    "workspace_init": "创建工作区",
-    "init": "初始化并拆解参考小说",
-    "reference_resume": "继续拆解参考小说",
-    "world_import": "导入并构建目标世界资料库",
-    "world_build": "构建目标世界资料库",
-    "novel_outline": "设计核心玩法与全书舞台",
-    "design_concept": "生成世界观、粗略大纲与阶段粗纲",
-    "stage_design": "生成长线主线与舞台路线图",
-    "story_design": "重建设计资产",
-    "story_design_extend": "续写长线、角色线与后续舞台",
-    "stage_insert": "插入新舞台",
-    "mechanics_init": "初始化系统面板",
-    "story_arcs": "生成故事情节单元",
-    "chapter_outlines": "生成逐章章纲",
-    "write": "生成正文",
-    "novel_name_synopsis": "推荐书名与简介",
-    "volume_outline": "生成旧流程卷纲",
+    "workspace_init": "Create workspace",
+    "init": "Initialize and deconstruct the reference novel",
+    "reference_resume": "Continue deconstructing the reference novel",
+    "world_import": "Import and build the target-world knowledge base",
+    "world_build": "Build the target-world knowledge base",
+    "novel_outline": "Design core gameplay and book stages",
+    "design_concept": "Generate worldview, rough outline, and phase outline",
+    "stage_design": "Generate long mainline and stage roadmap",
+    "story_design": "Rebuild design assets",
+    "story_design_extend": "Extend the mainline, character arcs, and later stages",
+    "stage_insert": "Insert a new stage",
+    "mechanics_init": "Initialize the system panel",
+    "story_arcs": "Generate story arcs",
+    "chapter_outlines": "Generate chapter outlines",
+    "write": "Generate draft",
+    "novel_name_synopsis": "Suggest title and synopsis",
+    "volume_outline": "Generate legacy volume outline",
 }
 
 
@@ -56,7 +60,7 @@ def valid_workspace_name(name: str) -> bool:
 def require_workspace_name(name: str) -> str:
     name = (name or "").strip()
     if not valid_workspace_name(name):
-        raise ValueError("工作区名称只能包含中文、字母、数字、空格、下划线、点和连字符，长度不超过 80。")
+        raise ValueError("Workspace name may contain Chinese, letters, digits, spaces, underscores, dots, and hyphens (max 80 characters).")
     return name
 
 
@@ -66,16 +70,16 @@ def _positive_int(value: Any, field_name: str, default: int | None = None) -> in
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name}必须是正整数。") from exc
+        raise ValueError(f"{field_name} must be a positive integer.") from exc
     if parsed < 1:
-        raise ValueError(f"{field_name}必须是正整数。")
+        raise ValueError(f"{field_name} must be a positive integer.")
     return parsed
 
 
 def story_arc_title(content: str) -> str:
-    """兼容常见标题写法，提取故事情节的名称。"""
+    """Extract the story-arc name from common heading forms."""
     heading = next((line.strip() for line in (content or "").splitlines() if line.strip()), "")
-    if not heading or "情节" not in heading:
+    if not heading or not re.search(r"(?:情节|Arc)", heading, re.IGNORECASE):
         return ""
     heading = re.sub(r"^#{1,6}\s*", "", heading).strip()
     for pattern in (
@@ -89,7 +93,7 @@ def story_arc_title(content: str) -> str:
 
 
 class WorkspaceStore:
-    """仅允许访问当前设置目录下的工作区，避免 Web 文件接口越界。"""
+    """Only allow workspaces under the configured root so web file APIs cannot escape it."""
 
     def __init__(self, root: str | Path):
         self.root = Path(root).expanduser().resolve()
@@ -97,7 +101,7 @@ class WorkspaceStore:
     def set_root(self, root: str | Path) -> None:
         path = Path(root).expanduser().resolve()
         if path.exists() and not path.is_dir():
-            raise ValueError("工作区根目录指向的是文件，不能使用。")
+            raise ValueError("Workspace root points at a file and cannot be used.")
         path.mkdir(parents=True, exist_ok=True)
         self.root = path
 
@@ -107,7 +111,7 @@ class WorkspaceStore:
         try:
             path.relative_to(self.root)
         except ValueError as exc:
-            raise ValueError("非法工作区路径。") from exc
+            raise ValueError("Invalid workspace path.") from exc
         return path
 
     def list_workspaces(self) -> list[dict[str, Any]]:
@@ -127,26 +131,26 @@ class WorkspaceStore:
         return sorted(items, key=lambda item: item["updated_at"], reverse=True)
 
     def delete_workspace(self, name: str) -> dict[str, Any]:
-        """删除一个明确位于工作区根目录内的工作空间。"""
+        """Delete a workspace that is a direct child of the workspace root."""
         safe_name = require_workspace_name(name)
         path = self.workspace_path(safe_name)
         if not path.is_dir():
             raise FileNotFoundError(safe_name)
-        # workspace_path 已通过 resolve + relative_to 防止路径越界；这里再约束
-        # 目标必须是根目录的直接子目录，避免未来路径规则变化扩大删除范围。
+        # workspace_path already uses resolve + relative_to to block path escape; also require
+        # the target to be a direct child of the root so later path-rule changes cannot widen deletes.
         if path.parent != self.root or path == self.root:
-            raise ValueError("非法工作区删除路径。")
+            raise ValueError("Invalid workspace delete path.")
         shutil.rmtree(path)
         return {"deleted": True, "workspace": safe_name}
 
     def _volume_details(self, base: Path, fs: Path) -> list[dict[str, Any]]:
-        """列出每个舞台/卷的故事情节单元和章节数据。"""
+        """List story arcs and chapter data for each stage/volume."""
         details = []
         stage_roadmap = _read_file(fs / "story_design" / "stage_roadmap.md") if False else ""
-        # 扫描 story_arcs 和 chapter_outlines 目录
+        # Scan story_arcs and chapter_outlines directories
         for kind, dirname in [("story_arcs", "story_arcs"), ("chapter_outlines", "chapter_outlines")]:
             pass
-        # 收集所有卷号
+        # Collect all volume numbers
         vol_nums = set()
         for dirname in ["story_arcs", "chapter_outlines", "chapters"]:
             dir_path = fs / dirname
@@ -200,12 +204,12 @@ class WorkspaceStore:
         processed_chapters = max(int(reference_state.get("processed_chapters") or 0), arc_progress, card_count)
         total_chapters = reference_state.get("total_chapters")
         total_chapters = int(total_chapters) if isinstance(total_chapters, int) or str(total_chapters).isdigit() else None
-        # import_state 是新流程的断点资产；老工作区没有它时，默认此前已完成完整拆解。
+        # import_state is the new-flow breakpoint; older workspaces without it are treated as fully deconstructed.
         if not reference_state and sample.exists() and ref_chapters > 0:
             total_chapters = ref_chapters
             processed_chapters = max(processed_chapters, ref_chapters)
-        # 容错：历史分卷 meta.json 的 end_ch 可能残留旧值（换源 / 部分拆解后未重算），
-        # 导致 arc_progress 高于实际拆解量。已拆解章节数不会超过源文件总章节数，据此封顶。
+        # Tolerance: historical volume meta.json end_ch may keep a stale value (after a source change or partial deconstruction),
+        # so arc_progress can exceed actual deconstruction. Capped at the source chapter count.
         if total_chapters:
             processed_chapters = min(processed_chapters, total_chapters)
             arc_progress = min(arc_progress, total_chapters)
@@ -214,8 +218,8 @@ class WorkspaceStore:
             if reference_state
             else bool(sample.exists() and ref_chapters > 0)
         )
-        # 参考小说拆解只产出全书大纲、卷纲和故事片段。
-        # 旧流程的参考世界观不再影响拆解完成状态。
+        # Reference deconstruction only produces the book outline, volume outlines, and story arcs.
+        # Legacy reference worldview no longer affects deconstruction completion.
         reference_complete = reference_analysis_complete
         manifest = self._load_json(fs / "world_knowledge" / "manifest.json") or {}
         source_records = manifest.get("sources", []) if isinstance(manifest.get("sources", []), list) else []
@@ -231,21 +235,21 @@ class WorkspaceStore:
         def _has(path):
             return bool(path.exists() and path.stat().st_size > 0)
 
-        # 第一步：全书设计（世界观 + 粗略大纲 + 独立阶段粗纲）。
+        # Step 1: book design (worldview + rough outline + standalone phase outline).
         concept_defs = [
-            ("worldview", "世界观", design_dir / "worldview.md", None),
-            ("rough_outline", "粗略大纲", design_dir / "rough_outline.md", design_dir / "core_gameplay.md"),
-            ("stage_outline", "阶段粗纲", design_dir / "stage_outline.md", None),
+            ("worldview", "Worldview", design_dir / "worldview.md", None),
+            ("rough_outline", "Rough outline", design_dir / "rough_outline.md", design_dir / "core_gameplay.md"),
+            ("stage_outline", "Phase outline", design_dir / "stage_outline.md", None),
         ]
         concept_assets = [
             {"key": key, "label": label, "done": bool(_has(primary) or (alt is not None and _has(alt)))}
             for key, label, primary, alt in concept_defs
         ]
         concept_ready = all(item["done"] for item in concept_assets)
-        # 第二步：舞台设计（长线主线 + 舞台路线图）。
+        # Step 2: stage design (long mainline + stage roadmap).
         stage_defs = [
-            ("long_mainline", "长线主线", design_dir / "long_mainline.md"),
-            ("stage_roadmap", "舞台路线图", design_dir / "stage_roadmap.md"),
+            ("long_mainline", "Long mainline", design_dir / "long_mainline.md"),
+            ("stage_roadmap", "Stage roadmap", design_dir / "stage_roadmap.md"),
         ]
         stage_assets = [
             {"key": key, "label": label, "done": _has(path)} for key, label, path in stage_defs
@@ -255,18 +259,15 @@ class WorkspaceStore:
         stage_outline_text = (
             stage_outline_path.read_text(encoding="utf-8") if _has(stage_outline_path) else ""
         )
-        stage_outline_count = len(re.findall(
-            r"(?m)^#{1,6}\s*(?:第\s*)?阶段\s*0*\d+\b",
-            stage_outline_text,
-        ))
+        stage_outline_count = len(PHASE_HEADING_RE.findall(stage_outline_text))
         stage_assets_exist = all(item["done"] for item in stage_assets)
         stage_ready = stage_assets_exist and (
             not stage_outline_count or stage_count == stage_outline_count
         )
-        # 兼容旧前端读取的 ready_count/total_count/assets（合并两步）。
+        # Keep ready_count/total_count/assets for older clients (both steps combined).
         design_assets = concept_assets + stage_assets
         name_synopsis_path = fs / "novel_name_synopsis.md"
-        design_assets.append({"key": "name_synopsis", "label": "书名与简介", "done": _has(name_synopsis_path)})
+        design_assets.append({"key": "name_synopsis", "label": "Title and synopsis", "done": _has(name_synopsis_path)})
         design_ready = (3 if concept_ready else 0) + (2 if stage_ready else 0)
         design_state = self._load_json(design_dir / "design_state.json") or {}
         stage_ready = stage_ready and int(design_state.get("stage_pipeline_version") or 0) == 2
@@ -308,32 +309,32 @@ class WorkspaceStore:
         mechanics_mode = (
             mechanics.get("mode")
             or ((mechanics.get("profile") or {}).get("mode") if isinstance(mechanics, dict) else None)
-            or "未初始化"
+            or "Not initialized"
         )
         story_arcs = self._count_files(fs / "story_arcs", {".md"})
         chapter_outlines = self._count_files(fs / "chapter_outlines", {".md"})
         chapters = self._count_files(fs / "chapters", {".md", ".txt"})
 
         steps = [
-            ("参考拆解", sample.exists() and ref_chapters > 0),
-            ("核心设计", concept_ready and stage_ready),
-            ("故事情节", story_arcs > 0),
-            ("逐章章纲", chapter_outlines > 0),
-            ("正文", chapters > 0),
+            ("Reference deconstruction", sample.exists() and ref_chapters > 0),
+            ("Core design", concept_ready and stage_ready),
+            ("Story arcs", story_arcs > 0),
+            ("Chapter outlines", chapter_outlines > 0),
+            ("Draft", chapters > 0),
         ]
         completed = sum(done for _, done in steps)
         if not sample.exists():
-            next_action = "上传参考小说并初始化"
+            next_action = "Upload a reference novel and initialize"
         elif not (concept_ready and stage_ready):
-            next_action = "生成核心玩法与舞台路线"
+            next_action = "Generate core gameplay and the stage roadmap"
         elif story_arcs == 0:
-            next_action = "选择舞台并生成故事情节单元"
+            next_action = "Choose a stage and generate story arcs"
         elif chapter_outlines == 0:
-            next_action = "生成逐章章纲"
+            next_action = "Generate chapter outlines"
         elif chapters == 0:
-            next_action = "生成正文"
+            next_action = "Generate draft"
         else:
-            next_action = "继续下一个舞台，或编辑既有资产"
+            next_action = "Continue with the next stage, or edit existing assets"
 
         return {
             "name": name,
@@ -360,7 +361,7 @@ class WorkspaceStore:
                     {
                         "id": str(source.get("id") or ""),
                         "file_name": re.sub(
-                            r"^[0-9a-f]{16}_", "", str(source.get("file_name") or "未命名资料"),
+                            r"^[0-9a-f]{16}_", "", str(source.get("file_name") or "Unnamed source"),
                             flags=re.IGNORECASE,
                         ),
                         "size": source.get("size") if isinstance(source.get("size"), int) else 0,
@@ -404,7 +405,7 @@ class WorkspaceStore:
 
     @staticmethod
     def _reference_story_arc_end(outlines_dir: Path) -> int:
-        """获取实际完成进度，兼容自然分卷的局部编号与虚拟分卷的全局范围。"""
+        """Return actual coverage, supporting local numbering of natural volumes and global ranges of virtual volumes."""
         if not outlines_dir.is_dir():
             return 0
         local_coverage = 0
@@ -467,30 +468,30 @@ class WorkspaceStore:
         if not path.is_file():
             raise FileNotFoundError(relative_path)
         if path.suffix.lower() not in EDITABLE_EXTENSIONS:
-            raise ValueError("该文件类型不支持在工作台中预览。")
+            raise ValueError("This file type cannot be previewed in the workbench.")
         size = path.stat().st_size
         if size > 1_500_000:
-            raise ValueError("文件超过 1.5MB，工作台不直接打开；请使用本地编辑器查看。")
+            raise ValueError("File is over 1.5MB; the workbench will not open it. Use a local editor.")
         content = path.read_text(encoding="utf-8", errors="replace")
         return {"path": str(path.relative_to(self.workspace_path(name))), "content": content, "size": size}
 
     def write_file(self, name: str, relative_path: str, content: str) -> None:
         path = self._safe_file_path(name, relative_path)
         if relative_path.replace("\\", "/").startswith("reference/"):
-            raise ValueError("参考拆解资产为只读内容，不能在工作台中修改。")
+            raise ValueError("Reference deconstruction assets are read-only and cannot be edited in the workbench.")
         if path.suffix.lower() not in EDITABLE_EXTENSIONS:
-            raise ValueError("该文件类型不支持在工作台中编辑。")
+            raise ValueError("This file type cannot be edited in the workbench.")
         if len(content.encode("utf-8")) > 1_500_000:
-            raise ValueError("单次保存内容超过 1.5MB。")
+            raise ValueError("Saved content exceeds 1.5MB.")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
     def reference_arc_chapters(self, name: str, relative_path: str) -> dict[str, Any]:
-        """返回某个参考故事片段覆盖章节的拆解事实卡，供工作台只读浏览。"""
+        """Return deconstruction fact cards for chapters covered by a reference story arc, for read-only browsing."""
         normalized = relative_path.replace("\\", "/")
         matched = REFERENCE_ARC_PATH_RE.fullmatch(normalized)
         if not matched:
-            raise ValueError("只能查看参考故事片段对应的章节。")
+            raise ValueError("Only chapters for a reference story arc can be viewed.")
         arc_path = self._safe_file_path(name, normalized)
         if not arc_path.is_file():
             raise FileNotFoundError(relative_path)
@@ -515,10 +516,10 @@ class WorkspaceStore:
                 _, source_chapters = split_chapters(str(sample))
             return source_chapters or []
 
-        # 解析该故事片段覆盖的全书章节号；优先用卷元数据，其次按事实卡，最后回退到原文切分。
+        # Resolve book chapter numbers covered by this story arc: volume metadata first, then fact cards, then source splits.
         chapter_numbers: list[int] = []
         if isinstance(meta, dict) and meta.get("start_ch") is not None:
-            # 智能分卷后，故事片段文件名保留全书章节范围。
+            # After intelligent volume split, story-arc filenames keep book-level chapter ranges.
             chapter_numbers = list(range(start, end + 1))
         elif card_dir.is_dir() and volume_index:
             for card_path in sorted(card_dir.glob("chapter_*.json")):
@@ -547,18 +548,18 @@ class WorkspaceStore:
             if isinstance(card, dict) and (card.get("summary") or card.get("event_chain") or card.get("title")):
                 chapters.append(self._chapter_card_payload(chapter_number, card))
                 continue
-            # 个别章节尚未拆出事实卡时回退到原文，保证仍可浏览。
+            # Fall back to source text when a chapter has no fact card yet, so it can still be browsed.
             source = _source()
             if 1 <= chapter_number <= len(source):
                 chapter = source[chapter_number - 1]
                 chapters.append({
                     "number": chapter_number,
-                    "title": str(chapter.get("title") or f"第{chapter_number}章"),
+                    "title": str(chapter.get("title") or f"Chapter {chapter_number}"),
                     "summary": str(chapter.get("content") or ""),
                     "source": "raw",
                 })
         if not chapters:
-            raise ValueError("未找到该故事片段对应的章节事实卡。")
+            raise ValueError("No chapter fact cards were found for this story arc.")
         return {
             "path": normalized,
             "start_chapter": start,
@@ -572,7 +573,7 @@ class WorkspaceStore:
         outline = str(card.get("chapter_outline_600") or card.get("summary") or "")
         return {
             "number": number,
-            "title": str(card.get("title") or f"第{number}章"),
+            "title": str(card.get("title") or f"Chapter {number}"),
             "summary": outline,
             "chapter_outline_600": outline,
             "chapter_rhythm": {
@@ -588,13 +589,13 @@ class WorkspaceStore:
 
     def _safe_file_path(self, name: str, relative_path: str) -> Path:
         if not relative_path or Path(relative_path).is_absolute():
-            raise ValueError("文件路径无效。")
+            raise ValueError("Invalid file path.")
         base = self.workspace_path(name)
         path = (base / relative_path).resolve()
         try:
             path.relative_to(base)
         except ValueError as exc:
-            raise ValueError("文件路径超出当前工作区。") from exc
+            raise ValueError("File path is outside the current workspace.") from exc
         return path
 
     @staticmethod
@@ -639,7 +640,7 @@ class TaskRecord:
     started_at: str | None = None
     finished_at: str | None = None
     exit_code: int | None = None
-    message: str = "等待执行"
+    message: str = "Waiting to run"
     log_path: str = ""
 
     def public(self) -> dict[str, Any]:
@@ -649,7 +650,7 @@ class TaskRecord:
 
 
 class UploadStore:
-    """保存浏览器上传的临时资料，任务只通过 upload id 取得文件。"""
+    """Store temporary browser uploads; tasks receive files only by upload id."""
 
     def __init__(self, root: Path):
         self.root = root
@@ -667,12 +668,12 @@ class UploadStore:
         with self._lock:
             path = self._items.get(upload_id)
         if not path or not path.is_file():
-            raise ValueError("上传文件已失效，请重新上传。")
+            raise ValueError("The uploaded file is no longer available. Upload it again.")
         return path
 
 
 class TaskManager:
-    """以子进程复用 CLI，记录日志并对同一工作区串行化写入任务。"""
+    """Reuse the CLI in a subprocess, log output, and serialize write tasks per workspace."""
 
     def __init__(self, store: WorkspaceStore, task_dir: Path, uploads: UploadStore):
         self.store = store
@@ -689,7 +690,7 @@ class TaskManager:
         return self.task_dir / f"{task_id}.json"
 
     def _persist_record(self, task: TaskRecord) -> None:
-        """持久化任务元数据；日志正文仍单独保存在 .log 文件中。"""
+        """Persist task metadata; log text stays in a separate .log file."""
         path = self._record_path(task.id)
         temporary = path.with_suffix(".json.tmp")
         temporary.write_text(
@@ -699,7 +700,7 @@ class TaskManager:
         temporary.replace(path)
 
     def _load_records(self) -> None:
-        """恢复历史任务，并关闭服务重启前未正常结束的任务。"""
+        """Restore historical tasks and close tasks that did not finish before the service restarted."""
         for path in self.task_dir.glob("*.json"):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -717,7 +718,7 @@ class TaskManager:
                     finished_at=data.get("finished_at"),
                     exit_code=data.get("exit_code"),
                     message=str(data.get("message") or ""),
-                    # 不信任元数据中的任意路径，日志固定从任务目录恢复。
+                    # Do not trust arbitrary paths in metadata; logs are always restored from the task directory.
                     log_path=str(self.task_dir / f"{task_id}.log"),
                 )
             except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError):
@@ -725,23 +726,23 @@ class TaskManager:
             if record.status in {"queued", "running"}:
                 record.status = "failed"
                 record.finished_at = now_iso()
-                record.message = "服务重启，任务已中断"
-                self._append_log(record, "\n服务重启，未完成的任务已标记为中断。\n")
+                record.message = "Service restarted; the task was interrupted"
+                self._append_log(record, "\nService restarted; unfinished tasks were marked interrupted.\n")
                 self._persist_record(record)
             self._tasks[record.id] = record
 
     def create(self, task_type: str, workspace: str, args: dict[str, Any] | None = None) -> TaskRecord:
         if task_type not in TASK_LABELS:
-            raise ValueError("不支持的工作台任务。")
+            raise ValueError("Unsupported workbench task.")
         workspace = require_workspace_name(workspace)
         args = args or {}
         command = self._build_command(task_type, workspace, args)
         with self._lock:
             if workspace in self._deleting_workspaces:
-                raise ValueError("该工作区正在删除，不能开始新任务。")
+                raise ValueError("This workspace is being deleted, so a new task cannot start.")
             if workspace in self._active_workspaces:
-                raise ValueError("该工作区已有任务正在执行，请等待它结束。")
-            # 让初始化任务在界面中立即可见，并由 CLI 在随后补齐标准目录结构。
+                raise ValueError("This workspace already has a running task. Wait for it to finish.")
+            # Make init tasks visible in the UI immediately; the CLI then fills in the standard directories.
             if task_type in {"workspace_init", "init"}:
                 self.store.workspace_path(workspace).mkdir(parents=True, exist_ok=True)
             task_id = uuid.uuid4().hex[:12]
@@ -795,7 +796,7 @@ class TaskManager:
         }
 
     def prompts(self, task_id: str) -> dict[str, Any]:
-        """返回任务执行期间实际发送给模型的 Prompt。"""
+        """Return prompts actually sent to the model while the task ran."""
         task = self.get(task_id)
         if not task:
             raise KeyError(task_id)
@@ -812,13 +813,13 @@ class TaskManager:
         return {"task": self._public(task), "items": items[-50:]}
 
     def delete(self, task_id: str) -> dict[str, Any]:
-        """删除一条已结束任务的元数据、日志与 Prompt 记录。"""
+        """Delete metadata, logs, and prompt records for a finished task."""
         with self._lock:
             task = self._tasks.get(task_id)
             if not task:
                 raise KeyError(task_id)
             if task.status in {"queued", "running"}:
-                raise ValueError("正在运行的任务不能删除。")
+                raise ValueError("A running task cannot be deleted.")
             self._tasks.pop(task_id, None)
         removed = []
         for path in (
@@ -832,7 +833,7 @@ class TaskManager:
         return {"deleted": True, "task_id": task_id, "removed": removed}
 
     def clear_prompts(self, workspace: str | None = None) -> dict[str, Any]:
-        """清理已结束任务的 Prompt；任务元数据与执行日志继续保留。"""
+        """Clear prompts for finished tasks; task metadata and run logs are kept."""
         if workspace:
             workspace = require_workspace_name(workspace)
         with self._lock:
@@ -858,26 +859,26 @@ class TaskManager:
         }
 
     def delete_workspace_records(self, workspace: str) -> dict[str, Any]:
-        """删除指定工作空间的已结束任务记录、日志与 Prompt。"""
+        """Delete finished task records, logs, and prompts for a workspace."""
         workspace = require_workspace_name(workspace)
         with self._lock:
             tasks = [task for task in self._tasks.values() if task.workspace == workspace]
             if any(task.status in {"queued", "running"} for task in tasks):
-                raise ValueError("该工作区仍有任务正在执行，请先结束任务再删除。")
+                raise ValueError("This workspace still has a running task. Stop it before deleting.")
             task_ids = [task.id for task in tasks]
         for task_id in task_ids:
             self.delete(task_id)
         return {"workspace": workspace, "removed_task_count": len(task_ids)}
 
     def begin_workspace_delete(self, workspace: str) -> None:
-        """原子阻止新 CLI 任务进入待删除工作空间。"""
+        """Atomically block new CLI tasks from entering a workspace that is being deleted."""
         workspace = require_workspace_name(workspace)
         with self._lock:
             if workspace in self._active_workspaces or any(
                 task.workspace == workspace and task.status in {"queued", "running"}
                 for task in self._tasks.values()
             ):
-                raise ValueError("该工作区仍有后台任务正在执行，请先等待或结束任务再删除。")
+                raise ValueError("This workspace still has a background task. Wait for it or stop it before deleting.")
             self._deleting_workspaces.add(workspace)
 
     def end_workspace_delete(self, workspace: str) -> None:
@@ -888,9 +889,9 @@ class TaskManager:
         with self._lock:
             task.status = "running"
             task.started_at = now_iso()
-            task.message = "正在执行"
+            task.message = "Running"
             self._persist_record(task)
-        self._append_log(task, f"开始：{task.label}\n")
+        self._append_log(task, f"Start: {task.label}\n")
         reported_warning = False
 
         env = os.environ.copy()
@@ -914,8 +915,10 @@ class TaskManager:
             assert process.stdout is not None
             for line in iter(process.stdout.readline, ""):
                 if (
-                    line.lstrip().startswith(("错误：", "Traceback"))
+                    line.lstrip().startswith(("Error:", "错误：", "Traceback"))
+                    or "[LLMProvider] Call failed" in line
                     or "[LLMProvider] 调用失败" in line
+                    or "[LLMProvider] api_key is not configured" in line
                     or "[LLMProvider] 未配置 api_key" in line
                 ):
                     reported_warning = True
@@ -926,18 +929,18 @@ class TaskManager:
                 task.exit_code = exit_code
                 if exit_code != 0:
                     task.status = "failed"
-                    task.message = f"执行失败（退出码 {exit_code}）"
+                    task.message = f"Run failed (exit code {exit_code})"
                 elif reported_warning:
                     task.status = "succeeded_with_warnings"
-                    task.message = "命令已结束，请检查日志中的提示"
+                    task.message = "Command finished; check the log for notes"
                 else:
                     task.status = "succeeded"
-                    task.message = "执行完成"
-        except Exception as exc:  # noqa: BLE001 - 日志必须记录后台执行异常
-            self._append_log(task, f"\n工作台启动任务失败：{exc}\n")
+                    task.message = "Run completed"
+        except Exception as exc:  # noqa: BLE001 - logs must record background run exceptions
+            self._append_log(task, f"\nWorkbench failed to start the task: {exc}\n")
             with self._lock:
                 task.status = "failed"
-                task.message = "工作台无法启动该任务"
+                task.message = "The workbench could not start this task"
         finally:
             with self._lock:
                 task.finished_at = now_iso()
@@ -961,14 +964,14 @@ class TaskManager:
         if task_type == "init":
             reference = self.uploads.resolve(str(args.get("reference_upload_id", "")))
             if reference.suffix.lower() != ".txt":
-                raise ValueError("参考小说目前仅支持 .txt 文件。")
+                raise ValueError("Reference novels currently support .txt files only.")
             command += ["init", workspace, "--txt", str(reference)]
             if args.get("defer_reference_analysis"):
                 command.append("--no-analyze")
-            batch_size = _positive_int(args.get("batch_size"), "章节读取批次", 20)
+            batch_size = _positive_int(args.get("batch_size"), "chapter batch size", 20)
             if batch_size != 20:
                 command += ["--batch-size", str(batch_size)]
-            max_chapters = _positive_int(args.get("max_chapters"), "拆解章节数", None)
+            max_chapters = _positive_int(args.get("max_chapters"), "deconstruction chapter count", None)
             if max_chapters:
                 command += ["--max-chapters", str(max_chapters)]
             return command
@@ -979,12 +982,12 @@ class TaskManager:
             if upload_id:
                 reference = self.uploads.resolve(upload_id)
                 if reference.suffix.lower() != ".txt":
-                    raise ValueError("后续小说章节目前仅支持 .txt 文件。")
+                    raise ValueError("Later novel chapters currently support .txt files only.")
                 command += ["--txt", str(reference)]
-            batch_size = _positive_int(args.get("batch_size"), "章节读取批次", 20)
+            batch_size = _positive_int(args.get("batch_size"), "chapter batch size", 20)
             if batch_size != 20:
                 command += ["--batch-size", str(batch_size)]
-            max_chapters = _positive_int(args.get("max_chapters"), "拆解章节数", None)
+            max_chapters = _positive_int(args.get("max_chapters"), "deconstruction chapter count", None)
             if max_chapters:
                 command += ["--max-chapters", str(max_chapters)]
             if args.get("rebuild_reference"):
@@ -994,7 +997,7 @@ class TaskManager:
         if task_type == "world_import":
             ids = args.get("upload_ids") or []
             if not isinstance(ids, list) or not ids:
-                raise ValueError("请至少上传一份目标题材资料。")
+                raise ValueError("Upload at least one target-genre source.")
             paths = [str(self.uploads.resolve(str(upload_id))) for upload_id in ids]
             command += ["world-import", workspace, *paths, "--build"]
             if force:
@@ -1010,10 +1013,10 @@ class TaskManager:
             primary = str(args.get("primary") or "").strip()
             if primary:
                 command += ["--primary", primary]
-            chunk_size = _positive_int(args.get("chunk_size"), "资料分片字符数", None)
+            chunk_size = _positive_int(args.get("chunk_size"), "source chunk size", None)
             if chunk_size:
                 command += ["--chunk-size", str(chunk_size)]
-            chapter_batch_size = _positive_int(args.get("chapter_batch_size"), "章节资料每批章节数", None)
+            chapter_batch_size = _positive_int(args.get("chapter_batch_size"), "chapters per source batch", None)
             if chapter_batch_size:
                 command += ["--chapter-batch-size", str(chapter_batch_size)]
             return command
@@ -1036,16 +1039,16 @@ class TaskManager:
             direction_upload = str(args.get("direction_upload_id") or "")
             direction = str(args.get("direction") or "").strip()
             if not direction_upload and not direction:
-                raise ValueError("请填写新舞台灵感。")
+                raise ValueError("Enter inspiration for the new stage.")
             command += ["stage-insert", workspace]
             if direction_upload:
                 command += ["--direction-file", str(self.uploads.resolve(direction_upload))]
             else:
                 command += ["--direction", direction]
-            after_stage = _positive_int(args.get("after_stage"), "插入位置", None)
-            before_stage = _positive_int(args.get("before_stage"), "插入位置", None)
+            after_stage = _positive_int(args.get("after_stage"), "insert position", None)
+            before_stage = _positive_int(args.get("before_stage"), "insert position", None)
             if after_stage and before_stage:
-                raise ValueError("只能选择插入在某个舞台之前或之后。")
+                raise ValueError("Choose insertion before or after a stage, not both.")
             if after_stage:
                 command += ["--after-stage", str(after_stage)]
             if before_stage:
@@ -1070,7 +1073,7 @@ class TaskManager:
 
         if task_type in {"story_arcs", "chapter_outlines", "volume_outline"}:
             command += [task_type.replace("_", "-"), workspace]
-            volume = _positive_int(args.get("volume"), "舞台/卷号", 1)
+            volume = _positive_int(args.get("volume"), "stage/volume number", 1)
             command += ["--volume", str(volume)]
             if force:
                 command.append("--force")
@@ -1078,9 +1081,9 @@ class TaskManager:
 
         if task_type == "write":
             command += ["write", workspace]
-            volume = _positive_int(args.get("volume"), "舞台/卷号", 1)
-            start = _positive_int(args.get("start"), "起始章节", 1)
-            max_chapters = _positive_int(args.get("max"), "生成章节数", None)
+            volume = _positive_int(args.get("volume"), "stage/volume number", 1)
+            start = _positive_int(args.get("start"), "start chapter", 1)
+            max_chapters = _positive_int(args.get("max"), "chapter count to generate", None)
             command += ["--volume", str(volume), "--start", str(start)]
             if max_chapters:
                 command += ["--max", str(max_chapters)]
@@ -1096,4 +1099,4 @@ class TaskManager:
                 command.append("--force")
             return command
 
-        raise ValueError("不支持的工作台任务。")
+        raise ValueError("Unsupported workbench task.")

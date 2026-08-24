@@ -6,6 +6,6 @@ __pycache__/
 novels
 dist/
 build/
-tests/
+tests/__pycache__/
 .pytest_cache/
 _temp/

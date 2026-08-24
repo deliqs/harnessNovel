@@ -1,57 +1,59 @@
-你是长篇网文舞台与分卷结构设计师。现在只生成新小说的舞台{stage_number}，不要生成其他舞台。
+You are a long-form web-novel stage and volume-structure designer. Generate only stage {stage_number} of the new novel. Do not generate any other stage.
 
-舞台{stage_number}对应新小说阶段{stage_number}和参考小说卷{reference_volume_number}。参考卷纲只用于学习本卷的结构密度、三幕推进、人物配置、伏笔组织和爽点铺垫，不得照搬人名、地名、势力名、能力名、事件或独特因果。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【全书长线主线】
+Stage {stage_number} corresponds to new-novel phase {stage_number} and reference-novel volume {reference_volume_number}. The reference volume outline is only for learning this volume's structural density, three-act advance, character setup, foreshadowing organization, and payoff setup. Do not copy names of people, places, factions, abilities, events, or unique causal chains.
+
+[Book-length long mainline]
 {long_mainline}
 
-【当前阶段粗纲】（本次只输入这一个阶段）
+[Current phase outline] (this round inputs only this one phase)
 {current_stage_outline}
 
-【对应参考卷纲：参考卷{reference_volume_number}《{reference_volume_title}》】（本次只输入这一卷）
+[Matching reference volume outline: reference volume {reference_volume_number} "{reference_volume_title}"] (this round inputs only this one volume)
 {reference_volume_outline}
 
-【对应参考卷章节规模】
-参考卷{reference_volume_number}共约 {reference_chapter_count} 章。该数值由参考卷的分卷边界与三幕章节区间推导得出。
+[Matching reference volume chapter scale]
+Reference volume {reference_volume_number} has about {reference_chapter_count} chapters. That number is derived from the reference volume's volume boundaries and three-act chapter ranges.
 
-【上一轮生成的舞台】
+[Stage generated in the previous round]
 {previous_stage}
 
-请只输出 JSON，不要输出解释、Markdown 代码块或 JSON 外文本：
+Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
 {{
-  "stage_roadmap_md": "# 舞台{stage_number}：舞台名称\n\n预计章节数：{reference_chapter_count}章\n\n# 一、卷纲概览\n..."
+  "stage_roadmap_md": "# Stage {stage_number}: Stage name\n\nPlanned chapters: {reference_chapter_count} chapters\n\n# Volume overview\n..."
 }}
 
-输出必须严格遵守以下结构，与参考小说卷纲的五个板块一致：
+The output must strictly follow this structure, matching the five blocks of a reference-novel volume outline:
 
-# 舞台{stage_number}：舞台名称
-预计章节数：{reference_chapter_count}章
+# Stage {stage_number}: Stage name
+Planned chapters: {reference_chapter_count} chapters
 
-# 一、卷纲概览
-1. 用一句话概括本舞台核心矛盾和主角目标。
-2. 写清矛盾方向和核心提升项，包括实力、地位、资源、关系或认知变化。
-3. 写清本舞台如何推进全书长线主线。
+# Volume overview
+1. Summarize this stage's core conflict and the protagonist's goal in one sentence.
+2. State the conflict direction and the core upgrades, including changes in power, status, resources, relationships, or cognition.
+3. State how this stage advances the book-length long mainline.
 
-# 二、三幕结构
-第一幕（开头）：进入舞台、承接上一舞台后果、引入矛盾、初始挑战和第一个爽点。
-第二幕（发展）：冲突升级、意外爆发、局势反复和至暗时刻。
-第三幕（高潮与收尾）：转折翻盘、高潮爆发、阶段收获、代价及下一舞台钩子。
-每幕给出预计章节区间，三个区间必须覆盖本舞台全部预计章节，不能重叠或断档。
+# Three-act structure
+Act I (opening): enter the stage, inherit consequences from the previous stage, introduce the conflict, the first challenge, and the first payoff.
+Act II (development): conflict escalates, surprises erupt, the situation swings, and a darkest moment arrives.
+Act III (climax and close): the turnaround, the climax burst, phase gains, the cost, and a hook into the next stage.
+Give each act a planned chapter range. The three ranges must cover this stage's full planned chapter count, with no overlap and no gap.
 
-# 三、人物谱系
-区分主角、核心配角、反派和功能性角色。写清身份、性格、能力、与主角的关系脉络、本舞台关键行动与变化。承接上一舞台已存在角色的状态，不得无故重置。
+# Character roster
+Distinguish protagonist, core supporting cast, antagonists, and functional characters. State identity, personality, abilities, the relationship thread with the protagonist, and this stage's key actions and changes. Inherit the state of characters who already exist from the previous stage; do not reset them without cause.
 
-# 四、伏笔追踪
-分别写本舞台埋下的伏笔、本舞台回收的伏笔、跨舞台线索；注明暗示方式和预计回收舞台。不能回收尚未埋下的线索。
+# Foreshadowing tracker
+Write separately the foreshadowing planted in this stage, the foreshadowing paid off in this stage, and cross-stage clues; note the hint method and the planned payoff stage. Do not pay off a clue that has not been planted.
 
-# 五、核心爽点
-列出2至3个最重要的高潮场景。每个场景写压抑铺垫、爆发转折机制、爽点释放以及战利品和成长收获。
+# Core payoff
+List 2 to 3 of the most important climax scenes. For each scene, write the oppressive setup, the burst/turn mechanism, the payoff release, and the spoils and growth gained.
 
-硬性要求：
-1. 只允许出现一个“# 舞台N”标题，且N必须为{stage_number}；不得输出舞台{stage_number}以外的内容。
-2. 当前是全书第{stage_number}/{total_stages}个舞台。除最后舞台外应留下自然钩子；最后舞台必须完成长线核心矛盾。
-3. 上一舞台是连续性事实来源；当前舞台的主角状态、角色关系、资源、伤势、身份和未回收伏笔必须与其衔接。
-4. 参考卷纲只提供结构骨架，新舞台剧情必须由新小说世界观、长线主线和当前阶段粗纲决定。
-5. 不得输出 Markdown 表格、代码块或额外说明。
-6. 不要自行使用固定章节数或通用区间。本舞台直接对标参考卷{reference_volume_number}的章节规模，预计章节数必须写为 {reference_chapter_count} 章。
-7. 三幕结构使用舞台内的相对章号，从第1章开始，最后一幕结束于第{reference_chapter_count}章；三幕必须连续覆盖全部章节，不得重叠或断档。
+Hard requirements:
+1. Only one "# Stage N" heading is allowed, and N must be {stage_number}; do not output content outside stage {stage_number}.
+2. This is stage {stage_number}/{total_stages} of the book. Except for the last stage, leave a natural hook; the last stage must complete the long-mainline core conflict.
+3. The previous stage is the source of continuity facts; the current stage's protagonist state, character relationships, resources, injuries, identity, and unpaid foreshadowing must connect to it.
+4. The reference volume outline supplies only a structural skeleton. The new stage's plot must be decided by the new novel's worldview, long mainline, and current phase outline.
+5. Do not output Markdown tables, code fences, or extra commentary.
+6. Do not invent a fixed chapter count or a generic range. This stage maps directly onto the chapter scale of reference volume {reference_volume_number}; Planned chapters must be written as {reference_chapter_count} chapters.
+7. The three-act structure uses relative chapter numbers inside the stage, starting at chapter 1, with the last act ending at chapter {reference_chapter_count}; the three acts must cover every chapter in a continuous run, with no overlap and no gap.

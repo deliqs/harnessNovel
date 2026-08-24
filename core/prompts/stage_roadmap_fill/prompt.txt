@@ -1,54 +1,56 @@
-你是一个长篇网文舞台/副本设计师。全书长线主线已经确认（见下方），现在只需要你补充舞台路线图（stage_roadmap_md）。
+You are a long-form web-novel stage / instance designer. The book-length long mainline is already confirmed (see below). You only need to supply the stage roadmap (stage_roadmap_md).
 
-【用户创作方向】
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+[User creative direction]
 {creative_direction}
 
-【粗略大纲】（最高优先级，含核心玩法、阶段粗纲、主要角色）
+[Rough outline] (highest priority; includes core gameplay, phase outline, and main characters)
 {rough_outline}
 
-【世界观】
+[Worldview]
 {worldview}
 
-【已确认的全书长线主线】（舞台必须与之挂钩，不得矛盾）
+[Confirmed book-length long mainline] (stages must hook into it and must not contradict it)
 {long_mainline}
 
-【带片段ID的参考小说结构】（只用于学习舞台推进与长线悬念的节奏）
+[Reference novel structure with segment IDs] (learn only the rhythm of stage advance and long-running suspense)
 {reference_outline}
 
-【目标世界知识库】（可选）
+[Target world knowledge base] (optional)
 {world_knowledge}
 
-参考小说只用于学习结构，不可照搬人名、地名、事件、世界观专有名词。
+The reference novel is for learning structure only. Do not copy names of people, places, events, or worldbuilding proper nouns.
 
-请只输出 JSON，不要输出解释、Markdown 代码块或 JSON 外文本。格式：
+Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON. Format:
 {{
-  "stage_roadmap_md": "# 舞台1：舞台名称\n\n预计章节数：12-15章\n\n...",
-  "referenced_arc_paths": ["实际参考或映射到的片段ID"]
+  "stage_roadmap_md": "# Stage 1: Stage name\n\nPlanned chapters: 12-15 chapters\n\n...",
+  "referenced_arc_paths": ["segment IDs actually referenced or mapped this time"]
 }}
 
-stage_roadmap_md 要求：
-1. 不要写文档总标题（如“# 舞台路线图”）；stage_roadmap_md 的第一行必须就是“# 舞台1：舞台名称”。每个舞台用一级标题（顶格、只有一个 #，不要用 ## / ### / 加粗 / 列表 / 表格 / 代码块），格式严格为：# 舞台N：舞台名称（N 从 1 递增）。
-2. 每个舞台必须写“预计章节数”，供后续推断章节量；格式为：预计章节数：12-15章（写明数字）。
-3. 不要输出“后续舞台储备”或“舞台迭代规则”。
-4. 每个舞台必须包含以下小项：阶段功能、玩法价值、长线主线推进、舞台规则、舞台内短线（多个能刺激情绪的小目标/小危机/小反转/小爽点/小钩子）、主要资源、主要敌人/压力、盟友/见证者、角色节点、结束状态、后患与钩子、不能提前。
+stage_roadmap_md requirements:
+1. Do not write a document-level title (such as "# Stage roadmap"); the first line of stage_roadmap_md must be "# Stage 1: Stage name". Each stage uses a level-1 heading (flush left, only one #; do not use ## / ### / bold / lists / tables / code fences). The format must be exactly: # Stage N: Stage name (N increases from 1).
+2. Each stage must include "Planned chapters", so later steps can infer chapter count; the format is: Planned chapters: 12-15 chapters (write the numbers).
+3. Do not output "reserve stages for later" or "stage iteration rules".
+4. Each stage must include these items: Stage function, Gameplay value, Long mainline advance, Stage rules, Short lines inside the stage (several small goals / small crises / small reversals / small payoffs / small hooks that can move emotion), Main resources, Main enemies/pressure, Allies/witnesses, Character nodes, End state, Aftermath and hooks, Must not happen yet.
 
-结构示例：
-# 舞台1：名称
-预计章节数：
-阶段功能：
-玩法价值：
-长线主线推进：
-舞台规则：
-舞台内短线：
-主要资源：
-主要敌人/压力：
-盟友/见证者：
-角色节点：
-结束状态：
-后患与钩子：
-不能提前：
+Structure example:
+# Stage 1: Name
+Planned chapters:
+Stage function:
+Gameplay value:
+Long mainline advance:
+Stage rules:
+Short lines inside the stage:
+Main resources:
+Main enemies/pressure:
+Allies/witnesses:
+Character nodes:
+End state:
+Aftermath and hooks:
+Must not happen yet:
 
-# 舞台2：名称
-按同样格式输出。
+# Stage 2: Name
+Output in the same format.
 
-referenced_arc_paths 只能填写输入中真实出现、且本次舞台设计实际参考或映射过的片段ID；没有使用则返回空数组。
+referenced_arc_paths may only contain segment IDs that actually appear in the input and that this stage design actually referenced or mapped; if none were used, return an empty array.

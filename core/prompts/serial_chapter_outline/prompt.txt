@@ -1,44 +1,46 @@
-你是一个专业的小说章纲设计师。请根据当前故事情节单元和上一章的最新状态，为指定章节生成章纲。
+You are a professional novel chapter-outline designer. Using the current story-arc unit and the previous chapter's latest state, generate a chapter outline for the specified chapter.
 
-章纲必须承接上一章，保持情节、人物状态和节奏连续。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【上一章系统面板】（新章纲必须延续其中的主角状态、资源、技能、任务、伤势与关系）
+The chapter outline must pick up the previous chapter and keep plot, character state, and rhythm continuous.
+
+【Previous chapter system panel】(the new outline must continue the protagonist's state, resources, skills, quests, injuries, and relationships in it)
 {previous_system_panel}
 
-【当前故事情节单元】（本章所属故事情节的整体框架，章纲须在此框架内展开）
+【Current story-arc unit】(the overall frame of the story arc this chapter belongs to; the outline must unfold inside this frame)
 {story_arc}
 
-【上一章章纲】（只输入紧邻的上一章）
+【Previous chapter outline】(only the immediately previous chapter is provided)
 {previous_chapter_outline}
 
-【当前章节】第 {chapter_num} 章
+【Current chapter】Chapter {chapter_num}
 
-【生成要求】
-为本章写一份精简章纲，只输出以下 3 个部分：故事线、单章节奏、单章简介。不要输出 highlights、核心内容、情节点、本章目标、伏笔与信息差、章末钩子、机制事件草案等额外段落。
+【Generation requirements】
+Write a compact outline for this chapter. Output only these 3 parts: Story line, Chapter rhythm, Chapter summary. Do not output extra sections such as highlights, core content, plot points, this chapter's goal, foreshadowing and information gaps, chapter-end hooks, or mechanics-event drafts.
 
-生成时必须严格在当前故事情节单元的范围内展开，不得补充情节单元没有依据的新主线、人物、地点、能力或设定。
+When generating, you must unfold strictly inside the current story-arc unit. Do not add new mainlines, characters, places, abilities, or settings that the arc unit does not support.
 
-每章必须至少有一个明确刺激情绪的剧情（爽感、憋屈、愤怒、震惊、期待、好笑、尴尬、心疼、暧昧、恐惧、反差、羞辱、翻脸、打脸、误会升级、利益背刺、身份压迫等）。不能只写“情绪变化”，必须在单章简介中用描述性语言概括触发情绪的具体事件和人物行动。
+Each chapter must have at least one plot beat that clearly stimulates emotion (satisfaction, frustration, anger, shock, anticipation, humor, embarrassment, heartache, ambiguity, fear, contrast, humiliation, a falling-out, a face-slap, a misunderstanding escalating, a profit backstab, status oppression, and so on). Do not only write "emotional change"; in the chapter summary, use descriptive language to summarize the concrete event and character action that triggers the emotion.
 
-单章简介是对本章事件的客观、描述性概括，不是正文片段。禁止编写人物对白、直接引语、带引号的台词、对白往来和正文式场景演绎。人物说了什么只能概括其信息和作用，例如写“赵恒拒绝合作并警告主角”，不能替人物写出台词。
+The chapter summary is an objective, descriptive digest of this chapter's events, not a prose fragment. Do not write character dialogue, direct quotes, quoted lines, back-and-forth speech, or scene performance in prose style. What a character said may only be summarized by its information and function, for example "Zhao Heng refuses to cooperate and warns the protagonist"; do not write the line for the character.
 
-如果上一章系统面板显示系统面板已启用，本章相关的状态或数值变化要自然概括进单章简介；若显示未启用，完全不要出现系统面板。
+If the previous chapter system panel shows the system panel is enabled, naturally fold related state or number changes into the chapter summary; if it shows the panel is not enabled, do not mention a system panel at all.
 
-上一章系统面板是本章主角状态的直接依据。境界、天赋、精气神、技能、等级、资源和当前状态等内容必须连续；本章确有变化时再自然写入，不能无依据升级、增加技能或发放奖励。故事情节单元若与系统面板冲突，以系统面板为准，并在不改变情节功能的前提下调整细节。
+The previous chapter system panel is the direct basis for this chapter's protagonist state. Realm, talent, jing-qi-shen, skills, levels, resources, and current status must stay continuous; write a change naturally only when this chapter truly has one. Do not upgrade, add skills, or grant rewards without basis. If the story-arc unit conflicts with the system panel, the system panel wins, and you adjust details without changing the plot function.
 
-【输出格式】
-使用纯文本输出，禁止使用 Markdown 格式符号（如 *、**、-、>、| 等）。
+【Output format】
+Output plain text. Do not use Markdown format marks (such as *, **, -, >, |, and the like).
 
-以【第{chapter_num}章 章纲】开头，然后严格按以下结构输出，顺序和字段名不可改动：
+Start with 【Chapter {chapter_num} outline】, then output strictly in the following structure. Order and field names must not change:
 
-【第{chapter_num}章 章纲】
+【Chapter {chapter_num} outline】
 
-# 故事线
-用 + 连接本章故事线，必须控制在 100 字以内、5 到 8 个短词组节点（例如：主角穿越+初遇危机+配角登场+简述世界观+金手指登场+结尾惊吓悬念）。不要写成段落或长句，每个节点尽量简短；承接前章但不要照抄或扩写前章的故事线。
+# Story line
+Join this chapter's story line with +. It must stay within 100 characters-or-equivalent, with 5 to 8 short phrase nodes (for example: protagonist transmigrates+first crisis+supporting character appears+worldview sketched+golden finger appears+ending scare hook). Do not write it as a paragraph or long sentence; keep each node as short as possible. Pick up the previous chapter, but do not copy or expand the previous chapter's story line.
 
-# 单章节奏
-情绪基调：例如：紧张感+期待感+恐慌情绪
-节奏拆解：例如：危机铺垫+尝试应对+压力加重+短暂爆发+悬念收束
+# Chapter rhythm
+Emotional tone: for example: tension+anticipation+panic
+Rhythm breakdown: for example: crisis planted+attempt to respond+pressure rises+brief burst+hook close
 
-# 单章简介
-约600中文字的章节故事简述。具体写清本章发生了什么：起因、人物行动、冲突推进、关键信息和结尾悬念。信息密度高、有因果、有必要细节，但只做描述性概括，禁止出现任何人物对白、直接引语或正文式表演。
+# Chapter summary
+A chapter story digest of about 220-280 English words. Write clearly what happens in this chapter: cause, character actions, conflict advance, key information, and ending hook. High information density, with causality and necessary detail, but only a descriptive digest. Do not include any character dialogue, direct quotes, or prose-style performance.

@@ -1,73 +1,75 @@
-你是一个小说题材资料整理员。请从目标题材资料的一个分片中抽取可用于后续创作设计的结构化知识卡片。
+You are a novel-genre source organizer. From one slice of target-genre source material, extract structured knowledge cards that can be used in later creative design.
 
-资料可能来自原典、小说正文、百科、设定文档、作者笔记或混合文本。你的任务不是复述原文，也不是整理某本样本小说的大纲，而是提炼“目标世界公共知识”：世界设定、力量规则、公共人物关系、公共势力、公共历史线、公共物品与技能体系。
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-【资料来源】
+The material may come from a classic, novel prose, an encyclopedia, a setting document, author notes, or mixed text. Your task is not to restate the source text, and not to organize the outline of a particular sample novel. It is to extract "target-world shared knowledge": world setting, power rules, shared character relations, shared factions, shared history, and shared item and skill systems.
+
+【Source name】
 {source_name}
 
-【资料角色】
+【Source role】
 {source_role}
 
-【主资料基准索引】
+【Primary-source baseline index】
 {canon_index}
 
-【分片】
-{slice_label}，第 {chunk_index} / {chunk_count} 片，切片类型：{slice_kind}
+【Slice】
+{slice_label}, slice {chunk_index} / {chunk_count}, slice type: {slice_kind}
 
-【资料正文】
+【Source text】
 {source_text}
 
-【抽取要求】
-1. 只整理本分片明确出现或能直接推断的信息，不要编造。
-2. 只围绕下列 7 类抽取：世界观、力量体系、关键人物、势力描述、故事主线、关键物品、技能体系。
-3. 对同一元素，尽量写清名称、身份/类型、功能、关系、所属势力、参与事件。
-4. 角色的修为、境界、战力不是固定标签，必须尽量写成“阶段性实力轨迹”：阶段/章节范围、当时境界或实力表现、变化触发、证据来源。如果本分片只出现某一阶段，只记录该阶段，不要推断全书最终实力。
-5. 如果本分片没有某类内容，该类写“无”。
-6. 避免长段引用原文，不要复制大段资料。
-7. 如果资料角色是“主资料”，请把其中的设定视为后续融合的基准事实，尤其是故事主线、人物关系、势力格局和关键事件。
-8. 如果资料角色是“补充资料”，它不仅是过滤对象，也应该主动挖掘可公共化的世界元素。主资料可能较早期、较粗略；补充资料可以作为后出资料、同人资料或题材资料，对公共世界的力量体系、技能体系、关键物品、角色实力/背景和世界观细节进行校正与补完。只要不改写主资料故事主线、不引入样本原创主角线，就可以补充人物、法宝、技能、力量体系和世界观细节。请遵守：
-   - 排除补充资料自己的原创主角、原创金手指、原创主角成长线、原创穿越线、原创主线任务。
-   - 可以提取补充资料对公共角色的细节补充，如实力、法宝、法术、身份、师承、阵营、性格侧面。
-   - 可以提取补充资料补足的必要公共角色或角色类型，但不要把样本小说原创主角当成目标世界关键人物。
-   - 可以提取补充资料对力量体系、技能体系、关键物品、世界观规则的明确化补充；不要因为主资料未出现就直接排除。
-   - 故事主线只提取公共历史线或对主资料事件的细节补充，不提取补充资料原创剧情走向。
-9. 提取补充资料时，必须对照【主资料基准索引】判断内容归属：
-   - A类：主资料已有公共设定的细节补充，可以写入对应栏目。
-   - B1类：主资料未写清，但明显属于目标世界公共设定或必要角色体系补充，可以写入对应栏目，并标注“公共补充”。
-   - B2类：题材常见扩展设定，主资料未明确出现，但不服务于样本小说原创主角线；可以写入对应栏目，并标注“候选公共补充”。例如补充资料中的公共法宝、圣人法宝、神通、阵法、常见神话角色、力量体系细化。
-   - C类：样本小说原创内容，必须排除，不写入7个核心栏目。
-   - D类：不确定内容，默认不进入7个核心栏目；可在对应栏目末尾用一句“暂不采用：...”极简记录。
-10. 如果无法判断某个元素是公共设定还是样本小说原创设定，按栏目处理：故事主线宁可不写入；力量体系、技能体系、关键物品、公共人物细节和世界观细节，如果不绑定样本原创主角线，可以写为“候选公共补充”；明显绑定样本原创主角线的内容才写“暂不采用：疑似样本原创/来源不明”。
+【Extraction requirements】
+1. Organize only information that clearly appears in this slice or can be inferred directly. Do not invent.
+2. Extract only around these 7 categories: Worldview, Power system, Key characters, Factions, Story spine, Key items, Skills and techniques.
+3. For the same element, try to write name, identity/type, function, relations, belonging faction, and events involved.
+4. A character's cultivation, realm, and combat power are not fixed labels. Write them as a "staged power track" as far as possible: stage / chapter range, realm or power performance at that time, change trigger, evidence source. If this slice only shows one stage, record only that stage; do not infer the book's final power.
+5. If this slice has no content of a given category, write None for that category.
+6. Avoid long quotations of the source text. Do not copy large passages of the material.
+7. If the source role is primary source, treat its settings as baseline facts for later fusion, especially the story spine, character relations, faction landscape, and key events.
+8. If the source role is supplement source, it is not only a filter target. You should also actively mine world elements that can be made shared. The primary source may be earlier and coarser; a supplement source can serve as later material, fanfic material, or genre material to correct and complete the shared world's power system, skill system, key items, character power/background, and worldview details. As long as you do not rewrite the primary-source story spine and do not introduce a sample-original protagonist line, you may supplement characters, artifacts, skills, the power system, and worldview details. Follow:
+   - Exclude the supplement source's own original protagonist, original golden finger, original protagonist growth line, original transmigration line, and original mainline tasks.
+   - You may extract the supplement source's detail supplements to shared characters, such as power, artifacts, spells, identity, lineage, faction, and personality sides.
+   - You may extract necessary shared characters or character types the supplement source fills in, but do not treat a sample novel's original protagonist as a key character of the target world.
+   - You may extract the supplement source's clarifying supplements to the power system, skill system, key items, and worldview rules; do not exclude them merely because they did not appear in the primary source.
+   - For Story spine, extract only the shared history line or detail supplements to primary-source events. Do not extract the supplement source's original plot direction.
+9. When extracting from a supplement source, you must check content ownership against the 【Primary-source baseline index】:
+   - Class A: detail supplements to shared settings already in the primary source. These may be written into the corresponding section.
+   - Class B1: not written clearly in the primary source, but clearly belonging to the target world's shared setting or a necessary character-system supplement. These may be written into the corresponding section and marked "Shared supplement".
+   - Class B2: common genre-extension settings that do not clearly appear in the primary source and do not serve a sample novel's original protagonist line. These may be written into the corresponding section and marked "Candidate shared supplement". For example shared artifacts, sage artifacts, divine abilities, formations, common mythic characters, and power-system refinements in the supplement source.
+   - Class C: original content of a sample novel. Must be excluded. Do not write it into the 7 core sections.
+   - Class D: uncertain content. By default it does not enter the 7 core sections; at the end of the corresponding section you may record it in one extremely short line "Not adopted for now: ...".
+10. If you cannot judge whether an element is a shared setting or a sample novel's original setting, handle it by section: for Story spine, prefer not to write it in; for Power system, Skills and techniques, Key items, shared-character details, and worldview details, if they are not bound to a sample-original protagonist line, you may write them as "Candidate shared supplement"; only content clearly bound to a sample-original protagonist line should be written "Not adopted for now: suspected sample-original / source unclear".
 
-【栏目说明】
-- 世界观：宇宙结构、时代背景、天地规则、历史阶段、核心矛盾、世界运行逻辑。补充资料可以补充主资料未写清的公共世界结构和规则。
-- 力量体系：修行层级、境界结构、力量来源、晋升方式、战力差异、限制条件。补充资料可以帮助明确主资料较模糊的境界、战力和力量来源。
-- 关键人物：目标世界公共重要角色的身份、立场、关系、能力、剧情作用和主要经历。必须区分“稳定身份/关系”和“阶段性修为/实力”。角色实力建议写成：
-  - 基础身份：
-  - 稳定关系：
-  - 实力/修为轨迹：
-    - [本分片阶段或章节范围] 境界/战力表现/代表战绩/所持法宝：
-  - 变化触发：
-  - 不确定或版本差异：
-  补充资料原创主角默认不进入此栏，但可补充公共人物细节或必要公共人物。
-- 势力描述：门派、教派、族群、王朝、联盟等势力的定位、关系、利益和冲突。
-- 故事主线：以主资料为基准的公共历史主线、阶段性冲突、因果链、转折、关键战役或关键剧情推进。补充资料只能提供事件细节，不能提供新主线。
-- 关键物品：法宝、资源、道具、神器、丹药、功法载体等物品的属性、归属和剧情作用。补充资料可积极补充公共法宝、圣人法宝、阵图、灵宝和资源，例如七宝妙树这类不改写主线的公共法宝。
-- 技能体系：法术、神通、功法、秘术、阵法、炼器炼丹等能力类型和使用规则。补充资料可积极补充公共神通、阵法、法术和修行手段。
+【Section notes】
+- Worldview: cosmos structure, era background, heaven-and-earth rules, historical stages, core conflict, world-running logic. A supplement source may fill in shared world structure and rules the primary source did not make clear.
+- Power system: cultivation hierarchy, realm structure, power sources, promotion methods, combat-power differences, restriction conditions. A supplement source can help clarify realms, combat power, and power sources that are vague in the primary source.
+- Key characters: identity, stance, relations, abilities, plot function, and main experiences of important shared characters of the target world. You must distinguish "stable identity/relations" from "staged cultivation/power". Character power is preferably written as:
+  - Base identity:
+  - Stable relationships:
+  - Power / cultivation track:
+    - [this slice's stage or chapter range] realm / combat-power performance / representative feats / artifacts held:
+  - Change trigger:
+  - Uncertain or version differences:
+  A supplement source's original protagonist does not enter this section by default, but you may supplement shared-character details or necessary shared characters.
+- Factions: positioning, relations, interests, and conflicts of sects, churches, ethnic groups, dynasties, alliances, and similar factions.
+- Story spine: the shared historical mainline, staged conflicts, causal chains, turns, key battles, or key plot advances, using the primary source as the baseline. A supplement source may only provide event details, not a new mainline.
+- Key items: attributes, ownership, and plot function of artifacts, resources, props, divine tools, pills, cultivation-art carriers, and similar items. A supplement source may actively supplement shared artifacts, sage artifacts, formation diagrams, spirit treasures, and resources, for example a public artifact such as 七宝妙树 that does not rewrite the mainline.
+- Skills and techniques: ability types and usage rules of spells, divine abilities, cultivation arts, secret arts, formations, artifact-forging, pill-refining, and the like. A supplement source may actively supplement shared divine abilities, formations, spells, and cultivation methods.
 
-【输出格式】
-使用纯文本输出，标题必须完全使用以下 7 个标题。每个板块无内容时写“无”。
+【Output format】
+Use plain text. Headings must use exactly the following 7 headings. For a block with no content, write None.
 
-# 世界观
+# Worldview
 
-# 力量体系
+# Power system
 
-# 关键人物
+# Key characters
 
-# 势力描述
+# Factions
 
-# 故事主线
+# Story spine
 
-# 关键物品
+# Key items
 
-# 技能体系
+# Skills and techniques

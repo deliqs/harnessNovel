@@ -1,7 +1,7 @@
-"""逐章章纲的对话管理。
+"""Chapter-outline conversation management.
 
-每个工作区 + 卷号 + 情节单元独立维护对话。首条消息生成该情节单元的所有章纲，
-后续消息基于当前章纲进行调整。
+Each workspace + volume + story arc keeps its own conversation. The first
+message generates all chapter outlines for that arc; later messages refine them.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def _read_text(path) -> str:
 
 
 def _chapter_outlines_exist(ws, volume: int, arc_idx: int) -> bool:
-    """检查指定情节单元的章纲是否已生成。"""
+    """Return whether chapter outlines for this story arc already exist."""
     from training.adaptive_builder import _list_novel_story_arcs
     arcs = _list_novel_story_arcs(ws, volume)
     for arc in arcs:
@@ -117,11 +117,11 @@ class ChapterOutlineChatManager:
         key = (workspace, volume, arc_idx)
         display_text = message.strip()
         if not display_text:
-            raise ValueError("请输入内容后再发送。")
+            raise ValueError("Enter content before sending.")
         with self._jobs_lock:
             current = self._jobs.get(key)
             if current and current["status"] in {"running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前情节单元已有章纲任务正在进行。")
+                raise ValueError("This story arc already has a chapter-outline task running.")
             pause_event = threading.Event()
             pause_event.set()
             stop_event = threading.Event()
@@ -129,7 +129,7 @@ class ChapterOutlineChatManager:
             job = {
                 "id": uuid.uuid4().hex, "status": "running", "phase": "queued",
                 "completed": 0, "total": 0, "progress_kind": "chapters",
-                "message": "任务已创建，正在启动", "pause_event": pause_event,
+                "message": "Task created, starting", "pause_event": pause_event,
                 "stop_event": stop_event, "cancel_event": cancel_event,
                 "prompt_history": [], "prompt_count": 0, "error": "",
             }
@@ -192,8 +192,8 @@ class ChapterOutlineChatManager:
                 if isinstance(result, dict) and result.get("error"):
                     raise RuntimeError(str(result["error"]))
                 if not result:
-                    raise RuntimeError("未配置可用模型，请先在右上角配置大模型 API。")
-                note = str(result.get("adjustment_note") or "").strip() or "章纲处理完成。"
+                    raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
+                note = str(result.get("adjustment_note") or "").strip() or "Chapter outlines processed."
                 conv.append_assistant(note, result.get("artifacts") or [])
                 conv.save()
                 with self._jobs_lock:
@@ -209,7 +209,7 @@ class ChapterOutlineChatManager:
                 with self._jobs_lock:
                     active = self._jobs.get(key)
                     if active and active["id"] == job["id"]:
-                        active.update(status="failed", phase="failed", message="生成失败", error=str(exc))
+                        active.update(status="failed", phase="failed", message="Generation failed", error=str(exc))
             finally:
                 trace_context.__exit__(None, None, None)
 
@@ -244,9 +244,9 @@ class ChapterOutlineChatManager:
         from training.adaptive_builder import chapter_outline_resume_status
         resume = chapter_outline_resume_status(init_workspace(workspace), volume, arc_idx)
         if not resume.get("can_resume"):
-            raise ValueError("当前情节单元没有可继续的未完成章纲。")
+            raise ValueError("This story arc has no unfinished chapter outlines to continue.")
         return self.start_message(
-            workspace, volume, arc_idx, "继续生成未完成章纲", resume_incomplete=True,
+            workspace, volume, arc_idx, "Continue generating unfinished chapter outlines", resume_incomplete=True,
         )
 
     def pause(self, workspace: str, volume: int, arc_idx: int) -> dict[str, Any]:
@@ -254,10 +254,10 @@ class ChapterOutlineChatManager:
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing"}:
-                raise ValueError("当前没有可暂停的章纲任务。")
+                raise ValueError("There is no pausable chapter-outline task.")
             job["pause_event"].clear()
             job["cancel_event"].set()
-            job.update(status="pausing", message="正在暂停当前模型请求")
+            job.update(status="pausing", message="Pausing the current model request")
         return self.job_status(workspace, volume, arc_idx)
 
     def resume(self, workspace: str, volume: int, arc_idx: int) -> dict[str, Any]:
@@ -265,10 +265,10 @@ class ChapterOutlineChatManager:
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"paused", "pausing"}:
-                raise ValueError("当前没有已暂停的章纲任务。")
+                raise ValueError("There is no paused chapter-outline task.")
             job["cancel_event"].clear()
             job["pause_event"].set()
-            job.update(status="running", phase="generating", message="已继续生成")
+            job.update(status="running", phase="generating", message="Resumed generation")
         return self.job_status(workspace, volume, arc_idx)
 
     def stop(self, workspace: str, volume: int, arc_idx: int) -> dict[str, Any]:
@@ -276,11 +276,11 @@ class ChapterOutlineChatManager:
         with self._jobs_lock:
             job = self._jobs.get(key)
             if not job or job["status"] not in {"running", "pausing", "paused"}:
-                raise ValueError("当前没有可结束的章纲任务。")
+                raise ValueError("There is no chapter-outline task to stop.")
             job["stop_event"].set()
             job["cancel_event"].set()
             job["pause_event"].set()
-            job.update(status="stopping", phase="stopping", message="正在结束本轮生成")
+            job.update(status="stopping", phase="stopping", message="Ending this generation round")
         return self.job_status(workspace, volume, arc_idx)
 
     def run_message(self, workspace: str, volume: int, arc_idx: int, message: str) -> dict[str, Any]:
@@ -288,7 +288,7 @@ class ChapterOutlineChatManager:
         conv = self.get(workspace, volume, arc_idx)
         display_text = message.strip()
         if not display_text:
-            raise ValueError("请输入内容后再发送。")
+            raise ValueError("Enter content before sending.")
 
         conv.append_user(display_text)
         from training.adaptive_builder import gen_chapter_outlines_for_arc, refine_chapter_outlines
@@ -301,23 +301,23 @@ class ChapterOutlineChatManager:
             result = refine_chapter_outlines(ws, volume, arc_idx, instruction=display_text)
             mode = "refine"
         if not result:
-            raise RuntimeError("未配置可用模型，请先在右上角配置大模型 API。")
+            raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
 
         note = str(result.get("adjustment_note") or "").strip()
         if not note:
-            note = "已生成章纲。" if mode == "initial" else "已按指令调整。"
+            note = "Chapter outlines generated." if mode == "initial" else "Adjusted from the instruction."
         artifacts = result.get("artifacts") or []
         conv.append_assistant(note, artifacts)
         conv.save()
         return {"mode": mode, "result": result, "conversation": conv.history()}
 
     def reset(self, workspace: str, volume: int, arc_idx: int) -> dict[str, Any]:
-        """清空对话，并删除该情节单元的章纲及对应系统面板快照。"""
+        """Clear the conversation and delete this arc's chapter outlines and system-panel snapshots."""
         key = (workspace, volume, arc_idx)
         with self._jobs_lock:
             job = self._jobs.get(key)
             if job and job.get("status") in {"running", "pausing", "paused", "stopping"}:
-                raise ValueError("当前章纲仍在生成，请先结束任务再重置。")
+                raise ValueError("Chapter outlines are still generating. Stop the task before resetting.")
             if job:
                 job["prompt_history"] = []
                 job["prompt_count"] = 0
