@@ -39,13 +39,13 @@ VOLUME_TITLE_RE = re.compile(
 )
 
 WORLD_SECTIONS = [
-    ("世界观", "资料的宇宙结构、时代背景、天地规则、历史阶段、核心矛盾和世界运行逻辑。"),
-    ("力量体系", "修行层级、境界结构、力量来源、晋升方式、战力差异、限制条件。"),
-    ("关键人物", "重要角色的身份、立场、关系、能力、剧情作用和主要经历。"),
-    ("势力描述", "门派、教派、族群、王朝、联盟等势力的定位、关系、利益和冲突。"),
-    ("故事主线", "主线事件、阶段性冲突、因果链、转折、关键战役或关键剧情推进。"),
-    ("关键物品", "法宝、资源、道具、神器、丹药、功法载体等物品的属性、归属和剧情作用。"),
-    ("技能体系", "法术、神通、功法、秘术、阵法、炼器炼丹等能力类型和使用规则。"),
+    ("世界观", "Cosmos structure, era background, heaven-and-earth rules, historical stages, core conflict, and world-running logic."),
+    ("力量体系", "Cultivation ranks, realm structure, power sources, promotion methods, combat-power differences, and limits."),
+    ("关键人物", "Important characters' identities, stances, relations, abilities, plot roles, and main experiences."),
+    ("势力描述", "Sects, churches, peoples, dynasties, alliances: positioning, relations, interests, and conflicts."),
+    ("故事主线", "Mainline events, staged conflicts, causal chains, turns, key battles, or key plot advances."),
+    ("关键物品", "Artifacts, resources, tools, divine items, pills, and cultivation-art carriers: attributes, ownership, and plot role."),
+    ("技能体系", "Spells, divine abilities, cultivation arts, secret arts, formations, forging/refining, and usage rules."),
 ]
 
 SECTION_LOOKUP = dict(WORLD_SECTIONS)
@@ -856,12 +856,12 @@ def _build_source_all_sections(ws, record, card_paths, llm, force=False):
         )
         if current_summary:
             print(
-                f"  断点续传{record['role_label']}《{record['file_name']}》全栏目 "
+                f"  Resuming all-section summary for {record['role_label']} '{record['file_name']}' "
                 f"{step_index}/{total_steps}"
             )
         else:
             print(
-                f"  汇总{record['role_label']}《{record['file_name']}》全栏目 "
+                f"  Summarizing all sections for {record['role_label']} '{record['file_name']}' "
                 f"{step_index}/{total_steps}"
             )
             current_summary = _run_prompt(
@@ -869,9 +869,10 @@ def _build_source_all_sections(ws, record, card_paths, llm, force=False):
                 "world_knowledge_merge_all_sections",
                 dict(
                     merge_task=(
-                        f"资料级全栏目串行汇总：为{record['role_label']}《{record['file_name']}》"
-                        "构建完整的7栏目资料知识库。本轮只读取2个新的资料卡片和上一轮阶段摘要；"
-                        "请在同一资料内部去重、补充和纠错，不要与其他资料做主次裁决。"
+                        f"Source-level all-section serial summary: for {record['role_label']} '{record['file_name']}' "
+                        "build a complete 7-section source knowledge base. This round only reads 2 new source cards "
+                        "and the previous stage summary; dedupe, fill, and correct inside this source. "
+                        "Do not rank this source against other sources."
                     ),
                     previous_summary=_compact_world_document(previous_summary),
                     knowledge_cards=_format_knowledge_items(card_items),
@@ -894,12 +895,12 @@ def _build_single_source_sections(ws, record, card_paths, llm, force=False, max_
 
     index_path = os.path.join(_source_world_dir(ws, record), "README.md")
     index_lines = [
-        f"# {record['file_name']} 资料知识库",
+        f"# {record['file_name']} source knowledge base",
         "",
-        f"- 资料角色：{record.get('role_label', '资料')}",
-        f"- 资料路径：{record.get('source_path') or record.get('imported_path')}",
+        f"- Source role: {record.get('role_label', 'source')}",
+        f"- Source path: {record.get('source_path') or record.get('imported_path')}",
         "",
-        "## 栏目",
+        "## Sections",
     ]
     for section_name, _ in WORLD_SECTIONS:
         if section_name in section_paths:
@@ -921,7 +922,7 @@ def _load_existing_source_sections(ws, records):
             if _has_meaningful_file(_source_section_path(ws, record, section_name))
         }
         if not section_paths:
-            print(f"  警告：未找到资料分栏知识库，跳过：{record['file_name']}")
+            print(f"  Warning: source sectioned knowledge base not found, skipping: {record['file_name']}")
             continue
         source_items.append({
             "record": record,
@@ -931,7 +932,7 @@ def _load_existing_source_sections(ws, records):
     return source_items
 
 
-# ── 最终融合与审计 ──
+# ── final merge and audit ──
 
 def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=None):
     if not source_items:
@@ -953,7 +954,7 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
         if _has_meaningful_file(path)
     ]
     if not source_section_paths:
-        print("错误：未能生成最终分栏世界知识库。")
+        print("Error: failed to generate the final sectioned world knowledge base.")
         return None
 
     final_paths = {
@@ -975,8 +976,8 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
         and min(os.path.getmtime(path) for path in final_paths.values()) >= newest_source_mtime
         and has_final_trace
     ):
-        print(f"目标世界分栏知识库已存在：{_final_world_dir(ws)}")
-        print("使用 --force 可重新汇总。")
+        print(f"Target-world sectioned knowledge base already exists: {_final_world_dir(ws)}")
+        print("Use --force to rebuild the summary.")
         return _final_world_dir(ws)
 
     primary_paths = [
@@ -1010,13 +1011,13 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
             )
             if current_checkpoint:
                 print(
-                    f"  断点续传最终知识库：{record['file_name']} "
+                    f"  Resuming final knowledge base: {record['file_name']} "
                     f"{idx}/{len(supplement_items)}"
                 )
                 current_summary = current_checkpoint
             else:
                 print(
-                    f"  整合最终知识库全栏目：{record['file_name']} "
+                    f"  Merging final knowledge-base all sections: {record['file_name']} "
                     f"{idx}/{len(supplement_items)}"
                 )
                 current_summary = _run_prompt(
@@ -1024,11 +1025,13 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
                     "world_knowledge_merge_all_sections",
                     dict(
                         merge_task=(
-                            "最终全栏目串行整合：已有阶段摘要是主资料7栏目知识库及已整合补充资料，"
-                            f"本轮只整合补充资料《{record['file_name']}》的7栏目知识库。"
-                            "故事主线、核心事件顺序、核心因果、基础身份关系以主资料为准。"
-                            "力量体系、技能体系、关键物品、角色实力/背景、世界观细节允许补充资料进行公共化校正和完善。"
-                            "排除补充资料原创主角线、原创金手指和原创主线任务。"
+                            "Final all-section serial merge: the existing stage summary is the primary-source "
+                            "7-section knowledge base plus already merged supplement sources. "
+                            f"This round only merges the 7-section knowledge base of supplement source '{record['file_name']}'. "
+                            "Story spine, core event order, core causality, and basic identity relations follow the primary source. "
+                            "Power system, skills and techniques, key items, character power/background, and worldview details "
+                            "may be corrected and completed from the supplement source as shared knowledge. "
+                            "Exclude the supplement source's original protagonist line, original golden finger, and original mainline tasks."
                         ),
                         previous_summary=_compact_world_document(current_summary),
                         knowledge_cards=_aggregate_sections(supplement_paths, max_chars=40000),
@@ -1042,8 +1045,8 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
     legacy_path = os.path.join(_world_root(ws), "world_knowledge.md")
     if os.path.exists(legacy_path):
         os.remove(legacy_path)
-        print(f"  -> 已移除旧版聚合知识库：{legacy_path}")
-    print(f"  -> 最终分栏知识库目录：{_final_world_dir(ws)}")
+        print(f"  -> Removed legacy aggregated knowledge base: {legacy_path}")
+    print(f"  -> Final sectioned knowledge-base directory: {_final_world_dir(ws)}")
     return _final_world_dir(ws)
 
 
@@ -1061,7 +1064,7 @@ def _build_supplement_usage_audit(ws, source_items, llm, force=False):
 
     final_paths = _final_section_paths(ws)
     supplement_paths = [
-        (f"{item['record'].get('file_name', '补充资料')} / {section_name}", path)
+        (f"{item['record'].get('file_name', 'supplement source')} / {section_name}", path)
         for item in supplement_items
         for section_name, path in item.get("sections", {}).items()
         if _has_meaningful_file(path)
@@ -1079,33 +1082,33 @@ def _build_supplement_usage_audit(ws, source_items, llm, force=False):
     if os.path.exists(output_path) and not force and os.path.getmtime(output_path) >= newest_mtime:
         return output_path
 
-    print("  审计补充资料利用情况...")
+    print("  Auditing supplement-source usage...")
     _run_prompt(
         llm,
         "world_supplement_usage_audit",
         dict(
-            primary_name=primary_item["record"].get("file_name", "主资料"),
-            supplement_names="、".join(item["record"].get("file_name", "补充资料") for item in supplement_items),
+            primary_name=primary_item["record"].get("file_name", "primary source"),
+            supplement_names=", ".join(item["record"].get("file_name", "supplement source") for item in supplement_items),
             canon_index=_read_file(canon_path) if os.path.exists(canon_path) else "(no primary-source baseline index)",
             final_knowledge=_aggregate_sections(final_paths, max_chars=40000),
             supplement_knowledge=_aggregate_sections(supplement_paths, max_chars=40000),
         ),
         output_path,
     )
-    print(f"  -> 补充资料利用审计已保存：{output_path}")
+    print(f"  -> Supplement-source usage audit saved: {output_path}")
     return output_path
 
 
-# ── 公共入口：构建知识库 ──
+# ── public entry: build knowledge base ──
 
 def build_world_knowledge(ws, llm, force=False, chunk_size=36000, merge_chunk_size=50000,
                           chapter_batch_size=20, max_workers=4, primary_source=None,
                           merge_only=False):
     """Build structured target-world knowledge from imported source files."""
-    _ = merge_chunk_size  # 保留旧参数兼容；当前合并固定按每轮2张 card 串行处理。
+    _ = merge_chunk_size  # Keep the old argument for compatibility; merge is serial, 2 cards per round.
     records = _assign_source_roles(_source_records(ws), primary_source=primary_source)
     if not records:
-        print("错误：未找到目标世界资料。请先运行 world-import。")
+        print("Error: target-world sources not found. Run world-import first.")
         return None
 
     os.makedirs(_cards_dir(ws), exist_ok=True)
@@ -1114,17 +1117,17 @@ def build_world_knowledge(ws, llm, force=False, chunk_size=36000, merge_chunk_si
 
     primary = next((record for record in records if record.get("role") == "primary"), None)
     if primary:
-        reason = primary.get("role_reason") or "最大文件"
-        print(f"  主资料：{primary['file_name']}（{reason}，{primary.get('size', 0)} 字节）")
+        reason = primary.get("role_reason") or "largest file"
+        print(f"  Primary source: {primary['file_name']} ({reason}, {primary.get('size', 0)} bytes)")
     supplements = [record for record in records if record.get("role") != "primary"]
     if supplements:
-        print("  补充资料：" + "、".join(record["file_name"] for record in supplements))
+        print("  Supplement sources: " + ", ".join(record["file_name"] for record in supplements))
 
     if merge_only:
-        print("  -> merge-only：跳过 cards/canon/source worlds，直接基于已有 worlds/<资料名>/*.md 重建 _final。")
+        print("  -> merge-only: skip cards/canon/source worlds; rebuild _final from existing worlds/<source>/*.md.")
         source_items = _load_existing_source_sections(ws, records)
         if not source_items:
-            print("错误：未找到可用于合并的资料级分栏知识库。请先完整运行 world-build。")
+            print("Error: no source-level sectioned knowledge base available to merge. Run a full world-build first.")
             return None
         final_dir = _integrate_final_sections(ws, source_items, llm, force=True, max_workers=max_workers)
         if final_dir:
@@ -1186,7 +1189,7 @@ def build_world_knowledge(ws, llm, force=False, chunk_size=36000, merge_chunk_si
         if _has_meaningful_file(path)
     ]
     if not existing_cards:
-        print("错误：资料分片为空，无法生成世界知识库。")
+        print("Error: source slices are empty; cannot generate the world knowledge base.")
         return None
 
     source_items = []
@@ -1203,7 +1206,7 @@ def build_world_knowledge(ws, llm, force=False, chunk_size=36000, merge_chunk_si
             source_items.append(source_world)
 
     if not source_items:
-        print("错误：未能生成任何资料级分栏世界知识库。")
+        print("Error: failed to generate any source-level sectioned world knowledge base.")
         return None
 
     final_dir = _integrate_final_sections(ws, source_items, llm, force=force, max_workers=max_workers)
@@ -1212,11 +1215,11 @@ def build_world_knowledge(ws, llm, force=False, chunk_size=36000, merge_chunk_si
     return final_dir
 
 
-# ── 公共入口：加载上下文 ──
+# ── public entry: load context ──
 
 def load_world_knowledge_context(ws, max_chars=80000):
     manifest = _load_manifest(ws)
-    # 用户可在 Web 界面关闭资料库；关闭后下游设计流程不再注入资料。
+    # Users can disable the knowledge base in the Web UI; downstream design then skips it.
     if manifest.get("enabled", True) is False:
         return ""
     section_paths = _final_section_paths(ws)
@@ -1230,11 +1233,11 @@ def load_world_knowledge_context(ws, max_chars=80000):
     content = _read_file(legacy_path).strip()
     if len(content) <= max_chars:
         return content
-    return content[:max_chars] + "\n\n（目标世界知识库内容过长，以上为截断后的前置摘要。）"
+    return content[:max_chars] + "\n\n(target world knowledge base was too long; the above is a truncated front summary.)"
 
 
 def world_knowledge_status(ws):
-    """返回资料库是否已具备可注入下游生成的完整7栏目。"""
+    """Return whether the knowledge base has all 7 sections ready to inject into later generation."""
     manifest = _load_manifest(ws)
     source_count = len(_source_records(ws))
     final_section_count = len(_final_section_paths(ws))
@@ -1247,7 +1250,7 @@ def world_knowledge_status(ws):
 
 
 def set_world_knowledge_enabled(ws, enabled: bool) -> bool:
-    """切换资料库启用状态；持久化到 manifest。返回最终状态。"""
+    """Toggle knowledge-base enabled state; persist it in the manifest. Return the final state."""
     manifest = _load_manifest(ws)
     manifest["enabled"] = bool(enabled)
     _save_manifest(ws, manifest)
@@ -1255,5 +1258,5 @@ def set_world_knowledge_enabled(ws, enabled: bool) -> bool:
 
 
 def is_world_knowledge_enabled(ws) -> bool:
-    """读取资料库启用状态。"""
+    """Read the knowledge-base enabled state."""
     return bool(_load_manifest(ws).get("enabled", True))

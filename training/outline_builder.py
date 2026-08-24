@@ -150,7 +150,7 @@ def split_chapters(txt_path, max_chapters=None):
     _assign_volumes_by_position(chapters, volumes)
     if max_chapters is not None:
         if max_chapters < 1:
-            raise ValueError("章节上限必须是正整数。")
+            raise ValueError("Chapter limit must be a positive integer.")
         chapters = chapters[:max_chapters]
     return volumes, chapters
 
@@ -183,20 +183,20 @@ def split_chapters_to_files(ws, output_dir_name="chapters", max_chapters=None, r
     base_dir = os.path.join(ws.reference, output_dir_name)
     meta_path = os.path.join(base_dir, "_volumes.json")
     if os.path.exists(meta_path) and not refresh:
-        print(f"章节拆分已存在，跳过。")
+        print("Chapter split already exists; skipping.")
         return
     if refresh and os.path.isdir(base_dir):
         shutil.rmtree(base_dir)
 
     sample_path = ws.reference_sample
     if not os.path.exists(sample_path):
-        print(f"错误：未找到参考小说文件 {sample_path}")
+        print(f"Error: reference novel file not found: {sample_path}")
         return
 
     volumes, chapters = split_chapters(sample_path, max_chapters=max_chapters)
     groups = group_chapters_by_volume(chapters, volumes)
     scope = f"（仅处理前 {max_chapters} 章）" if max_chapters is not None else ""
-    print(f"解析出 {len(volumes)} 卷，{len(chapters)} 章{scope}")
+    print(f"Parsed {len(volumes)} volumes, {len(chapters)} chapters{scope}")
 
     _fix_chapter_numbering(groups)
 
@@ -218,7 +218,7 @@ def split_chapters_to_files(ws, output_dir_name="chapters", max_chapters=None, r
                 "title": g["title"] + label,
                 "chapters": vol_chapters[start:end],
             })
-        print(f"  {g['title']}（{len(vol_chapters)} 章）→ 拆分为 {num_parts} 个子卷")
+        print(f"  {g['title']} ({len(vol_chapters)} chapters) -> split into {num_parts} sub-volumes")
 
     base_dir = os.path.join(ws.reference, output_dir_name)
     vol_meta = []
@@ -245,12 +245,12 @@ def split_chapters_to_files(ws, output_dir_name="chapters", max_chapters=None, r
             saved += 1
 
         vol_offset += len(vol_chapters)
-        print(f"  {g['title']}: {len(vol_chapters)} 章 → {vol_dir_name}/")
+        print(f"  {g['title']}: {len(vol_chapters)} chapters -> {vol_dir_name}/")
 
     with open(os.path.join(base_dir, "_volumes.json"), "w", encoding="utf-8") as f:
         json.dump(vol_meta, f, ensure_ascii=False, indent=2)
 
-    print(f"\n共保存 {saved} 个章节文件到 {base_dir}")
+    print(f"\nSaved {saved} chapter files to {base_dir}")
 
 
 def load_chapter_text(ws, volume, chapter_num, total_chapters):
@@ -414,18 +414,18 @@ def _write_story_arc_index(vol_dir, arc_items):
 
 
 def _extract_story_arcs_for_volume(vol_idx, volume_title, chapters, llm, outlines_dir, batch_size=20):
-    """按读取窗口提取自然故事情节单元，并从已有片段的末章继续。"""
+    """Extract natural story-arc units by read window, continuing from the last chapter of existing segments."""
     vol_dir = os.path.join(outlines_dir, _vol_dir_name(vol_idx, volume_title))
     arc_path = _arc_dir(vol_dir)
     existing_arcs = _load_story_arc_texts(vol_dir)
     total = len(chapters)
     existing_end = max((item["end_ch"] for item in existing_arcs), default=0)
     if existing_end >= total:
-        print(f"    -> 已存在 {len(existing_arcs)} 个故事情节单元，覆盖至第 {existing_end} 章，跳过提取。")
+        print(f"    -> {len(existing_arcs)} story-arc units already exist, covering through chapter {existing_end}; skipping extraction.")
         return existing_arcs
 
     if existing_arcs:
-        print(f"    -> 已存在 {len(existing_arcs)} 个故事情节单元，续拆第 {existing_end + 1}-{total} 章...")
+        print(f"    -> {len(existing_arcs)} story-arc units already exist; continuing chapters {existing_end + 1}-{total}...")
     carryover = ""
     arc_items = list(existing_arcs)
     arc_idx = max((item["idx"] for item in existing_arcs), default=0) + 1
@@ -437,11 +437,11 @@ def _extract_story_arcs_for_volume(vol_idx, volume_title, chapters, llm, outline
         start_ch = start_idx + 1
         end_ch = end_idx
         is_final_window = "yes" if end_idx >= total else "no"
-        print(f"    -> 识别故事情节（第 {start_ch}-{end_ch} 章，读取窗口 {batch_size} 章）...")
+        print(f"    -> Identifying story arcs (chapters {start_ch}-{end_ch}, read window {batch_size} chapters)...")
 
         prompt = PromptLoader.load(
             "story_arc_extract",
-            previous_carryover=carryover or "无",
+            previous_carryover=carryover or "none",
             start_chapter=start_ch,
             end_chapter=end_ch,
             is_final_window=is_final_window,
@@ -496,21 +496,21 @@ def _extract_story_arcs_for_volume(vol_idx, volume_title, chapters, llm, outline
     carryover_path = os.path.join(arc_path, "_carryover.md")
     if carryover:
         _write_file(carryover_path, carryover)
-        print(f"    -> 仍有未闭合情节续接区：{carryover_path}")
+        print(f"    -> Open carryover still remains: {carryover_path}")
     elif os.path.exists(carryover_path):
         os.remove(carryover_path)
 
-    print(f"    -> 故事情节单元已保存：{len(arc_items)} 个")
+    print(f"    -> Story-arc units saved: {len(arc_items)}")
     return arc_items
 
 
 def _generate_volume_outline_from_arcs(vol_dir, volume_title, total_chapters, llm,
                                        start_chapter=1, end_chapter=None, force=False):
-    """读取故事情节单元，合并生成卷纲。"""
+    """Read story-arc units and merge them into a volume outline."""
     vol_outline_path = os.path.join(vol_dir, "volume_outline.md")
     existing_outline = _read_file(vol_outline_path)
     if existing_outline and not force:
-        print(f"    -> 卷纲已存在，跳过合并。")
+        print("    -> Volume outline already exists; skipping merge.")
         return existing_outline
 
     arc_items = _load_story_arc_texts(vol_dir)
@@ -522,7 +522,7 @@ def _generate_volume_outline_from_arcs(vol_dir, volume_title, total_chapters, ll
     if len(arc_summaries) == 1:
         outline = arc_summaries[0]
     else:
-        print(f"    -> 合并 {len(arc_summaries)} 个故事情节单元为卷纲...")
+        print(f"    -> Merging {len(arc_summaries)} story-arc units into a volume outline...")
         all_subs = _join_prompt_parts(arc_summaries)
         merge_prompt = PromptLoader.load(
             "volume_merge",
@@ -536,15 +536,15 @@ def _generate_volume_outline_from_arcs(vol_dir, volume_title, total_chapters, ll
         outline = normalize_text(llm.generate(merge_prompt))
 
     _write_file(vol_outline_path, outline)
-    print(f"    -> 卷纲已保存：{vol_outline_path}")
+    print(f"    -> Volume outline saved: {vol_outline_path}")
     return outline
 
 
 def extract_volume_outline(vol_idx, volume_title, chapters, llm, outlines_dir, batch_size=20, force=False):
-    """提取单卷卷纲。先抽取故事情节单元，再合并为卷纲。"""
+    """Extract one volume outline: first pull story-arc units, then merge them."""
     vol_dir = os.path.join(outlines_dir, _vol_dir_name(vol_idx, volume_title))
     total = len(chapters)
-    print(f"    [{volume_title}] 共 {total} 章")
+    print(f"    [{volume_title}] {total} chapters")
     _extract_story_arcs_for_volume(vol_idx, volume_title, chapters, llm, outlines_dir, batch_size)
     return _generate_volume_outline_from_arcs(vol_dir, volume_title, total, llm, force=force)
 
@@ -554,10 +554,10 @@ def extract_novel_outline(volume_outlines, llm, outlines_dir, force=False):
     novel_outline_path = os.path.join(outlines_dir, "novel_outline.md")
     existing = _read_file(novel_outline_path)
     if existing and not force:
-        print(f"  -> 完整大纲已存在，跳过。")
+        print("  -> Full outline already exists; skipping.")
         return existing
 
-    print(f"  -> 汇总 {len(volume_outlines)} 卷卷纲，生成完整大纲...")
+    print(f"  -> Combining {len(volume_outlines)} volume outlines into a full outline...")
     all_outlines = _join_prompt_parts(
         f"【{vo['title']}】\n{vo['outline']}"
         for vo in volume_outlines
@@ -565,7 +565,7 @@ def extract_novel_outline(volume_outlines, llm, outlines_dir, force=False):
     prompt = PromptLoader.load("novel_extract", all_volume_outlines=all_outlines)
     novel_outline = normalize_text(llm.generate(prompt))
     _write_file(novel_outline_path, novel_outline)
-    print(f"  -> 完整大纲已保存：{novel_outline_path}")
+    print(f"  -> Full outline saved: {novel_outline_path}")
     return novel_outline
 
 
@@ -603,7 +603,7 @@ def _parse_virtual_volumes(llm_result):
 
 
 def _extract_segment_endpoints(batch_dir):
-    """从故事情节单元或旧批次摘要中提取所有片段结束章节号。"""
+    """Extract every segment end-chapter from story-arc units or old batch summaries."""
     endpoints = set()
     for item in _story_arc_files(batch_dir):
         endpoints.add(item["end_ch"])
@@ -706,7 +706,7 @@ def _copy_chapter_outlines_for_volume(src_dir, dst_dir, start_ch, end_ch):
 
 
 def _generate_virtual_volume_outline(vol_dir, start_ch, end_ch, llm):
-    """读取虚拟卷覆盖的情节单元或旧批次摘要，调用 LLM 生成卷纲。"""
+    """Read story-arc units or old batch summaries covered by a virtual volume, then call the LLM for a volume outline."""
     vol_outline_path = os.path.join(vol_dir, "volume_outline.md")
     existing = _read_file(vol_outline_path)
     if existing:
@@ -756,7 +756,7 @@ def _generate_virtual_volume_outline(vol_dir, start_ch, end_ch, llm):
 
 
 def _extract_segment_ranges(batch_dir):
-    """从故事情节单元或旧批次摘要中提取故事片段章节范围。"""
+    """Extract story-segment chapter ranges from story-arc units or old batch summaries."""
     segments = []
     for item in _story_arc_files(batch_dir):
         segments.append((item["start_ch"], item["end_ch"]))
@@ -816,22 +816,22 @@ def _generate_chapter_outlines_batch(chapters_batch, llm):
 
 
 def _load_existing_volumes(outlines_dir, groups, chapters):
-    """检查是否已有完整的情节单元/旧批次摘要和卷纲。如果有，返回 {volume_outlines, groups}。
+    """If complete story-arc units / old batch summaries and volume outlines exist, return {volume_outlines, groups}.
 
-    支持两种情况：
-    1. 新版：vol_XX_<title>/story_arcs/ 下有 arc 文件和 volume_outline.md
-    2. 旧版：vol_XX_<title>/ 下有 batch 文件和 volume_outline.md
+    Two cases:
+    1. Current: arc files and volume_outline.md under vol_XX_<title>/story_arcs/
+    2. Legacy: batch files and volume_outline.md under vol_XX_<title>/
     """
     if not os.path.isdir(outlines_dir):
         return None
 
-    # 扫描已有的卷目录
+    # Scan existing volume directories
     vol_dirs = _volume_dirs(outlines_dir)
 
     if not vol_dirs:
         return None
 
-    # 检查每个卷目录是否有完整的批次文件和卷纲
+    # Check each volume directory for complete batch files and a volume outline
     volume_outlines = []
     vol_groups = []
     all_complete = True
@@ -847,7 +847,7 @@ def _load_existing_volumes(outlines_dir, groups, chapters):
             all_complete = False
             break
 
-        # 检查新版故事情节单元或旧版批次文件
+        # Check current-format story-arc units or legacy batch files
         arc_files = _story_arc_files(vol_path)
         batch_files = [f for f in os.listdir(vol_path) if re.match(r'^batch_\d+_\d+\.md$', f)]
         if not arc_files and not batch_files:
@@ -889,28 +889,28 @@ def _run_legacy_outline_build(txt_path=None, output_dir=None, batch_size=20, ski
         output_dir = DATA_DIR
 
     if not os.path.exists(txt_path):
-        print(f"错误：未找到小说文件 {txt_path}")
+        print(f"Error: novel file not found: {txt_path}")
         return
 
     outlines_dir = os.path.join(output_dir, "outlines")
 
-    print(f">>> 参考小说大纲梳理启动 <<<")
-    print(f"读取文件：{txt_path}")
-    print(f"输出目录：{outlines_dir}")
+    print(">>> Starting reference-novel outline extraction <<<")
+    print(f"Reading file: {txt_path}")
+    print(f"Output directory: {outlines_dir}")
 
     # 1. 切分章节并识别卷
     volumes, chapters = split_chapters(txt_path, max_chapters=max_chapters)
     scope = f"仅处理前 {max_chapters} 章，" if max_chapters is not None else ""
-    print(f"解析出 {len(volumes)} 卷，{len(chapters)} 章，{scope}每次读取 {batch_size} 章识别故事情节。")
+    print(f"Parsed {len(volumes)} volumes, {len(chapters)} chapters, {scope}reading {batch_size} chapters per window to identify story arcs.")
 
     # 2. 按卷分组
     groups = group_chapters_by_volume(chapters, volumes)
     for g in groups:
         n = len(g['chapters'])
         windows = (n + batch_size - 1) // batch_size
-        print(f"  {g['title']}：{n} 章 -> {windows} 个读取窗口")
+        print(f"  {g['title']}: {n} chapters -> {windows} read windows")
 
-    # 3. 检查是否已有完整的情节单元和卷纲（跳过阶段一）
+    # 3. Skip phase one if complete story-arc units and volume outlines already exist
     existing_volumes = None if resume else _load_existing_volumes(outlines_dir, groups, chapters)
 
     # 4. 初始化 LLM
@@ -918,21 +918,21 @@ def _run_legacy_outline_build(txt_path=None, output_dir=None, batch_size=20, ski
     if not builder_config.get("api_key"):
         builder_config["api_key"] = os.getenv("OPENAI_API_KEY")
     if not builder_config.get("api_key"):
-        print("错误：未检测到 API Key。")
+        print("Error: API Key not detected.")
         return
     llm = LLMProvider(**builder_config)
 
     if existing_volumes:
         # 已有完整数据，跳过阶段一和虚拟分卷
-        print(f"\n--- 阶段一：已跳过（检测到已有故事情节单元/旧批次摘要和卷纲） ---")
+        print("\n--- Phase one skipped (existing story-arc units / old batch summaries and volume outlines detected) ---")
         volume_outlines = existing_volumes["volume_outlines"]
         groups = existing_volumes["groups"]
     else:
-        # 4. 按卷提取故事情节单元和卷纲（增量保存）
-        print(f"\n--- 阶段一：按卷提取故事情节单元和卷纲 ---")
+        # 4. Extract story-arc units and volume outlines per volume (incremental save)
+        print("\n--- Phase one: extract story-arc units and volume outlines per volume ---")
         volume_outlines = []
         for vi, g in enumerate(groups):
-            print(f"\n  处理：{g['title']}")
+            print(f"\n  Processing: {g['title']}")
             outline = extract_volume_outline(
                 vi, g["title"], g["chapters"], llm, outlines_dir, batch_size, force=resume,
             )
@@ -944,7 +944,7 @@ def _run_legacy_outline_build(txt_path=None, output_dir=None, batch_size=20, ski
         f.write("# 参考小说卷纲\n\n")
         for vo in volume_outlines:
             f.write(f"## {vo['title']}\n\n{vo['outline']}\n\n---\n\n")
-    print(f"\n卷纲汇总已保存至：{volume_outline_path}")
+    print(f"\nCombined volume outline saved to: {volume_outline_path}")
 
     # 汇总生成完整大纲
     extract_novel_outline(volume_outlines, llm, outlines_dir, force=resume)
@@ -975,11 +975,11 @@ def run_outline_build(txt_path=None, output_dir=None, batch_size=20, skip_chapte
     )
 
 def resegment(outlines_dir):
-    """基于已有故事情节单元或旧批次摘要重新执行虚拟分卷。
+    """Re-run virtual volume split from existing story-arc units or old batch summaries.
 
-    两种情况：
-    1. vol_01_全书/ 存在：直接从此目录重新分卷。
-    2. 已有虚拟卷目录（含 meta.json）：将所有卷的情节单元/批次摘要汇总到 vol_01_全书/ 并去重，再重新分卷。
+    Two cases:
+    1. vol_01_全书/ exists: re-split from that directory.
+    2. Virtual volume dirs (with meta.json) already exist: gather all volume story-arc units / batch summaries into vol_01_全书/, dedupe, then re-split.
     """
     all_batch_dir = None
     for name in os.listdir(outlines_dir):
@@ -988,14 +988,14 @@ def resegment(outlines_dir):
             break
 
     if not all_batch_dir or not os.path.isdir(all_batch_dir):
-        # 没有全书目录，查找虚拟卷目录并汇总情节单元/批次摘要
+        # No whole-book directory; find virtual-volume dirs and gather story-arc units / batch summaries
         vol_dirs = _volume_dirs(outlines_dir)
 
         if not vol_dirs:
-            print("错误：未找到任何卷目录，无法执行重新分卷。")
+            print("Error: no volume directories found; cannot re-segment volumes.")
             return
 
-        print("  -> 未找到 vol_01_全书，从现有卷目录汇总故事情节单元...")
+        print("  -> vol_01_全书 not found; gathering story-arc units from existing volume directories...")
         all_batch_dir = os.path.join(outlines_dir, _vol_dir_name(0, "全书"))
         os.makedirs(all_batch_dir, exist_ok=True)
         os.makedirs(_arc_dir(all_batch_dir), exist_ok=True)
@@ -1017,9 +1017,9 @@ def resegment(outlines_dir):
         # 删除旧的虚拟卷目录
         for name, vol_path in vol_dirs:
             shutil.rmtree(vol_path, ignore_errors=True)
-            print(f"  -> 已删除旧卷目录：{name}")
+            print(f"  -> Deleted old volume directory: {name}")
 
-        print(f"  -> 已汇总 {len(seen)} 个故事情节单元、{len(seen_batches)} 个旧批次摘要到 vol_01_全书/")
+        print(f"  -> Gathered {len(seen)} story-arc units and {len(seen_batches)} old batch summaries into vol_01_全书/")
 
     # 以下统一处理：优先从 story arcs 读取，旧工作区回退 batch 摘要
     arc_items = _load_story_arc_texts(all_batch_dir)
@@ -1034,7 +1034,7 @@ def resegment(outlines_dir):
                     segment_summaries.append(content)
 
     if not segment_summaries:
-        print("错误：未找到故事情节单元或批次摘要。")
+        print("Error: no story-arc units or batch summaries found.")
         return
 
     batch_summaries = []
@@ -1049,7 +1049,7 @@ def resegment(outlines_dir):
     if not builder_config.get("api_key"):
         builder_config["api_key"] = os.getenv("OPENAI_API_KEY")
     if not builder_config.get("api_key"):
-        print("错误：未检测到 API Key。")
+        print("Error: API Key not detected.")
         return
     llm = LLMProvider(**builder_config)
 
@@ -1063,17 +1063,17 @@ def resegment(outlines_dir):
             if m:
                 total_ch = max(total_ch, int(m.group(1)))
 
-    print(f">>> 虚拟分卷（重新分卷）<<<")
-    print(f"  故事情节单元/摘要：{len(segment_summaries)} 个文件，约 {total_ch} 章")
+    print(">>> Virtual volume split (re-segment) <<<")
+    print(f"  Story-arc units/summaries: {len(segment_summaries)} files, about {total_ch} chapters")
 
     all_batches_text = _join_prompt_parts(segment_summaries)
-    print(f"  -> 调用 LLM 分析故事情节单元，识别卷边界...")
+    print("  -> Calling the LLM to analyze story-arc units and identify volume boundaries...")
     seg_prompt = PromptLoader.load("virtual_volume_segment", batch_summaries=all_batches_text)
     seg_result = normalize_text(llm.generate(seg_prompt))
 
     virtual_volumes = _parse_virtual_volumes(seg_result)
     if not virtual_volumes:
-        print("  警告：LLM 未输出有效分卷结果，保持原状。")
+        print("  Warning: LLM did not output a valid volume split; leaving as-is.")
         return
 
     # 将边界对齐到故事片段端点
@@ -1086,13 +1086,13 @@ def resegment(outlines_dir):
     # 确保覆盖全部章节：首卷从1开始，末卷到 total_ch 结束
     virtual_volumes = _ensure_full_coverage(virtual_volumes, total_ch)
 
-    print(f"  -> 识别出 {len(virtual_volumes)} 卷（已对齐片段边界）：")
+    print(f"  -> Identified {len(virtual_volumes)} volumes (aligned to segment boundaries):")
     for vi, title, sc, ec in virtual_volumes:
-        print(f"     卷{vi}：{title}（第{sc}-{ec}章，{ec - sc + 1}章）")
+        print(f"     Volume {vi}: {title} (chapters {sc}-{ec}, {ec - sc + 1} chapters)")
     covered = sum(ec - sc + 1 for _, _, sc, ec in virtual_volumes)
-    print(f"  -> 覆盖：{covered}/{total_ch} 章")
+    print(f"  -> Coverage: {covered}/{total_ch} chapters")
 
-    # 分配故事情节单元/旧批次文件
+    # Assign story-arc units / legacy batch files
     arc_assignment = _assign_story_arcs_to_volumes(all_batch_dir, virtual_volumes)
     batch_assignment = _assign_batches_to_volumes(all_batch_dir, virtual_volumes)
 
@@ -1102,7 +1102,7 @@ def resegment(outlines_dir):
         vol_dir_name = _vol_dir_name(vi - 1, vol_title)
         vol_dir = os.path.join(outlines_dir, vol_dir_name)
 
-        print(f"  -> 组织卷{vi}（{vol_title}，第{start_ch}-{end_ch}章）...")
+        print(f"  -> Organizing volume {vi} ({vol_title}, chapters {start_ch}-{end_ch})...")
         os.makedirs(vol_dir, exist_ok=True)
         os.makedirs(_arc_dir(vol_dir), exist_ok=True)
         for arc in arc_assignment.get(i, []):
@@ -1116,7 +1116,7 @@ def resegment(outlines_dir):
 
         outline = _generate_virtual_volume_outline(vol_dir, start_ch, end_ch, llm)
         new_volume_outlines.append({"title": vol_title, "outline": outline})
-        print(f"     卷纲已生成")
+        print("     Volume outline generated")
 
     # 删除原始"全书"伪卷目录
     shutil.rmtree(all_batch_dir, ignore_errors=True)
@@ -1129,11 +1129,11 @@ def resegment(outlines_dir):
             f.write(f"## {vo['title']}\n\n{vo['outline']}\n\n---\n\n")
 
     # 重新生成大纲
-    print(f"\n  -> 重新汇总生成大纲...")
+    print("\n  -> Rebuilding the combined outline...")
     extract_novel_outline(new_volume_outlines, llm, outlines_dir, force=True)
 
-    print(f"\n>>> 虚拟分卷完成 <<<")
-    print(f"  卷纲汇总：{volume_outline_path}")
+    print("\n>>> Virtual volume split complete <<<")
+    print(f"  Combined volume outline: {volume_outline_path}")
 
 def _ensure_full_coverage(virtual_volumes, total_ch):
     """确保虚拟卷覆盖全部章节范围：首卷从1开始，末卷到 total_ch 结束，中间无间隙。"""
@@ -1172,14 +1172,14 @@ def _ensure_min_chapters(virtual_volumes, min_chapters=60):
                     nvi, ntitle, ns, ne = result[i + 1]
                     merged = (nvi, ntitle, start_ch, ne)
                     new_result.append(merged)
-                    print(f"  -> 卷{vi}（{ch_count}章）不足{min_chapters}章，合并到卷{nvi}")
+                    print(f"  -> Volume {vi} ({ch_count} chapters) is under {min_chapters} chapters; merging into volume {nvi}")
                     i += 2
                     changed = True
                 # 尝试合并到前一卷
                 elif new_result:
                     pvi, ptitle, ps, pe = new_result[-1]
                     new_result[-1] = (pvi, ptitle, ps, end_ch)
-                    print(f"  -> 卷{vi}（{ch_count}章）不足{min_chapters}章，合并到卷{pvi}")
+                    print(f"  -> Volume {vi} ({ch_count} chapters) is under {min_chapters} chapters; merging into volume {pvi}")
                     i += 1
                     changed = True
                 else:
@@ -1198,12 +1198,12 @@ def _ensure_min_chapters(virtual_volumes, min_chapters=60):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="从参考小说中梳理大纲和卷纲")
-    parser.add_argument("--novel", type=str, required=True, help="工作区名称")
-    parser.add_argument("--batch-size", type=int, default=20, help="每次读取章节数，用于识别故事情节单元（默认20）")
-    parser.add_argument("--max-chapters", type=int, default=None, help="只拆解前 N 章（默认整本）")
-    parser.add_argument("--txt-path", type=str, default=None, help="小说文件路径（默认使用工作区 reference/sample_novel.txt）")
-    parser.add_argument("--output-dir", type=str, default=None, help="输出目录（默认使用工作区 reference/）")
+    parser = argparse.ArgumentParser(description="Extract outlines and volume outlines from a reference novel")
+    parser.add_argument("--novel", type=str, required=True, help="Workspace name")
+    parser.add_argument("--batch-size", type=int, default=20, help="Chapters per read window for identifying story-arc units (default 20)")
+    parser.add_argument("--max-chapters", type=int, default=None, help="Deconstruct only the first N chapters (default: whole book)")
+    parser.add_argument("--txt-path", type=str, default=None, help="Novel file path (default: workspace reference/sample_novel.txt)")
+    parser.add_argument("--output-dir", type=str, default=None, help="Output directory (default: workspace reference/)")
     args = parser.parse_args()
 
     ws = init_workspace(args.novel)

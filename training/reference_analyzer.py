@@ -121,15 +121,15 @@ class ReferenceAnalyzer:
 
     def run(self) -> dict[str, Any]:
         if not self.txt_path.is_file():
-            raise FileNotFoundError(f"未找到参考小说：{self.txt_path}")
+            raise FileNotFoundError(f"Reference novel not found: {self.txt_path}")
 
         volumes, chapters = self._load_chapters()
         total_chapters = len(chapters)
         if not total_chapters:
-            raise RuntimeError("没有识别到有效章节，无法进行参考拆解。")
+            raise RuntimeError("No valid chapters were identified; cannot deconstruct the reference novel.")
         target = min(self.max_chapters or total_chapters, total_chapters)
         if target < 1:
-            raise ValueError("拆解章节数必须是正整数。")
+            raise ValueError("The deconstruction chapter count must be a positive integer.")
 
         source_digest = _file_digest(self.txt_path)
         self._prepare_state(source_digest, total_chapters)
@@ -137,7 +137,7 @@ class ReferenceAnalyzer:
         if self.state.get("resegmented") and not self.rebuild:
             completed_target = previous_target
             if target <= completed_target:
-                print("  已完成参考拆解并执行智能分卷，复用现有分卷结果。")
+                print("  Reference deconstruction and smart volume split already done; reusing existing split.")
                 cards = self.state.get("chapter_cards") or {}
                 return {
                     "target_chapters": completed_target,
@@ -152,15 +152,15 @@ class ReferenceAnalyzer:
         self.previous_target = previous_target
         volume_specs = self._build_volume_specs(volumes, chapters, target)
 
-        print(f">>> 参考小说三阶段拆解启动 <<<")
-        print(f"  单章事实卡：目标第 1-{target}/{total_chapters} 章，并发上限 {self.max_workers}")
+        print(">>> Starting three-stage reference-novel deconstruction <<<")
+        print(f"  Single-chapter fact cards: target chapters 1-{target}/{total_chapters}, concurrency {self.max_workers}")
         cards = self._extract_missing_cards(volume_specs, source_digest)
         self._write_card_index(cards, target, total_chapters)
 
-        print("\n--- 阶段二：基于事实卡滚动提取故事片段 ---")
+        print("\n--- Stage two: rolling story-segment extraction from fact cards ---")
         segment_stats = self._extract_story_segments(volume_specs, cards)
 
-        print("\n--- 阶段三：基于已闭合片段梳理结构 ---")
+        print("\n--- Stage three: structure from closed segments ---")
         structure_stats = self._build_structures(volume_specs, target, total_chapters)
 
         self.state["target_chapters"] = target
@@ -198,16 +198,16 @@ class ReferenceAnalyzer:
             has_legacy = False
         if state and state.get("pipeline_version") != PIPELINE_VERSION:
             if not self.rebuild:
-                raise RuntimeError("检测到旧版参考拆解状态。为避免覆盖现有产物，请使用 --rebuild-reference 显式重建。")
+                raise RuntimeError("Detected a legacy reference-deconstruction state. To avoid overwriting existing artifacts, use --rebuild-reference.")
             self._clear_derived_assets()
             state = {}
         if not state and has_legacy:
             if not self.rebuild:
-                raise RuntimeError("检测到旧版故事片段。新三阶段拆解不会静默覆盖它们；请使用 --rebuild-reference 显式迁移。")
+                raise RuntimeError("Detected legacy story segments. The three-stage deconstruction will not silently overwrite them; use --rebuild-reference.")
             self._clear_derived_assets()
         if state and state.get("source_digest") and state.get("source_digest") != source_digest:
             if not self.rebuild:
-                raise RuntimeError("参考小说源文件已变化。请使用 --rebuild-reference 重新建立单章卡和故事片段。")
+                raise RuntimeError("The reference novel source file has changed. Use --rebuild-reference to rebuild chapter cards and story segments.")
             self._clear_derived_assets()
             state = {}
 
@@ -262,7 +262,7 @@ class ReferenceAnalyzer:
             "arc_count": len(arc_items),
         })
         _write_json(self.state_path, self.state)
-        print(f"  已还原 {len(arc_items)} 个既有故事片段，准备结合新增章节重新检查末尾边界。")
+        print(f"  Restored {len(arc_items)} existing story segments; will recheck the tail boundary with newly added chapters.")
 
     def _has_legacy_outline_assets(self) -> bool:
         if not self.outlines_dir.is_dir():
@@ -346,11 +346,11 @@ class ReferenceAnalyzer:
                 })
 
         if planned:
-            print(f"  待拆单章：{len(planned)} 章；已复用：{len(existing)} 章")
+            print(f"  Chapters still to extract: {len(planned)}; reused: {len(existing)}")
         errors: list[str] = []
         for start in range(0, len(planned), self.card_batch_size):
             batch = planned[start : start + self.card_batch_size]
-            print(f"  并行提取单章事实卡：第 {batch[0]['chapter']}-{batch[-1]['chapter']} 章（{len(batch)} 章）...")
+            print(f"  Extracting single-chapter fact cards in parallel: chapters {batch[0]['chapter']}-{batch[-1]['chapter']} ({len(batch)} chapters)...")
             workers = min(self.max_workers, len(batch))
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {executor.submit(self._extract_one_card, item, source_digest): item for item in batch}
@@ -362,12 +362,12 @@ class ReferenceAnalyzer:
                         errors.append(f"第{item['chapter']}章：{exc}")
                         continue
                     existing[int(card["chapter"])] = card
-                    print(f"    -> 第 {item['chapter']} 章事实卡已保存")
+                    print(f"    -> Chapter {item['chapter']} fact card saved")
             self._update_card_state(existing)
 
         cards = [existing[number] for number in sorted(existing)]
         if errors:
-            raise RuntimeError("单章事实卡存在失败，可直接重试：\n" + "\n".join(errors[:8]))
+            raise RuntimeError("Some single-chapter fact cards failed; you can retry:\n" + "\n".join(errors[:8]))
         return cards
 
     def _extract_one_card(self, item: dict[str, Any], source_digest: str) -> dict[str, Any]:
@@ -385,7 +385,7 @@ class ReferenceAnalyzer:
 
     def _generate_json(self, prompt: str, label: str) -> dict[str, Any]:
         if not self.llm:
-            raise RuntimeError("未配置可用模型。")
+            raise RuntimeError("No usable model is configured.")
         last_error: Exception | None = None
         current_prompt = prompt
         for attempt in range(3):
@@ -394,17 +394,17 @@ class ReferenceAnalyzer:
                 payload = parse_json_response(raw or "")
                 if isinstance(payload, dict):
                     return payload
-                raise ValueError("模型没有返回 JSON 对象")
+                raise ValueError("The model did not return a JSON object")
             except Exception as exc:  # noqa: BLE001 - 需要针对模型格式容错重试。
                 last_error = exc
                 if attempt < 2:
                     current_prompt = (
                         prompt
-                        + "\n\n【上次输出无法解析】\n"
-                        + f"错误：{exc}\n"
+                        + "\n\n[Previous output could not be parsed]\n"
+                        + f"Error: {exc}\n"
                         + "请只返回合法 JSON 对象，不要包含 Markdown 或解释。"
                     )
-        raise RuntimeError(f"{label} JSON 解析失败：{last_error}")
+        raise RuntimeError(f"{label} JSON parse failed: {last_error}")
 
     def _normalize_card(self, payload: dict[str, Any], item: dict[str, Any], source_digest: str) -> dict[str, Any]:
         rhythm = payload.get("chapter_rhythm") or {}
@@ -515,8 +515,8 @@ class ReferenceAnalyzer:
                 break
             is_final_window = force_final and cursor >= len(remaining)
             print(
-                f"  卷{spec['index']}滚动片段：第{window[0]['chapter']}-{window[-1]['chapter']}章"
-                f"（新增 {len(new_cards)}，遗留 {len(carryover)}）..."
+                f"  Volume {spec['index']} rolling segments: chapters {window[0]['chapter']}-{window[-1]['chapter']}"
+                f" (new {len(new_cards)}, carryover {len(carryover)})..."
             )
             prompt = PromptLoader.load(
                 "reference_segment_extract",
@@ -524,7 +524,7 @@ class ReferenceAnalyzer:
                 window_end=window[-1]["chapter"],
                 max_chapters=self.max_chapters_per_segment,
                 is_final_window="yes" if is_final_window else "no",
-                previous_tail_context="（无，本轮按正常滚动窗口识别。）",
+                previous_tail_context="(none; this round uses a normal rolling window.)",
                 chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
             )
             payload = self._generate_json(prompt, f"卷{spec['index']}故事片段")
@@ -585,8 +585,8 @@ class ReferenceAnalyzer:
         if len(window) <= (tail["end_chapter"] - tail["start_chapter"] + 1):
             return
         print(
-            f"  卷{spec['index']}末片段重评：旧第{tail['start_chapter']}-{tail['end_chapter']}章"
-            f" + 上次未闭合尾部 + 新增前{window_end - previous_local_end}章..."
+            f"  Volume {spec['index']} tail-segment re-eval: old chapters {tail['start_chapter']}-{tail['end_chapter']}"
+            f" + previous open tail + first {window_end - previous_local_end} new chapters..."
         )
         prompt = PromptLoader.load(
             "reference_segment_extract",
@@ -600,7 +600,7 @@ class ReferenceAnalyzer:
         payload = self._generate_json(prompt, f"卷{spec['index']}末故事片段边界重评")
         segments = self._normalize_segments(payload, window)
         if not segments or int(segments[-1]["end_chapter"]) < int(tail["end_chapter"]):
-            print("    -> 重评结果未形成可靠的新边界，保留原末片段。")
+            print("    -> Re-evaluation did not form a reliable new boundary; keeping the original tail segment.")
             return
 
         tail["path"].unlink(missing_ok=True)
@@ -701,17 +701,17 @@ class ReferenceAnalyzer:
     @staticmethod
     def _render_segment(segment: dict[str, Any]) -> str:
         return "\n\n".join([
-            f"【情节{segment['segment_id']}：第{segment['start_chapter']}-{segment['end_chapter']}章｜{segment['title']}】",
-            f"情节功能：{segment['narrative_function']}",
-            f"自然边界判断：{segment['boundary_reason']}",
-            f"起承转合：{segment['structure']}",
-            "叙事阶段识别：以单章事实卡归纳当前情节的推进、加压、转折与阶段性收束。",
-            f"主角行动链：{segment['protagonist_action']}",
-            f"矛盾与情绪曲线：{segment['emotion_rhythm']}",
-            f"核心爽点或张力点：{segment['satisfaction_point']}",
-            f"角色与关系变化：{segment['character_changes']}",
-            f"收获与代价：{segment['gains_costs']}",
-            f"伏笔与下个困境：{segment['foreshadowing']}",
+            f"【Arc{segment['segment_id']}: Chapters {segment['start_chapter']}-{segment['end_chapter']} | {segment['title']}】",
+            f"Plot function: {segment['narrative_function']}",
+            f"Boundary reason: {segment['boundary_reason']}",
+            f"Rise and turn: {segment['structure']}",
+            "Narrative stages: summarize advance, pressure, turn, and staged close from single-chapter fact cards.",
+            f"Protagonist action chain: {segment['protagonist_action']}",
+            f"Conflict and emotion curve: {segment['emotion_rhythm']}",
+            f"Core payoff or tension: {segment['satisfaction_point']}",
+            f"Character and relationship change: {segment['character_changes']}",
+            f"Gains and costs: {segment['gains_costs']}",
+            f"Foreshadowing and next bind: {segment['foreshadowing']}",
         ])
 
     @staticmethod
@@ -796,10 +796,10 @@ class ReferenceAnalyzer:
 
     def _generate_text(self, prompt: str, label: str) -> str:
         if not self.llm:
-            raise RuntimeError("未配置可用模型。")
+            raise RuntimeError("No usable model is configured.")
         result = self.llm.generate(prompt, temperature=0.2)
         if not result:
-            raise RuntimeError(f"{label}未获得模型输出。")
+            raise RuntimeError(f"{label} did not receive model output.")
         return result
 
     @staticmethod
@@ -834,7 +834,7 @@ def run_reference_analysis(
     if not config.get("api_key"):
         config["api_key"] = os.getenv("OPENAI_API_KEY")
     if not config.get("api_key"):
-        raise RuntimeError("未检测到参考拆解模型 API Key。")
+        raise RuntimeError("Reference-deconstruction model API Key not detected.")
     analyzer = ReferenceAnalyzer(
         txt_path,
         output_dir,
