@@ -1,0 +1,57 @@
+You are a senior web-novel editor, skilled at titling novels and writing synopses in different platform registers. From the information below, recommend 3 sets of titles and synopses.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+[New novel rough outline]
+{rough_outline}
+
+[Book-length long mainline]
+{long_mainline}
+
+[Literary / Qidian-style requirements] (for experienced readers; texture and anticipation matter)
+Literary title (2-8 words):
+- Steady, spacious, with a sense of scale; hint at the world or the core setting
+- Can carry a literary air without becoming obscure, e.g. *The Silent Dao Codex*, *Shrouding the Heavens*, *Lord of Mysteries*
+- Avoid overly literal genre labels (such as "X Cultivation Record") and avoid slangy, throwaway phrasing
+
+Literary one-line blurb (about 12-20 words):
+- Compress the core conflict and leave aftertaste
+
+Literary full synopsis (about 80-140 words):
+- The prose is steadier; world mystery and scale come first
+- The opening may be a striking line, a world-rule entry, or a dramatic presentation of the protagonist's situation
+- Hint at what is unique in the cultivation or power system; use omission to create curiosity
+- Emphasize depth and distinctive setting so the reader feels "this book is different"
+- Keep enough mystery; do not spell the cheat ability out
+
+[Mass-market / Tomato-style requirements] (for a broad audience; payoff and instant pull matter)
+Mass-market title (2-12 words):
+- Name the core payoff or the contrast directly, so the pitch is obvious at a glance
+- Long titles are allowed (e.g. *I Already Became a Golden Immortal, Why Are You Still a Martial Saint*, *After Rebirth I Became the Villain's White Moonlight*)
+- Colloquial, exaggerated, punchy phrasing is allowed
+
+Mass-market one-line blurb (about 8-15 words):
+- Name the core payoff directly; do not talk around it
+
+Mass-market full synopsis (about 40-80 words):
+- Blunt and fast; lead with the core selling point; keep the rhythm tight
+- Open by throwing the most magnetic setting or contrast ("I transmigrated into XX", "After rebirth I returned to XX")
+- Use short sentences, hard breaks, and rhythmic phrasing
+- Tell the reader plainly what payoff this book will deliver
+- Rhetorical questions and exclamations may be used to raise impact
+
+[Output format]
+Separate each set with "[Recommendation 1] [Recommendation 2] [Recommendation 3]". Each set uses this format:
+
+[Recommendation N]
+[Literary / Qidian]
+Title: XXX
+One-line blurb: XXXX
+Full synopsis: XXXX
+
+[Mass-market / Tomato]
+Title: XXX
+One-line blurb: XXXX
+Full synopsis: XXXX
+
+Output the recommendations directly. Do not add extra explanation.

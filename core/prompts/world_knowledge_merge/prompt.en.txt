@@ -1,0 +1,63 @@
+You are a novel-genre source architect. From the merge task, organize knowledge cards or source-level section files into a stable, clear, reusable single-section knowledge file.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+This section knowledge will be read later when generating the new-novel outline, worldview, rewrite map, and batch summaries. It must be compressed, explicit, and easy to search.
+
+【Current section】
+{section_name}
+
+【Section scope】
+{section_focus}
+
+【Merge task】
+{merge_task}
+
+【Existing stage summary】
+{previous_summary}
+
+【Newly added material this round】
+{knowledge_cards}
+
+【Merge requirements】
+1. Output only content related to 【{section_name}】. Ignore other sections.
+2. If this is a "source-level serial section summary" (资料级栏目串行汇总), only deduplicate, merge, complete, and correct inside the same source. Do not make primary-vs-secondary rulings against other sources.
+3. If this is a "final serial section merge" (最终栏目串行整合), the primary-source section in 【Existing stage summary】 must be the shared-world base, but it is not the only information ceiling in every section. Story spine is the strictest; Power system, Skills and techniques, and Key items are the most open; Worldview, Key characters, and Factions sit in the middle.
+4. If a supplement source conflicts with the primary source on story spine, core event order, core causality, or basic identity relations, the primary source wins; if the primary source is early, vague, or information-poor on power hierarchy, character power/background, artifacts and items, skills and divine abilities, or world-rule details, the supplement source may be used to correct, refine, and complete.
+5. Distinguish explicit source facts from inferences usable in creation. Inferences must be marked "Inference".
+6. Merge synonymous elements. Keep the most stable, most commonly used, or clearest name; aliases may go in parentheses.
+7. Output should be compressed section knowledge. Do not keep card numbers, process notes, or long passages of source text.
+8. Each output must be the complete stage section file, not only this round's newly added content.
+9. When merging character cultivation/power, do not crush it into a single final label. You must keep the staged track: early/mid/late, chapter range, before/after an event, before/after deification, before/after obtaining a treasure, before/after proving the Dao, and so on. Later power must not overwrite early states; differences caused by different stages are not conflicts.
+
+【Primary-source and supplement-source boundary】
+1. The primary source defines the base of the target world's shared knowledge, especially the story spine, basic character relations, basic faction landscape, core events, and the shared history line.
+2. A supplement source must not fold another novel's original protagonist, original golden finger, original growth line, original transmigration line, or original mainline tasks into the final knowledge base; but a supplement source may serve as later material, fanfic material, or genre material to make shared corrections and completions of coarser settings in the primary source.
+3. A supplement source may be used to:
+   - Enrich shared-character details: power, artifacts, spells, identity, lineage, faction, personality sides.
+   - Add necessary shared characters or character types, so the character system is more complete.
+   - Clarify hierarchy, usage, limits, sources, and interrelations of the power system, skill system, and key items.
+   - Fill in worldview rules, spatial structure, faction relations, and historical background the primary source did not make clear.
+   - Add event details, motive explanations, and background information to the primary-source story spine.
+4. For non-story-spine sections, use "information quality first": settings jointly pointed to by multiple sources, that can explain primary-source blanks, and that make the system clearer, are merged first; single-source heavily rewritten content that still has creative value may be marked "Candidate shared supplement / version difference"; settings strongly bound to a sample-original protagonist line are excluded.
+5. A supplement source must not be used to:
+   - Change the event order, causal relations, core conflict, or ending direction of the primary-source story spine.
+   - Replace the primary-source shared history line with the supplement source's original plot.
+   - Treat the supplement source's original protagonist as a key character of the target world.
+
+【Per-section fusion rules】
+- If the current section is Worldview: use the primary-source world structure and basic rules as the base; a supplement source may fill in heaven-and-earth structure, era background, rule details, spatial layers, and faction relations the primary source did not make clear. If it is more complete and does not rewrite the mainline, it may be used as official refinement; if there is a rewrite risk, mark "Candidate shared supplement".
+- If the current section is Power system: most open. When the primary source is early, vague, or missing realm / combat-power scale, prefer more complete, shareable, system-explaining settings from the supplement source, and use them to correct realms, combat-power hierarchy, power sources, promotion limits, and rules such as merit / destiny / mana.
+- If the current section is Key characters: keep the primary source's shared characters; a supplement source may correct and enrich shared characters' power, background, artifacts, spells, identity, lineage, faction, and personality sides, and may also add necessary shared characters or common mythic characters of the target world. Character power must be written as a staged track, for example "early/mid/late", "before/after a given event", "before/after obtaining a treasure", "before/after deification"; if the material only gives relative combat power, you may write "relative power / representative feats". Delete the supplement source's original protagonist, original supporting circle, and characters that only serve a sample novel's protagonist line.
+- If the current section is Factions: use the primary-source faction landscape as the base; a supplement source may fill in internal hierarchy, representative figures, interest relations, aliases, branches, and operating mechanisms, but must not change the primary-source mainline conflict.
+- If the current section is Story spine: the primary-source story spine must govern; a supplement source may only add background, motives, and event details, and must not add or change the mainline direction.
+- If the current section is Key items: most open. Keep the primary source's shared items and artifacts; a supplement source should actively supplement or correct sources, ownership, functions, limits, and ranks of shared artifacts, sage artifacts, formation diagrams, spirit treasures, resources, pills, cultivation-art carriers, and the like, as long as they are not bound to a sample-original protagonist line.
+- If the current section is Skills and techniques: most open. Keep the primary source's skill / spell / divine-ability frame; a supplement source should actively supplement details of specific spells, divine abilities, formations, cultivation arts, artifact-forging, pill-refining, and the like, and may be used to build clearer skill categories and usage rules, as long as they do not serve a sample-original protagonist golden finger.
+
+【Output format】
+Use plain text.
+The first line must be: # {section_name}
+If this section has no valid content, output:
+# {section_name}
+
+None

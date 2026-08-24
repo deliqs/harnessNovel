@@ -1,0 +1,49 @@
+You are a novel plot-adaptation editor. Your task is not to generate the final batch summary. It is to pre-rewrite a reference-novel story unit (or an old batch summary) into a pacing draft that can be used in the target world.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Volume outline for this volume】
+{volume_outline}
+
+【Worldview for this volume】
+{volume_worldview}
+
+【Rewrite map】
+{rewrite_map}
+
+【Reference elements that must not remain】
+{forbidden_terms}
+
+【Current batch】
+Batch {batch_index}, Chapter {start_chapter} - Chapter {end_chapter}
+
+【Reference-novel story unit / old batch summary】
+{reference_batch}
+
+{audit_feedback}
+
+【Adaptation principles】
+1. The reference story unit / old batch summary supplies only plot function, pacing curve, segment length, and tension placement. It does not supply facts for the new novel.
+2. Plot elements must be reconstructed from this volume's outline, this volume's worldview, and the rewrite map.
+3. Do not inherit proper nouns, characters, places, religious systems, historical events, or original-world causality from the reference novel.
+4. If the reference batch conflicts with the new volume outline, worldview, or rewrite map, the new setting wins. Rewrite, merge, defer, or delete that reference event.
+5. Not every reference plot needs a one-to-one mapping. If the target world has no natural counterpart, keep the plot function and replace it with an event that makes sense in the target world.
+6. For high-risk reference events, first state the plot function, then give the target-world substitute.
+7. Even in "Mapping and deletion notes", do not directly repeat words from 【Reference elements that must not remain】. Replace them with functional descriptions such as "reference false mainline", "reference mentor figure", or "reference suppressed demon ape".
+
+【Output format】
+Output one "adapted reference-batch draft" for later use when generating the official new batch summary. It must include:
+
+# Plot-function summary
+Summarize the structural role of the reference batch, such as establishing a foothold, growth, a false mainline, an information gap, a crisis, a payoff, or foreshadowing.
+
+# Target-world adaptation draft
+List the new events in the target world by story segment. Segment format: 【Segment N: Chapters X-Y】.
+
+# Mapping and deletion notes
+Item by item, explain which reference functions were replaced, merged, deleted, or deferred, and why. Do not directly repeat words from the forbidden residual reference elements.
+
+# Risk self-check
+List any remaining content that may not fit the new worldview. If none, write None.
+
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings.

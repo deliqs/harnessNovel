@@ -1,0 +1,105 @@
+You are a professional novel-plot designer. From this volume's outline and worldview, generate a batch summary for the specified chapter range of this volume.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+A batch summary is a high-level description of the core plot across a multi-chapter range. It is used to guide later chapter-by-chapter outline generation.
+
+【Priority】
+When generating, process information in the following priority order:
+1. Volume outline for this volume
+2. Worldview for this volume
+3. Rewrite map
+4. Previous batch summaries
+5. Adapted reference-batch draft
+6. Original reference story units / old batch summaries
+
+If lower-priority material conflicts with higher-priority material, the higher-priority material wins.
+
+【Volume outline for this volume】
+{volume_outline}
+
+【Worldview for this volume】
+{volume_worldview}
+
+【Rewrite map】(all later plot must obey this)
+{rewrite_map}
+
+【Plot-reasonability constraints】
+{forbidden_terms}
+
+【Current batch】 Batch {batch_index}, covering Chapter {start_chapter} - Chapter {end_chapter}
+
+【Previous batch summary】(the immediate predecessor of the current batch; it must be continued)
+{previous_batch}
+
+【Adapted reference-batch draft】(a pacing draft usable in the target world)
+{adapted_reference_batch}
+
+【Corresponding reference-novel story unit / old batch summary】(used only to check pacing; settings must not be inherited directly)
+{reference_batch}
+
+{audit_feedback}
+
+{previous_result}
+
+【Generation requirements】
+Your task is to generate a complete plot summary for the current batch. It must continue the plot development of the previous batch, while referring to the pacing and tension curve of the "adapted reference-batch draft".
+
+The original reference-novel story unit / old batch summary may be used only to learn the following:
+1. Plot function
+2. Setup-development-turn-resolution structure
+3. Segment length
+4. Pacing curve
+5. Placement of payoffs, crises, reversals, and foreshadowing
+
+Do not inherit from the reference material anything that conflicts with the current new-novel outline, this volume's outline, or this volume's worldview:
+1. Original-world historical events and mainline tasks
+2. Original-world faction relations, stage identities, and religious / faction causality
+3. Cross-world content that does not match the current stage
+4. Hard reskins that only change names while keeping the original event logic
+
+Note: in fanfic, all-heavens, or mythic works, character names, artifact names, and world names themselves may appear legally. Do not judge something unusable merely because a name matches the reference novel; the key is whether it is reasonable in the current new-book setting and the current stage.
+
+If a plot in the reference material has no natural counterpart in the target world, you must keep its plot function and replace it with an event that makes sense in the new worldview, or merge, delete, or defer it.
+
+Output format:
+Organize the batch by story segments. Story segments must be judged from the natural plot boundaries of the current new novel, forming a relatively complete small arc of setup, development, turn, and resolution. Do not cut by a fixed chapter count, and do not split chapter by chapter.
+
+Each segment begins with 【Segment N: Chapters X-Y】 (N starts at 1) and contains the following fields (every field must be filled in completely):
+
+1. Core events: What happens in this segment. Write the cause, the course, and the result. Include concrete proper nouns such as character names, faction names, and place names. Show the protagonist's action chain: plan → what is encountered → what the result is → how they adjust and respond.
+
+2. Conflict and emotion: This segment's conflict direction (external conflict, or internal cultivation / psychology). The emotion curve, with emphasis on suppression points and explosion points. Mark the protagonist's emotional tone at the end of the segment.
+
+3. Character actions: Key action sequences of the main characters, joined with arrows. Focus on who did what, why they did it, and what consequences followed.
+
+4. Protagonist state: At the end of this segment, the protagonist's identity, power, situation, and cognitive state. What has changed compared with the start of the segment.
+
+5. Foreshadowing and clues: Newly planted foreshadowing and how it was planted; recovered earlier foreshadowing and how it was recovered; information gaps (who holds key information and who does not know it).
+
+6. Continuity: How this segment connects to the previous segment (causal continuation, time skip, scene switch, and so on). The suspense or setup this segment leaves at the end for what follows.
+
+After all segments, output whole-batch summary information in the following blocks. Every block must be complete; none may be skipped. For a block with no relevant content, write None.
+
+# Power system
+Cultivation realms, cultivation-art types, artifact grades, special rules, special abilities, and similar items that appear or are involved in this batch. Each entry format: name | type | brief description | chapters of appearance
+
+# Newly introduced characters
+Characters who first appear in this batch. Each character includes: name | identity | abilities and specialties | relationship to the protagonist | core motive
+
+# Key character states
+The situation and changes of each key character at the end of this batch.
+
+# Protagonist growth
+The protagonist's changes in this batch: power breakthroughs, status changes, resources obtained, cognitive gains. Mark triggers and chapters.
+
+# Per-chapter pacing
+Annotate each chapter separately: pacing (fast / medium / slow) | chapter-end hook type (suspense / crisis / reversal / new mystery / information reveal) | tension level (1-5). Summarize as this batch's pacing curve (for example "fast-fast-slow-medium-fast"), and mark the chapter of peak tension.
+
+# Cross-chapter causal chain
+Event in Chapter X → result in Chapter Y. Mark the causal transmission chain to make the driving relationships among events clear.
+
+【Output requirements】
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings. Separate paragraphs with blank lines.
+
+Before output, you must self-check: events, character motives, faction relations, and worldview elements in this batch must fit the new-novel outline, this volume's outline, this volume's worldview, and the current stage; do not write old-world causality from the reference novel as facts of the new novel.

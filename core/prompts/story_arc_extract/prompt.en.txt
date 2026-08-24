@@ -1,0 +1,71 @@
+You are a professional web-novel structure analyst. From the previous pass's open carryover and this pass's chapter prose, identify naturally formed "story-arc units".
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+A story-arc unit is not a fixed chapter count, and it is not a template stamped on mechanically. It is a relatively complete minimal plot arc: it has a trigger, an advance, and a staged result, and later imitation can reuse it as an independent structural unit.
+
+【Previous-pass open carryover】
+{previous_carryover}
+
+【Current reading window】
+Chapter {start_chapter} - Chapter {end_chapter}
+
+【Whether this is the last reading window of this volume】
+{is_final_window}
+
+【Chapter prose】
+{chapters_text}
+
+【Identification principles】
+1. Judge natural plot boundaries from the novel's actual content. Do not cut by a fixed chapter count.
+2. One arc unit usually covers 2-8 chapters, but it may be shorter or longer. The criterion is plot function and staged closure, not chapter count.
+3. The common power-fantasy cycle (situation established, goal set, crisis planted, emotional tug, attempt to solve, core payoff, result feedback, gains tallied, new bind opened) is only an identification dimension, not a hard template; not every arc must contain every stage.
+4. If the tail of the current window is only setup for a new arc and has not yet formed a staged result, do not force it into a complete arc. Put it in Open carryover for the next pass to keep analyzing.
+5. If this is the last reading window of this volume, you may shape tail material that is not fully closed but already has a clear staged result into a "close / transition arc"; if it is still only fragment setup, keep it in the open zone and state why.
+6. Arc units must not overlap. Chapter ranges must be continuous or jump naturally. Do not drop chapters that have already formed a complete arc.
+7. Keep concrete information: character names, faction names, places, artifacts, techniques, resources, conflict causes, results, and later hooks.
+
+【Each arc unit must contain】
+Plot function: for example opening foothold, crisis planted, first payoff, face-slap / showing off, breakthrough upgrade, resource scramble, side line opened, foreshadowing planted, information revealed, staged gains, map-change transition, and so on. Fill from actual content.
+Boundary reason: why it starts at Chapter X and ends at Chapter Y; what staged result forms at the end.
+Rise and turn: write the trigger, advance, turn, and close.
+Narrative stages: list the stages this arc actually contains; for missing stages, say whether they are naturally absent, delayed, or folded into another arc.
+Protagonist action chain: goal -> judgment -> action -> resistance -> adjustment -> result.
+Conflict and emotion curve: pressure points, tug points, burst points, aftertaste; if this is not a payoff arc, still write the emotional function.
+Core payoff or tension: if there is no strong payoff, write "no strong payoff; mainly carries … function".
+Character and relationship change: important characters' actions, stances, and relationship changes.
+Gains and costs: material gains; power / status / knowledge / relationship changes; costs paid.
+Foreshadowing and next bind: newly planted foreshadowing, paid-off foreshadowing, information gaps, next-arc hook.
+
+【Output format】
+Use plain text only. Do not use Markdown list marks (such as *, -, >, |).
+
+First output completed arcs:
+
+# Completed arcs
+
+Each arc must start with this title:
+【ArcN: Chapters X-Y | name】
+
+Then output by field:
+Plot function:
+Boundary reason:
+Rise and turn:
+Narrative stages:
+Protagonist action chain:
+Conflict and emotion curve:
+Core payoff or tension:
+Character and relationship change:
+Gains and costs:
+Foreshadowing and next bind:
+
+After all completed arcs, output:
+
+# Open carryover
+
+If there is no open carryover, write None.
+If there is, write clearly:
+Chapters involved:
+What has already happened:
+Why it is still open:
+What the next pass should keep watching:

@@ -8,6 +8,7 @@ _CN_MAP = {'零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
 _CN_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
 
 _CH_NUM_RE = re.compile(r'第([一二三四五六七八九十百千零\d]+)章')
+_EN_CH_NUM_RE = re.compile(r'(?:Chapter|Ch\.?)\s+(\d+)', re.I)
 
 
 def _cn_to_int(s):
@@ -74,9 +75,12 @@ def _int_to_cn(n):
 
 def _extract_novel_chapter_num(title):
     """从章节标题中提取小说章节编号。返回整数，提取失败返回 None。"""
-    m = _CH_NUM_RE.search(title)
+    m = _CH_NUM_RE.search(title or "")
     if m:
         return _cn_to_int(m.group(1))
+    m = _EN_CH_NUM_RE.search(title or "")
+    if m:
+        return int(m.group(1))
     return None
 
 

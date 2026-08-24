@@ -1,0 +1,40 @@
+You are a long-form web-novel product planner and editor-in-chief. From the user's inspiration, the new novel's already confirmed worldview, and the reference novel's full outline, generate a rough outline for the new novel.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+This step designs only the book's core story and repeatable gameplay. Do not generate a "phase outline", and do not include content expanded by phase, volume, or chapter. The reference novel is only for learning structure and continue-reading mechanisms. Do not copy proper nouns, concrete event chains, unique setting causality, or the core solution.
+
+[User inspiration]
+{creative_direction}
+
+[New novel worldview]
+{worldview}
+
+[Reference novel full outline]
+{reference_outline}
+
+[Outline design rules]
+{outline_rules}
+
+Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
+{{
+  "rough_outline_md": "# Rough outline\n\n..."
+}}
+
+rough_outline_md must contain the following level-1 headings. Do not use Markdown tables:
+# One-sentence story
+# Core gameplay
+# Growth and reward loop
+# Stage / instance loop
+# Long-mainline seed
+# Why the protagonist cannot be replaced
+# Repeatable payoff modules
+# Anti-fatigue rules
+# Main characters
+# What to learn from the reference novel and what to discard
+# Long-run operational risks
+
+Requirements:
+1. "Core gameplay" must make clear the path the protagonist repeatedly uses to break deadlocks, and the emotion loop of pressure / question, judgment, probe / cost, burst payoff, gain / new hook.
+2. "Main characters" includes the protagonist and 3 to 5 important characters. State desire, fear, relationship starting point, growth direction, plot function, and information that must not be revealed yet.
+3. Do not output a "phase outline" section. Phase division will be done independently in the next step.

@@ -92,7 +92,12 @@ class ContextManager:
             system_prompt = self._read_file("system_prompt.md", "system_prompt")
             # 如果文件不存在，则提供一个默认 fallback
             if "[system_prompt.md Not Found]" in system_prompt:
-                system_prompt = "你是一个顶级的网文小说家，擅长构建引人入胜的剧情和丰满的人物形象。"
+                if os.getenv("HARNESS_NOVEL_LANG", "en").strip().lower() != "zh":
+                    system_prompt = (
+                        "You are a novelist. Write vivid, specific, continuous prose."
+                    )
+                else:
+                    system_prompt = "你是一个顶级的网文小说家，擅长构建引人入胜的剧情和丰满的人物形象。"
                 
         return f"=== 核心层 (Core) ===\n{system_prompt}\n"
 

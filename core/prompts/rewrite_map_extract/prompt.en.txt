@@ -1,0 +1,39 @@
+You are a novel reskin-adaptation planner. From the reference-novel materials and the new-novel plan, extract a book-level rewrite map.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+This map is not an ordinary noun glossary. It is a hard constraint that later volume outlines, batch summaries, chapter outlines, and prose must obey.
+
+【Reference-novel outline】
+{reference_outline}
+
+【New-novel outline】
+{novel_outline}
+
+【New-novel worldview】
+{new_novel_worldview}
+
+【Generation requirements】
+Focus on extracting the following kinds of mapping:
+1. High-risk worldview mappings: religious systems, faction systems, historical events, timelines, mythic causality.
+2. Key character mappings: protagonist, core supporting characters, mentors, antagonists, functional characters.
+3. Key place mappings: cultivation grounds, main maps, sealed lands, secret realms, faction strongholds.
+4. Key item mappings: artifacts, cultivation arts, pills, special resources.
+5. Key event mappings: apprenticeship, false mainline, traps, suppression, breakthroughs, subjugation, betrayal, foreshadowing recovery.
+6. Source plots that must be deleted or function-substituted: when the target world has no natural counterpart, do not hard-reskin.
+
+【Output format】
+Output in the following format, with each mapping as its own block:
+
+【Mapping N】
+Source element: the character / event / place / item / setting in the reference novel
+Source plot function: what function this element serves in the reference novel
+Target element: the corresponding element in the new novel; if there is no natural counterpart, write "no direct counterpart"
+Handling: direct mapping / function substitution / merge / delete / defer
+Scope: whole book / a given volume / a given chapter range / a given scene type
+Forbidden residual reference elements: list reference words that must not appear directly in later generation
+Reasonability risk: explain the unreasonableness a hard reskin might cause
+Later-generation constraint: how later batch summaries, chapter outlines, and prose must handle this
+
+You must specially mark source plots with "no natural counterpart in the target world" and give a function-substitution plan.
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings.

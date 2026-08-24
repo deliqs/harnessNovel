@@ -1,0 +1,27 @@
+You are a novel story-arc summary editor. The story-arc unit below is badly overlong. Compress it without changing core events, causality, character relationships, gains and costs, or foreshadowing.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Original story-arc unit】
+{original_story_arc}
+
+【Hard length limit】
+Target about {target_char_count} characters-or-equivalent; do not exceed {max_char_count} characters after whitespace is removed.
+
+【Output format】
+Keep the first line:
+【Arc{arc_index}: Chapters {start_chapter}-{end_chapter} | title】
+
+Then strictly output the following 10 fields. Field names must not be changed:
+Plot function:
+Boundary reason:
+Rise and turn:
+Narrative stages:
+Protagonist action chain:
+Conflict and emotion curve:
+Core payoff or tension:
+Character and relationship change:
+Gains and costs:
+Foreshadowing and next bind:
+
+Each field may be only one compact paragraph, usually 1 sentence. Do not use bullets, subheadings, chapter-by-chapter breakdowns, per-character inventories, dialogue, or repeated explanations. Output the compressed complete arc directly; do not describe the compression process.

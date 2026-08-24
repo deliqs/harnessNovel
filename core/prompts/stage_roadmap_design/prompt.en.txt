@@ -1,0 +1,62 @@
+You are a long-form web-novel stage / instance designer. Based on the core gameplay and the book-length long mainline, design the "book-length stage roadmap" for the new novel.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+A "stage" here is not a traditional volume outline. It is an instance environment suited to showing the core gameplay: starter village, academy, secret realm, battlefield, city, sect, court, ruin, cross-world region, and so on. Every stage has rules, resources, enemies, allies, a goal, rewards, and aftermath.
+
+[User creative direction]
+{creative_direction}
+
+[Core gameplay document]
+{core_gameplay}
+
+[Book-length long mainline]
+{long_mainline}
+
+[Target world knowledge base] (optional)
+{world_knowledge}
+
+[Design requirements]
+Treat the whole book as the protagonist challenging a sequence of stages / instances. Do not write it as a traditional "what happens in chapter N" plot recap.
+
+Each stage is the top-level unit for later story-arc generation. Every stage must state:
+1. The stage's gameplay value: which face of the core gameplay it shows.
+2. The stage's relation to the long mainline: which long line this stage advances, misdirects, conceals, or pays off.
+3. Stage rules: what limits the protagonist, and what creates pressure.
+4. Short lines inside the stage: several small goals, small crises, small reversals, small payoffs, small gains, and small hooks that can move the reader's emotions.
+5. Stage resources: what the protagonist can obtain.
+6. Stage enemies and allies: who blocks, who witnesses, who becomes bound.
+7. State change after the stage ends: how the protagonist's power, identity, resources, cognition, and relationships change.
+8. What must not be revealed or completed yet.
+
+[Structure requirements]
+1. Do not write any document-level title (for example "# Stage roadmap" or "# Stage design"). The first stage in the body starts directly at a level-1 heading; do not write a general title first.
+2. Each stage must be organized with a level-1 heading, flush left, with only one #. The format must be exactly: # Stage N: Stage name (N increases from 1). Do not use ## / ###, do not use bold **Stage N**, and do not use a numbered list or a table to represent stages; the stage heading must occupy its own line.
+3. Each stage must include "Planned chapters", so later story-arcs can infer this stage's chapter count; the format is: Planned chapters: 12-15 chapters (write the numbers).
+4. Do not output "reserve stages for later".
+5. Do not output "stage iteration rules".
+6. If a new stage is needed later, it will be inserted by a separate command from new inspiration.
+
+[Output format]
+Output plain text. Use # for stage headings. Do not use Markdown tables. Do not wrap the whole document in a code fence.
+
+# Stage 1: Name
+Planned chapters:
+Stage function:
+Gameplay value:
+Long mainline advance:
+Stage rules:
+Short lines inside the stage:
+Main resources:
+Main enemies/pressure:
+Allies/witnesses:
+Character nodes:
+End state:
+Aftermath and hooks:
+Must not happen yet:
+
+# Stage 2: Name
+Output in the same format.
+
+# Stage 3: Name
+Output in the same format.

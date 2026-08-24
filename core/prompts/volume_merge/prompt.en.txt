@@ -1,0 +1,41 @@
+You are a professional novel-analysis expert. Below are story-unit summaries (or old batch summaries) from the same volume. Merge them into a complete volume outline.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Volume title】{volume_title}
+【Range of this volume】Chapter {start_chapter} - Chapter {end_chapter}, {total_chapters} chapters in total, {total_batches} plot units / summaries.
+
+【Plot units / summaries】
+{batch_summaries}
+
+【Merge requirements】
+Merge the story units into a structured volume outline containing the following five blocks. A plot unit is the smallest structural unit; do not smash it apart just to force a three-act structure.
+
+I. Volume-outline overview
+1. In one sentence, summarize this volume's core conflict and the protagonist's goal.
+2. This volume's conflict direction (external / internal) and core upgrade items (power, status, resources, romance, and so on).
+
+II. Three-act structure
+Lay out this volume's plot in three acts:
+Act I (opening): introduce the conflict, the protagonist meets the initial challenge, the first payoff.
+Act II (development): conflict escalates, an accident explodes, the darkest moment.
+Act III (climax and close): the turnaround, the climax explosion, the close and the suspense that leads into the next volume.
+Mark the chapter range of each act. Use story segments as the smallest unit; do not smash segments apart.
+
+III. Character roster
+Complete files for all important characters in this volume: identity, personality, abilities, relationship thread with the protagonist, and key actions and changes in this volume.
+Distinguish: protagonist, core supporting characters, antagonists, functional characters.
+
+IV. Foreshadowing tracking
+1. Foreshadowing planted in this volume (unresolved).
+2. Foreshadowing recovered in this volume (from earlier volumes).
+3. Cross-volume clues: suspense or setup this volume leaves at the end for the next volume.
+
+V. Core payoffs
+List this volume's 2-3 most important climax scenes. For each, mark:
+1. The suppression and setup before the scene (how many times suppression accumulated).
+2. The turning mechanism at the explosion.
+3. The spoils and growth gained after the payoff is released.
+
+【Output format】
+Use plain text. Do not use Markdown formatting symbols (such as *, **, -, >, |, and the like). Use # for headings. Separate paragraphs with blank lines.

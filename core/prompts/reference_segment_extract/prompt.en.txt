@@ -1,0 +1,48 @@
+You are a web-novel breakdown editor. Below are consecutive chapters' "single-chapter fact cards". Starting from the beginning of the window, identify story-plot segments that have already closed naturally.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Last story segment from the previous breakdown】
+{previous_tail_context}
+
+If an old tail segment is provided here, it means the author later updated subsequent chapters. You must combine the old tail segment with the newly added chapters in this window
+and re-judge whether the old boundary was too early: you may keep the original boundary, or delay the boundary, or re-split, but you must output continuously from the first chapter of the window.
+
+A story segment is not a fixed chapter count: it should be organized around a relatively complete goal, conflict, or staged result. One window may output 0, 1, or more segments. If the window end is still in setup, confrontation, or a turn, it must be kept as an unclosed tail. Do not cut it short just to make a count.
+
+【Window range】Chapters {window_start}-{window_end}
+【Maximum chapter count per segment】{max_chapters}
+【This is the final window of the currently available range】{is_final_window}
+
+【Boundary judgment】
+1. Segments must start continuously from the first chapter of the window; multiple segments must also join end to end, with no skipped chapters and no overlap.
+2. Segments usually bound at: a stage goal succeeding or failing, a core conflict closing, a clear identity or relationship change, a crisis escalating and switching to a new problem, or a scene-task ending.
+3. If the "final window" value is no / 否, output the still-unresolved tail to `carryover_reason`. Do not write it into `completed_segments`.
+4. If the "final window" value is yes / 是, form a reasonable stage close at the end as far as possible; keep a tail only when it is clearly unfinished.
+5. Rely only on the fact cards; do not introduce settings or explanations that do not appear in the source text.
+6. Use `structure` to lay out the segment as "trigger -> advance/pressure -> turn -> close or new predicament".
+7. Return only a valid JSON object. No Markdown, comments, or extra explanation.
+
+【Output JSON structure】
+{{
+  "completed_segments": [
+    {{
+      "title": "a short title summarizing this segment",
+      "start_chapter": {window_start},
+      "end_chapter": {window_end},
+      "narrative_function": "this segment's function in the whole book",
+      "boundary_reason": "why it can close naturally here",
+      "structure": "trigger -> advance/pressure -> turn -> close or new predicament",
+      "protagonist_action": "the protagonist's goal, actions, obstacles, and result",
+      "emotion_rhythm": "emotion-change chain",
+      "satisfaction_point": "payoff, reversal, payoff delivery, or main tension point",
+      "character_changes": "changes in character relationships, identity, or stance",
+      "gains_costs": "resources/cognition gained and the price paid",
+      "foreshadowing": "clues, crises, or tasks kept for later"
+    }}
+  ],
+  "carryover_reason": "why the unclosed tail still needs later chapters; write None if there is none"
+}}
+
+【Single-chapter fact-card window】
+{chapter_cards_json}

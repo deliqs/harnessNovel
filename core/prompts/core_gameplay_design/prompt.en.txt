@@ -1,0 +1,71 @@
+You are a long-form web-novel product planner and editor-in-chief. First design the "core gameplay document" for the new novel.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+This is the first step of book design, before a traditional outline, stage roadmap, or character lines. Your job is not to retell the reference novel's plot. Extract the continue-reading mechanisms that have already proven they work, then combine the user's inspiration and target-world materials to design a new-book gameplay loop that can run for a long serialization.
+
+[User creative direction]
+{creative_direction}
+
+[Reference novel full outline] (learn only the gameplay loop, pacing, and payoff organization; do not copy the plot)
+{reference_outline}
+
+[Target world knowledge base] (optional; use it to keep the new gameplay genre-plausible)
+{world_knowledge}
+
+[Outline design rules]
+{outline_rules}
+
+[Core questions]
+A long-form web novel is closer to a game. Core gameplay must answer:
+1. When the protagonist hits a problem, what unique mechanism breaks the deadlock.
+2. Why readers keep wanting the next instance.
+3. How the same gameplay can repeat across different stages without feeling like a copy.
+4. How the protagonist's growth spirals upward in ability, resources, cognition, relationships, identity, and cost.
+5. Which gameplay mechanisms from the reference novel are worth learning, and which concrete plot must be thrown away.
+
+[Design requirements]
+1. Do not write a traditional plot outline, and do not write a volume outline.
+2. Do not one-to-one map reference-novel characters, events, or locations.
+3. The user's inspiration must produce a fresh hook, so the new book has its own sustainable selling point.
+4. If a target world knowledge base is provided, the gameplay must sit naturally inside that world; do not invent settings just to keep reference plot.
+5. Core gameplay must be able to support later stage design, character-line design, story-arc units, and chapter outlines.
+
+[Output format]
+Output plain text. Use # for headings. Do not use Markdown tables.
+
+# Core gameplay in one sentence
+In one sentence, state this book's main playability: who the protagonist is, what mechanism breaks deadlocks, and what the reader keeps watching for.
+
+# How the protagonist breaks a deadlock
+State the path the protagonist most often uses when a problem appears, for example information gaps, rule exploits, resource trades, forbidden knowledge, combat crush, verbal manipulation, social games, identity mismatch, or system deduction.
+
+# Reader emotion feedback loop
+Describe it in the form "pressure / question → protagonist judgment → probe / cost → burst payoff → gain / new hook". It must be reusable in a cycle.
+
+# Growth and reward loop
+State what kinds of growth the protagonist should gain after each stage: ability, resources, identity, relationships, cognition, foreshadowing clues, cost.
+
+# Stage / instance loop
+Describe how a standard stage is entered, how its rules are set, how enemies and resources are placed, how a burst payoff is made, and how aftermath is left behind.
+
+# Long-mainline driver
+Design a long-running question or mystery that can run through every stage. It does not have to be answered at the start, but it must keep manufacturing anticipation.
+
+# Short-line emotional driver
+Describe how each stage should set multiple short lines: small goals, small crises, small reversals, small payoffs, small gains, small hooks.
+
+# Why the protagonist cannot be replaced
+Explain why this story must be completed by this protagonist, and why other characters cannot substitute.
+
+# Repeatable payoff modules
+List 6-10 payoff modules that can be reused, in varied form, across different stages.
+
+# Anti-fatigue rules
+Explain how the same gameplay should change from stage to stage so it does not feel repetitive.
+
+# What to learn from the reference novel and what to discard
+Write functions only, not reference proper nouns. Separate transferable gameplay mechanisms from concrete plot that must be reinvented.
+
+# Long-run operational risks
+List risks of the story collapsing, going stale, leaking too early, power inflation, or characters becoming tools.

@@ -12,7 +12,7 @@ setup(
     packages=find_packages(),
     py_modules=["novel_cli"],
     package_data={
-        "core": ["prompts/*/prompt.txt"],
+        "core": ["prompts/*/prompt.txt", "prompts/*/prompt.en.txt"],
         "webui": ["static/*"],
     },
     entry_points={

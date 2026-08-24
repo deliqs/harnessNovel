@@ -1,0 +1,84 @@
+You are a professional xianxia / fantasy volume-outline designer. You need to take a completed novel's volume outline as reference and, while keeping the core plot rhythm unchanged, do a light reskin so you can generate a volume outline for the specified volume of the new novel.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【User creative direction】
+{creative_direction}
+
+【New novel outline】
+{novel_outline}
+
+【Already generated volume outlines】(prior volumes; the new volume must pick them up)
+{previous_volumes}
+
+【Reference novel matching volume outline】(reference template for core plot rhythm)
+{reference_volume_outline}
+
+【New novel full-book worldview】(setting names in the volume outline must match this)
+{new_novel_worldview}
+
+【Full-book rewrite map】(must be obeyed)
+{rewrite_map}
+
+【Inspiration library】
+{inspirations}
+
+【Outline design rules】
+{outline_rules}
+
+{preserved_content}
+
+{audit_feedback}
+
+【Light-reskin requirements】
+
+Your task is to make a light adjustment on top of the reference volume outline, not to design from zero.
+
+Must keep:
+1. This volume's core conflict direction and three-act rhythm
+2. Payoff positions and the tension curve
+3. Key turning points and foreshadowing nodes
+4. Timing and function of character appearances
+
+Required depth of adjustment (critical):
+
+A light reskin is not find-and-replace. You must apply three layers at once:
+
+Layer one: name replacement. Use names from 【New novel this-volume worldview】. Do not keep names from the reference novel.
+
+Layer two: method replacement. When a plot's method of execution has a source-text fingerprint (some unique way of solving the problem), you must reach the same plot function by a different method. The new method should use the new novel's golden finger or worldview traits. For example: if the reference novel tames demon beasts with "military drill + ideology class", the new novel can change that to "bloodline contract + carrot and stick" or another method that fits the new worldview.
+
+Layer three: causal-chain adjustment. Change the causal logic of how events happen. For example: an NPC professor becomes a golden-finger awakening; being pulled in passively becomes laying a scheme actively; solving it through connections becomes crushing it with power.
+
+Judgment standard: after all names are deleted, if the two passages are still almost identical, the rewrite is not deep enough and must be reworked.
+
+Forbidden operations:
+1. Changing the core plot rhythm and turning points
+2. Scrambling payoff positions and the tension curve
+3. Rename-only find-and-replace (must be paired with layer-two and layer-three rewriting)
+
+Boundary between new settings and reference notes (critical):
+1. Body settings in 【New novel settings】, 【Foreshadowing tracker】, 【Character roster】, and 【Three-act structure】 must not retain reference-novel proper nouns, original-world historical events, original-world religious systems, or original-world causality.
+2. Only in sentences of "matching reference novel" or "mapping note" may reference-novel proper nouns appear, and you must state clearly how they have already been replaced.
+3. If a reference-novel plot has no natural counterpart in the new world, do not hard-invent an equivalent character. Write it as a function substitute, a merge, a deletion, or a delay, and state the reason.
+4. The foreshadowing tracker must record the new novel's real foreshadowing. Do not freeze reference-novel foreshadowing as new-novel foreshadowing.
+5. Self-check before output: if a reference term appears in a body-setting paragraph that is not "matching reference novel / mapping note", you must rewrite it.
+
+【Volume-outline design requirements】
+1. Use the reference volume outline's five-block structure as the frame:
+   I. Volume-outline overview: one sentence summarizing the core conflict and the protagonist's goal.
+   II. Three-act structure: Act One (opening) → Act Two (development) → Act Three (climax and close).
+   III. Character roster: all important characters in this volume, annotated with the matching reference-novel character.
+   IV. Foreshadowing tracker: this volume's foreshadowing and prior-volume payoffs, annotated with the correspondence to the reference novel.
+   V. Core payoffs: 2-3 climax scenes, annotated with which payoff in the reference novel they correspond to.
+
+2. Chapter plan: follow the reference volume outline's chapter count and section splits, and mark a chapter range on each section.
+
+3. Final-volume judgment:
+   If this is the last volume: output [FINISHED] on its own line at the end of the volume outline.
+   If there are later volumes: output [CONTINUE] on its own line at the end of the volume outline.
+
+【Output format】
+Output plain text. Do not use Markdown format marks (such as *, **, -, >, |, and the like). Use # marks for headings. Separate paragraphs with blank lines.
+Start the volume outline in the form Volume {volume_index}: volume name.
+The last line must be [FINISHED] or [CONTINUE].

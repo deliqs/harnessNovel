@@ -24,15 +24,19 @@ SUPPORTED_TEXT_EXTS = {
 }
 
 CHAPTER_HEADER_RE = re.compile(
-    r'^[ \t　]*(\d+\.)?第[一二三四五六七八九十百千零\d]+[章回节]'
-    r'(\s*[（(]\d+[）)])?\s*.+',
-    re.MULTILINE,
+    r'^[ \t　]*(?:(?:\d+\.)?第[一二三四五六七八九十百千零\d]+[章回节]'
+    r'(?:\s*[（(]\d+[）)])?\s*.+|(?:Chapter|Ch\.?)\s+\d+\b.*)',
+    re.MULTILINE | re.IGNORECASE,
 )
 CHAPTER_HEADER_FALLBACK = re.compile(
-    r'(^[ \t　]*第[一二三四五六七八九十百千零0-9]+[章回节].{0,60}?)\n',
-    re.MULTILINE,
+    r'(^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+[章回节].{0,60}?'
+    r'|(?:Chapter|Ch\.?)\s+\d+\b.{0,60}?)\n)',
+    re.MULTILINE | re.IGNORECASE,
 )
-VOLUME_TITLE_RE = re.compile(r'^[ \t　]*第[一二三四五六七八九十百千零0-9]+卷\b')
+VOLUME_TITLE_RE = re.compile(
+    r'^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+卷\b|(?:Volume|Book|Vol\.?)\s+\d+\b)',
+    re.IGNORECASE,
+)
 
 WORLD_SECTIONS = [
     ("世界观", "资料的宇宙结构、时代背景、天地规则、历史阶段、核心矛盾和世界运行逻辑。"),
@@ -51,6 +55,40 @@ CANON_INDEX_SECTIONS = (
     "公共物品与法宝", "公共技能与法术", "力量体系关键词",
     "世界观规则关键词", "待补充类别",
 )
+
+# English headings from generation; stored under the Chinese canonical key.
+_HEADING_ALIASES = {
+    "Worldview": "世界观",
+    "Power system": "力量体系",
+    "Key characters": "关键人物",
+    "Factions": "势力描述",
+    "Story spine": "故事主线",
+    "Key items": "关键物品",
+    "Skills and techniques": "技能体系",
+    "Shared characters": "公共人物",
+    "Shared factions": "公共势力",
+    "Shared places": "公共地点",
+    "Shared events and history": "公共事件与历史线",
+    "Shared items and artifacts": "公共物品与法宝",
+    "Shared skills and spells": "公共技能与法术",
+    "Power-system keywords": "力量体系关键词",
+    "Worldview-rule keywords": "世界观规则关键词",
+    "To be filled": "待补充类别",
+}
+_EMPTY_SECTION_BODIES = {"", "无", "none", "none.", "(none)"}
+
+
+def _heading_names(section_name):
+    names = [section_name]
+    for alias, canonical in _HEADING_ALIASES.items():
+        if canonical == section_name:
+            names.append(alias)
+    return names
+
+
+def _heading_re(section_name):
+    alt = "|".join(re.escape(n) for n in _heading_names(section_name))
+    return re.compile(rf"(?m)^#\s*(?:{alt})\s*$", re.I)
 
 
 # ── 路径工具 ──
@@ -113,7 +151,7 @@ def _write_file(path, content):
 def _require_headings(content, headings, label):
     missing = [
         heading for heading in headings
-        if not re.search(rf"(?m)^#\s*{re.escape(heading)}\s*$", content or "")
+        if not _heading_re(heading).search(content or "")
     ]
     if missing:
         raise RuntimeError(f"{label}缺少必要栏目：{'、'.join(missing)}。本轮结果未写入，请重试。")
@@ -527,26 +565,30 @@ def _assign_source_roles(records, primary_source=None):
 
 def _render_section_document(section_name, content):
     content = (content or "").strip()
-    if not content:
-        return f"# {section_name}\n\n无"
     if content.startswith("#"):
-        return content
-    return f"# {section_name}\n\n{content}"
+        _, _, rest = content.partition("\n")
+        body = rest.strip()
+    else:
+        body = content
+    if body.lower() in _EMPTY_SECTION_BODIES:
+        body = ""
+    if not body:
+        return f"# {section_name}\n\n无"
+    return f"# {section_name}\n\n{body}"
 
 
 def _split_sections_from_document(content):
     sections = {}
     content = normalize_text(content or "")
     for idx, (section_name, _) in enumerate(WORLD_SECTIONS):
-        pattern = re.compile(rf"(?m)^#\s*{re.escape(section_name)}\s*$")
-        match = pattern.search(content)
+        match = _heading_re(section_name).search(content)
         if not match:
             sections[section_name] = f"# {section_name}\n\n无"
             continue
 
         next_start = len(content)
         for next_section, _ in WORLD_SECTIONS[idx + 1:]:
-            next_match = re.search(rf"(?m)^#\s*{re.escape(next_section)}\s*$", content[match.end():])
+            next_match = _heading_re(next_section).search(content[match.end():])
             if next_match:
                 next_start = match.end() + next_match.start()
                 break

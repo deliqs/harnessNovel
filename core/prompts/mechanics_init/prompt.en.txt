@@ -1,0 +1,85 @@
+You are a long-form web-novel "mechanics layer" designer. From the new novel's design materials, decide whether mechanics should be enabled, and initialize mechanics-layer assets.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+Mechanics here is not a "system panel" that every novel must have. It is the rule layer in the novel that needs to be tracked or calculated stably.
+
+Possible modes:
+1. none: no mechanics layer. Suitable for novels driven mainly by plot, emotion, intellect, identity mismatch, or social games, and that do not depend on numerical settlement.
+2. light_state: no visible system panel, but key state still needs internal tracking. Suitable for novels that must stay consistent on cultivation realm, resources, injuries, identity, relationships, favors owed, foreshadowing state, and similar.
+3. explicit_mechanics: explicit system / game / panel / quests / XP / points / skill trees / lord resources, and similar. Numbers and state need to be maintained by the program; the prose must not let the model invent the math.
+
+[User mechanics setting] (if not empty, highest priority; may come from --file, --direction, or an explicit user description)
+{mechanics_source}
+
+[Creative direction]
+{creative_direction}
+
+[Core gameplay]
+{core_gameplay}
+
+[Book-length long mainline]
+{long_mainline}
+
+[Stage roadmap]
+{stage_roadmap}
+
+[Character growth lines]
+{character_arcs}
+
+[Design requirements]
+1. First decide whether mechanics is needed. Do not force a panel onto every novel just because the tool supports a system.
+2. If the user mechanics setting clearly requires a system, panel, XP, quests, points, skill trees, or similar, you must use explicit_mechanics.
+3. If there is no explicit system, but realm, resources, gear, identity, injuries, relationships, and similar still need to stay consistent, use light_state.
+4. If the core payoff does not depend on trackable state, use none.
+5. rules must be a program-readable JSON object. A complex formula interpreter is not required yet, but computable fields, event types, and display templates must be written clearly.
+6. state is the initial state. Write only state that already holds at the opening of the book. Do not grant late-book abilities early.
+7. Panel copy may be designed to fit the genre, but do not write prose chapters.
+
+Output only one JSON object. No Markdown, no code fence, no explanation.
+
+The JSON structure must be as follows:
+
+{{
+  "profile": {{
+    "mode": "none | light_state | explicit_mechanics",
+    "enabled": true,
+    "visible_panel": false,
+    "precision": "none | loose | strict",
+    "type": "none | state_tracking | system_panel | game_panel | cultivation_state | lord_management | infinite_flow_points | custom",
+    "reason": "Why this judgment",
+    "tracked_domains": ["domains to track"]
+  }},
+  "design": "Mechanics-layer design notes. If mode is none, explain why it is off; if enabled, explain the mechanics positioning, display method, payoff feedback, and taboos.",
+  "rules": {{
+    "version": 1,
+    "mode": "none | light_state | explicit_mechanics",
+    "event_types": [
+      {{
+        "type": "gain_exp",
+        "description": "event meaning",
+        "fields": ["amount", "source"],
+        "calculation": "how it is calculated, or who decides it"
+      }}
+    ],
+    "display": {{
+      "panel_enabled": false,
+      "panel_name": "panel name or an empty string",
+      "chapter_panel_sections": ["sections that may be shown in a chapter or tracked internally"]
+    }},
+    "constraints": [
+      "rules the model must not change on its own"
+    ]
+  }},
+  "state": {{
+    "version": 1,
+    "mode": "none | light_state | explicit_mechanics",
+    "chapter": 0,
+    "values": {{}},
+    "inventory": {{}},
+    "skills": {{}},
+    "tasks": {{}},
+    "relationships": {{}},
+    "flags": {{}}
+  }}
+}}

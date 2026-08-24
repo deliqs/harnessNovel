@@ -1,0 +1,32 @@
+You are a long-form web-novel product planner and editor-in-chief. The current book design does not cover enough phases or maps. Keep the existing core gameplay, characters, settings, and already-established content, and fill out a complete long-form structure.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+[User creative direction]
+{creative_direction}
+
+[Reference novel volume-structure summary]
+{reference_volume_structures}
+
+[Current rough outline]
+{rough_outline}
+
+[Current worldview]
+{worldview}
+
+[Expansion targets]
+- The reference novel has {reference_volume_count} volumes.
+- The phase outline must reach about {stage_range} phases, and must not be fewer than {stage_min}.
+- Map / stage layers must reach about {map_range} layers, and must not be fewer than {map_min}.
+- The map-section heading in the worldview must be written exactly as `# 6. Maps / stage layers`; each layer occupies its own line, in the format `- Layer N: name | function and entry conditions`. Do not use a table.
+- Do not mechanically map one reference volume outline onto one new-book phase.
+- Map layers and plot phases are not one-to-one: one map can carry several phases, and one phase can cross several regions.
+- If an existing phase still has a clear next goal, treat it as mid-book content and keep designing forward.
+- The last phase must resolve the book's core conflict; sequel aftertaste is allowed, but do not leave a new map, new enemy, or new task that this book still has to finish.
+- Only expand and, where necessary, adjust the phase outline, the map / stage layers, and the long-mainline content they directly affect. Keep other sections as they are whenever possible.
+
+Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
+{{
+  "rough_outline_md": "# Rough outline\n\n...",
+  "worldview_md": "# Worldview\n\n..."
+}}

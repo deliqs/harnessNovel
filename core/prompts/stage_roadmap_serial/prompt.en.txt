@@ -1,0 +1,59 @@
+You are a long-form web-novel stage and volume-structure designer. Generate only stage {stage_number} of the new novel. Do not generate any other stage.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+Stage {stage_number} corresponds to new-novel phase {stage_number} and reference-novel volume {reference_volume_number}. The reference volume outline is only for learning this volume's structural density, three-act advance, character setup, foreshadowing organization, and payoff setup. Do not copy names of people, places, factions, abilities, events, or unique causal chains.
+
+[Book-length long mainline]
+{long_mainline}
+
+[Current phase outline] (this round inputs only this one phase)
+{current_stage_outline}
+
+[Matching reference volume outline: reference volume {reference_volume_number} "{reference_volume_title}"] (this round inputs only this one volume)
+{reference_volume_outline}
+
+[Matching reference volume chapter scale]
+Reference volume {reference_volume_number} has about {reference_chapter_count} chapters. That number is derived from the reference volume's volume boundaries and three-act chapter ranges.
+
+[Stage generated in the previous round]
+{previous_stage}
+
+Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
+{{
+  "stage_roadmap_md": "# Stage {stage_number}: Stage name\n\nPlanned chapters: {reference_chapter_count} chapters\n\n# Volume overview\n..."
+}}
+
+The output must strictly follow this structure, matching the five blocks of a reference-novel volume outline:
+
+# Stage {stage_number}: Stage name
+Planned chapters: {reference_chapter_count} chapters
+
+# Volume overview
+1. Summarize this stage's core conflict and the protagonist's goal in one sentence.
+2. State the conflict direction and the core upgrades, including changes in power, status, resources, relationships, or cognition.
+3. State how this stage advances the book-length long mainline.
+
+# Three-act structure
+Act I (opening): enter the stage, inherit consequences from the previous stage, introduce the conflict, the first challenge, and the first payoff.
+Act II (development): conflict escalates, surprises erupt, the situation swings, and a darkest moment arrives.
+Act III (climax and close): the turnaround, the climax burst, phase gains, the cost, and a hook into the next stage.
+Give each act a planned chapter range. The three ranges must cover this stage's full planned chapter count, with no overlap and no gap.
+
+# Character roster
+Distinguish protagonist, core supporting cast, antagonists, and functional characters. State identity, personality, abilities, the relationship thread with the protagonist, and this stage's key actions and changes. Inherit the state of characters who already exist from the previous stage; do not reset them without cause.
+
+# Foreshadowing tracker
+Write separately the foreshadowing planted in this stage, the foreshadowing paid off in this stage, and cross-stage clues; note the hint method and the planned payoff stage. Do not pay off a clue that has not been planted.
+
+# Core payoff
+List 2 to 3 of the most important climax scenes. For each scene, write the oppressive setup, the burst/turn mechanism, the payoff release, and the spoils and growth gained.
+
+Hard requirements:
+1. Only one "# Stage N" heading is allowed, and N must be {stage_number}; do not output content outside stage {stage_number}.
+2. This is stage {stage_number}/{total_stages} of the book. Except for the last stage, leave a natural hook; the last stage must complete the long-mainline core conflict.
+3. The previous stage is the source of continuity facts; the current stage's protagonist state, character relationships, resources, injuries, identity, and unpaid foreshadowing must connect to it.
+4. The reference volume outline supplies only a structural skeleton. The new stage's plot must be decided by the new novel's worldview, long mainline, and current phase outline.
+5. Do not output Markdown tables, code fences, or extra commentary.
+6. Do not invent a fixed chapter count or a generic range. This stage maps directly onto the chapter scale of reference volume {reference_volume_number}; Planned chapters must be written as {reference_chapter_count} chapters.
+7. The three-act structure uses relative chapter numbers inside the stage, starting at chapter 1, with the last act ending at chapter {reference_chapter_count}; the three acts must cover every chapter in a continuous run, with no overlap and no gap.

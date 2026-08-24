@@ -13,20 +13,36 @@ from core.config import ConfigLoader
 from core.text_utils import normalize_text
 from core.workspace import NovelWorkspace, init_workspace
 
-# 独立行且长度合理的卷标题：如 "第一卷 斩落金锁听玄音"
-VOLUME_HEADER_RE = re.compile(r'^[ \t　]*第[一二三四五六七八九十百千零0-9]+卷\s+\S+', re.MULTILINE)
+# 独立行且长度合理的卷标题：如 "第一卷 斩落金锁听玄音" / "Volume 2 Title"
+VOLUME_HEADER_RE = re.compile(
+    r'^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+卷\s+\S+'
+    r'|(?:Volume|Book|Vol\.?)\s+\d+\b.*)',
+    re.MULTILINE | re.IGNORECASE,
+)
 
-# 章节标题：如 "1.第一章 标题"、"第一章 标题"、"第一章（1）标题"、"第一章 (2) 标题"
-CHAPTER_HEADER_RE = re.compile(r'^[ \t　]*(\d+\.)?第[一二三四五六七八九十百千零\d]+[章回节](\s*[（(]\d+[）)])?\s*.+', re.MULTILINE)
-CHAPTER_HEADER_FALLBACK = re.compile(r'(^[ \t　]*第[一二三四五六七八九十百千零0-9]+[章回节卷].{0,40}?)\n', re.MULTILINE)
-VOLUME_TITLE_RE = re.compile(r'^[ \t　]*第[一二三四五六七八九十百千零0-9]+卷\b')
+# 章节标题：如 "1.第一章 标题"、"第一章 标题"、"Chapter 12: Title"、"Ch. 12"
+CHAPTER_HEADER_RE = re.compile(
+    r'^[ \t　]*(?:(?:\d+\.)?第[一二三四五六七八九十百千零\d]+[章回节]'
+    r'(?:\s*[（(]\d+[）)])?\s*.+|(?:Chapter|Ch\.?)\s+\d+\b.*)',
+    re.MULTILINE | re.IGNORECASE,
+)
+CHAPTER_HEADER_FALLBACK = re.compile(
+    r'(^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+[章回节卷].{0,40}?'
+    r'|(?:Chapter|Ch\.?)\s+\d+\b.{0,40}?)\n)',
+    re.MULTILINE | re.IGNORECASE,
+)
+VOLUME_TITLE_RE = re.compile(
+    r'^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+卷\b|(?:Volume|Book|Vol\.?)\s+\d+\b)',
+    re.IGNORECASE,
+)
 
 # 卷目录名格式：vol_01_卷名
 VOL_DIR_RE = re.compile(r'^vol_(\d+)_(.+)$')
 ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
 ARC_HEADER_RE = re.compile(
-    r'^【情节(?:\d+)?[：:]\s*第(\d+)-(\d+)章(?:[｜|：:](.*?))?】',
-    re.MULTILINE,
+    r'^【(?:情节(?:\d+)?[：:]\s*第|Arc\s*\d+[：:]\s*Chapters?\s*)'
+    r'(\d+)\s*[-–—]\s*(\d+)\s*章?(?:[｜|：:]\s*(.*?))?】',
+    re.MULTILINE | re.IGNORECASE,
 )
 
 
@@ -310,12 +326,18 @@ def _parse_story_arc_result(result):
         return [], ""
 
     carryover = ""
-    carry_match = re.search(r'^# 未闭合情节续接区\s*$', result, re.MULTILINE)
+    carry_match = re.search(
+        r'^#\s*(?:未闭合情节续接区|Open carryover)\s*$',
+        result,
+        re.MULTILINE | re.IGNORECASE,
+    )
     arc_part = result
     if carry_match:
         arc_part = result[:carry_match.start()]
         carryover = result[carry_match.end():].strip()
-        if carryover in {"无", "无。", "（无）"}:
+        if carryover in {"无", "无。", "（无）"} or carryover.lower() in {
+            "none", "none.", "(none)",
+        }:
             carryover = ""
 
     matches = list(ARC_HEADER_RE.finditer(arc_part))

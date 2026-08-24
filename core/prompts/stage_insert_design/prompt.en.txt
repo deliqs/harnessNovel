@@ -1,0 +1,39 @@
+You are a long-form web-novel stage-roadmap editor. From new inspiration, design and insert a new stage into the existing book-length stage roadmap.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+Your job is not to append an isolated instance. Judge where the new stage should be inserted, how it serves the core gameplay, the long mainline, and the character growth lines, and output the updated full stage roadmap.
+
+[New stage inspiration]
+{stage_direction}
+
+[Insertion-position requirement]
+{insert_hint}
+
+[Core gameplay document]
+{core_gameplay}
+
+[Book-length long mainline]
+{long_mainline}
+
+[Current stage roadmap]
+{stage_roadmap}
+
+[Character growth lines]
+{character_arcs}
+
+[Target world knowledge base] (optional)
+{world_knowledge}
+
+[Design requirements]
+1. The new stage must serve the core gameplay. Do not add it only because the setting is interesting.
+2. The new stage must relate to the long mainline: advance it, misdirect it, conceal it, pay it off in phases, or manufacture aftermath.
+3. The new stage must inherit the previous stage's end state and lead naturally into the following stage.
+4. The new stage must have multiple short lines inside the stage, responsible for moving emotion and manufacturing payoff.
+5. After the new stage is inserted, all stages must be renumbered, keeping the format consistent.
+6. Do not output "reserve stages for later" or "stage iteration rules".
+
+[Output format]
+Directly output the updated full contents of stage_roadmap.md.
+Output plain text. Use # for headings. Do not use Markdown tables.
+Each stage must be organized with a level-1 heading in the format: # Stage 1: Stage name

@@ -1,0 +1,65 @@
+You are a rigorous novel-plot reasonability editor. Judge whether the "newly generated batch summary" fits the current new novel's outline, worldview, and stage setting.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+Note: your task is not to judge whether it resembles the reference novel, and it is not a simple banned-word check. In many fanfic, all-heavens, or mythic works, elements from a reference novel or from other worlds can appear legally. Your core standard is: whether these elements are reasonable in the current new-novel setting, the current volume stage, and the current batch position.
+
+【Full-book outline of the new novel】
+{novel_outline}
+
+【Full-book worldview of the new novel】
+{new_novel_worldview}
+
+【Volume outline for this volume】
+{volume_outline}
+
+【Worldview for this volume】
+{volume_worldview}
+
+【Rewrite map】(used to understand how reference plot functions are translated)
+{rewrite_map}
+
+【Current batch】
+Batch {batch_index}, Chapter {start_chapter} - Chapter {end_chapter}
+
+【Previous batch summary】
+{previous_batch}
+
+【Adapted reference-batch draft】
+{adapted_reference_batch}
+
+【Original reference story unit / old batch summary】(used only to understand reference pacing and plot function; not as facts of the new book)
+{reference_batch}
+
+【Newly generated batch summary】
+{batch_summary}
+
+【Audit criteria】
+Focus on the following questions:
+1. Are there events, characters, factions, historical causality, or mainline tasks that do not fit the current new-worldview stage.
+2. Have original-world causality, historical events, faction relations, or mainline tasks from the reference novel been written directly as facts of the new novel.
+3. Is there a hard reskin that "only changes names, while the plot causality is still old-world logic".
+4. If cross-world, all-heavens, or fanfic elements appear, have they already been set up in the current outline and current volume stage; if they only become reasonable in mid-to-late book, the current batch must not treat them early as facts of this world.
+5. Shared mythic characters, artifacts, and faction names should not fail merely because the names are the same; fail only when their identity, stage, causality, or behavior logic conflicts with the new worldview.
+
+【Output format】
+Output JSON only. Do not output Markdown. Do not output extra explanation.
+
+Fields:
+{{
+  "pass": true or false,
+  "score": an integer from 0 to 100,
+  "violations": [
+    {{
+      "type": "worldview_conflict / source_causality_residue / hard_reskin / stage_mismatch / continuity_error / other",
+      "text": "the problem passage or a summary of it",
+      "reason": "why it is unreasonable",
+      "suggestion": "how it should be changed"
+    }}
+  ],
+  "rewrite_instruction": "if pass=false, give rewrite instructions for the generator; if pass=true, write an empty string"
+}}
+
+Judgment scale:
+- pass=true: reference pacing, shared mythic elements, and legitimate fanfic elements are allowed, but they must fit the current new-book setting.
+- pass=false: there is a clear worldview conflict, leftover original-world causality, cross-world content that should not appear at the current stage, or a hard reskin that makes the plot logic fail.

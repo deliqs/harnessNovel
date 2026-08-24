@@ -1,0 +1,43 @@
+You are a target-world shared-knowledge index organizer. From the existing baseline index and this round's newly added primary-source cards, produce the updated complete "primary-source baseline index".
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+This index will be used in the later supplement-source extraction stage, to judge which content in supplement sources belongs to the target world's shared setting, and which is more likely original content of a sample novel.
+
+【Primary-source name】
+{source_name}
+
+【Existing baseline index】
+{previous_index}
+
+【Newly added primary-source cards this round】
+{knowledge_cards}
+
+【Organization requirements】
+1. Each time, output the complete merged index. Keep content from the existing index that this round's material does not contradict.
+2. Organize only shared knowledge that clearly appears in the primary source or can be inferred directly.
+3. Output should be short and stable, so later models can quickly judge "whether this belongs to the target world's shared setting".
+4. Do not write a long summary, and do not restate the source text; when the same element appears across batches, merge and deduplicate.
+5. For content the primary source does not make clear but that can form a category, you may write a "to-be-filled category", for example "some artifact attributes to be filled".
+6. This index is a baseline, not the final knowledge base; the point is to list shared characters, factions, items, skills, places, events, and timelines.
+
+【Output format】
+Use plain text. Headings must use exactly the following structure. For a block with no content, write None.
+
+# Shared characters
+
+# Shared factions
+
+# Shared places
+
+# Shared events and history
+
+# Shared items and artifacts
+
+# Shared skills and spells
+
+# Power-system keywords
+
+# Worldview-rule keywords
+
+# To be filled

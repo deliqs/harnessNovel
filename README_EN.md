@@ -63,6 +63,8 @@ Update:
 pip install --upgrade harnessNovel
 ```
 
+This fork defaults to English generation via `HARNESS_NOVEL_LANG=en` (default). Set `HARNESS_NOVEL_LANG=zh` for upstream Chinese prompts. CLI and web UI strings remain Chinese.
+
 <h2 align="left"><img src="docs/heading-web-en.svg" alt="Local Web Workbench" height="32"></h2>
 
 The project provides a local visual workbench. Book design, stage design, story arcs, chapter outlines, and draft generation all support multi-round dialogue — you can iteratively adjust the results through conversation and confirm only when satisfied.

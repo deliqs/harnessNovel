@@ -59,13 +59,10 @@ _STAGE_CODE_FENCE_RE = re.compile(r"^\s*```.*$", re.IGNORECASE)
 
 
 def _normalize_stage_roadmap(text):
-    """把舞台路线图规整为稳定格式：每个舞台写成一级标题「# 舞台N：名称」，并去除文档总标题与代码围栏。
-
-    仅改写「舞台标题行」、移除干扰项；正文（预计章节数、阶段功能等）原样保留。幂等。
-    在写盘前与解析前统一调用，避免下游因标题层级/写法差异识别不到舞台。
-    """
+    """Normalize stage headers to `# Stage N: name` (English) or `# 舞台N：名称` (zh)."""
     if not text:
         return ""
+    english = os.getenv("HARNESS_NOVEL_LANG", "en").strip().lower() != "zh"
     output_lines = []
     for line in text.splitlines():
         if _STAGE_CODE_FENCE_RE.match(line):
@@ -74,7 +71,10 @@ def _normalize_stage_roadmap(text):
         if header:
             number = int(header.group(1))
             name = header.group(2).strip().strip("*#：:.- ").strip()
-            output_lines.append(f"# 舞台{number}：{name}" if name else f"# 舞台{number}：")
+            if english:
+                output_lines.append(f"# Stage {number}: {name}" if name else f"# Stage {number}:")
+            else:
+                output_lines.append(f"# 舞台{number}：{name}" if name else f"# 舞台{number}：")
             continue
         if _STAGE_TITLE_LINE_RE.match(line):
             continue
@@ -1751,12 +1751,25 @@ def _completed_stage_prefix(stage_roadmap, target_count):
     return parts
 
 
+_VOLUME_STYLE_SECTIONS_ZH = ("卷纲概览", "三幕结构", "人物谱系", "伏笔追踪", "核心爽点")
+_VOLUME_STYLE_SECTIONS_EN = (
+    "Volume overview", "Three-act structure", "Character roster",
+    "Foreshadowing tracker", "Core payoff",
+)
+
+
 def _is_volume_style_stage(content):
-    required = ("卷纲概览", "三幕结构", "人物谱系", "伏笔追踪", "核心爽点")
-    return (
-        all(name in (content or "") for name in required)
-        and bool(re.search(r"预计章节数\s*[：:]\s*\d+", content or ""))
+    text = content or ""
+    has_sections = (
+        all(name in text for name in _VOLUME_STYLE_SECTIONS_ZH)
+        or all(name in text for name in _VOLUME_STYLE_SECTIONS_EN)
     )
+    has_count = bool(re.search(
+        r"(?:预计章节数|Planned chapters?)\s*[：:]\s*\d+",
+        text,
+        re.I,
+    ))
+    return has_sections and has_count
 
 
 def _reference_volume_chapter_count(volume, volume_outline):
@@ -2094,7 +2107,11 @@ def gen_stage_design(
                     f"舞台{number}生成结果编号无效（检测到 {numbers or '无编号'}），"
                     "已保留此前舞台，请重试继续。"
                 )
-            required_sections = ("卷纲概览", "三幕结构", "人物谱系", "伏笔追踪", "核心爽点")
+            required_sections = (
+                _VOLUME_STYLE_SECTIONS_EN
+                if any(name in stage for name in _VOLUME_STYLE_SECTIONS_EN)
+                else _VOLUME_STYLE_SECTIONS_ZH
+            )
             missing_sections = [name for name in required_sections if name not in stage]
             if not _is_volume_style_stage(stage):
                 raise RuntimeError(
@@ -3305,9 +3322,10 @@ def _infer_stage_chapter_count(stage_text):
     if not stage_text:
         return 0
     range_patterns = [
-        r'预计章节数[：:]\s*(\d+)\s*[-—~至到]\s*(\d+)',
-        r'章节数[：:]\s*(\d+)\s*[-—~至到]\s*(\d+)',
-        r'预计\s*(\d+)\s*[-—~至到]\s*(\d+)\s*章',
+        r'预计章节数[：:]\s*(\d+)\s*[-—–~至到to]+\s*(\d+)',
+        r'Planned chapters?[：:]\s*(\d+)\s*[-—–~to]+\s*(\d+)',
+        r'章节数[：:]\s*(\d+)\s*[-—–~至到to]+\s*(\d+)',
+        r'预计\s*(\d+)\s*[-—–~至到to]+\s*(\d+)\s*章',
     ]
     for pattern in range_patterns:
         m = re.search(pattern, stage_text)
@@ -3316,6 +3334,7 @@ def _infer_stage_chapter_count(stage_text):
 
     patterns = [
         r'预计章节数[：:]\s*(\d+)',
+        r'Planned chapters?[：:]\s*(\d+)',
         r'章节数[：:]\s*(\d+)',
         r'预计\s*(\d+)\s*章',
         r'共\s*(\d+)\s*章',
@@ -4308,7 +4327,7 @@ def _cap_story_line_in_outline(text, limit=STORY_LINE_LIMIT):
     header_idx = None
     same_line = ""
     for idx, line in enumerate(lines):
-        match = re.match(r"^\s*#{0,6}\s*故事线\s*[:：]?\s*(.*)$", line)
+        match = re.match(r"^\s*#{0,6}\s*(?:故事线|Story line|Storyline)\s*[:：]?\s*(.*)$", line, re.I)
         if match:
             header_idx = idx
             same_line = (match.group(1) or "").strip()
@@ -4330,7 +4349,11 @@ def _cap_story_line_in_outline(text, limit=STORY_LINE_LIMIT):
     if len(content) <= limit:
         return text
     capped = _truncate_plus_chain(content, limit)
-    header_clean = re.match(r"\s*#{0,6}\s*故事线", lines[header_idx]).group(0)
+    header_clean = re.match(
+        r"\s*#{0,6}\s*(?:故事线|Story line|Storyline)",
+        lines[header_idx],
+        re.I,
+    ).group(0)
     new_lines = lines[:header_idx] + [header_clean, capped] + lines[end:]
     return "\n".join(new_lines)
 
@@ -5054,6 +5077,17 @@ def _repair_chapter_style(llm, chapter_text, violations, cancel_event=None, max_
     raise RuntimeError(f"正文风格硬校验未通过（{labels}），已停止写入，请重试本章。")
 
 
+def _load_system_prompt_guide(ws, project_root):
+    custom = _read_file(os.path.join(ws.file_system, "writing", "system_prompt.md"))
+    if custom:
+        return custom
+    if os.getenv("HARNESS_NOVEL_LANG", "en").strip().lower() != "zh":
+        english = _read_file(os.path.join(project_root, "core", "system_prompt.en.md"))
+        if english:
+            return english
+    return _read_file(os.path.join(project_root, "core", "system_prompt.md"))
+
+
 def _humanize_chapter_text(
     llm,
     ws,
@@ -5065,8 +5099,7 @@ def _humanize_chapter_text(
     _backup_raw_chapter(ws, volume, chapter_num, chapter_text)
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     writing_guide = (
-        _read_file(os.path.join(ws.file_system, "writing", "system_prompt.md"))
-        or _read_file(os.path.join(project_root, "core", "system_prompt.md"))
+        _load_system_prompt_guide(ws, project_root)
         or "（无额外生文规范，请严格保持待精修正文已有的作者声音。）"
     )
     prompt = PromptLoader.load(
@@ -5111,13 +5144,9 @@ def gen_serial_chapters(
     context = _load_volume_outline_context(ws, volume)
     if not context:
         return
-    # 读取写作文风规范（从项目根目录读取）
+    # 读取写作文风规范（工作区优先；非 zh 时 core/system_prompt.en.md 优先于中文稿）
     custom_style_path = os.path.join(ws.file_system, "writing", "system_prompt.md")
-    style_guide = (
-        _read_file(custom_style_path)
-        or _read_file(os.path.join(_root, "core", "system_prompt.md"))
-        or ""
-    )
+    style_guide = _load_system_prompt_guide(ws, _root) or ""
     agents_md = _read_file(os.path.join(_root, "core", "agents.md")) or ""
     writing_rules = f"{style_guide}\n\n{agents_md}" if style_guide or agents_md else "（无写作文风规范）"
     hard_style_rules = (

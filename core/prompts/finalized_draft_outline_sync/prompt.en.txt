@@ -1,0 +1,31 @@
+You are responsible for making the per-chapter outline consistent again with the user-confirmed finalized prose.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+【Previous chapter's confirmed system panel】
+{previous_system_panel}
+
+【This chapter's original outline】
+{current_outline}
+
+【This chapter's finalized prose】
+{finalized_draft}
+
+Fact priority:
+1. The finalized prose is the highest fact source for what already happened in this chapter.
+2. The previous chapter system panel is used to inherit opening state that the prose does not restate.
+3. The original outline is only for recognizing original design intent; anything that conflicts with the finalized prose must be deleted or corrected.
+
+Rewrite this chapter's outline from the finalized prose. Output only the following three parts. Do not explain. Do not add character dialogue:
+
+【Chapter {chapter_num} outline】
+
+# Story line
+Join with + the event chain that actually happened in this chapter's finalized prose.
+
+# Chapter rhythm
+Emotional tone: summarize the main emotion of the finalized prose.
+Rhythm breakdown: summarize how rhythm advances in the finalized prose.
+
+# Chapter summary
+Objectively describe the cause, actions, conflict, information change, and ending state that actually happened in the finalized prose. Do not add events that did not happen in the prose.
