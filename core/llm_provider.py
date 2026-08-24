@@ -1,8 +1,7 @@
 import os
 import threading
 
-import httpx
-from openai import OpenAI
+from openai import OpenAI, Timeout
 from core.text_utils import normalize_text
 from core.prompt_trace import record_prompt
 
@@ -77,7 +76,7 @@ class LLMProvider:
 
     def _request_timeout(self):
         connect = min(_CONNECT_TIMEOUT, self.timeout)
-        return httpx.Timeout(
+        return Timeout(
             connect=connect, read=self.timeout, write=connect, pool=connect,
         )
 

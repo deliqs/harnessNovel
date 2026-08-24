@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import httpx
+from openai import Timeout
 
 from core.llm_provider import LLMProvider
 
@@ -33,7 +33,7 @@ class LLMProviderTimeoutTests(unittest.TestCase):
             mock_openai.return_value = MagicMock()
             LLMProvider(model="m", api_key="k")
         timeout = mock_openai.call_args.kwargs["timeout"]
-        self.assertIsInstance(timeout, httpx.Timeout)
+        self.assertIsInstance(timeout, Timeout)
         self.assertEqual(timeout.read, 600.0)
         self.assertLessEqual(timeout.connect, 30.0)
         self.assertLessEqual(timeout.write, 30.0)
