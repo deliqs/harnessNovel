@@ -5185,7 +5185,19 @@ _CHAPTER_FORBIDDEN_STYLE_PATTERNS = (
     ),
     (
         "not X but Y contrast template",
-        re.compile(r"\bnot\b(?!\s+only\b)[^.\n]{0,60}?\bbut\b", re.I),
+        # Copula + not, "not a/an/the/just/…", or sentence-start Not … but + complement.
+        # Auxiliary negation (did/could/do not … but he/she/…) is ordinary coordination.
+        re.compile(
+            r"(?:"
+            r"(?:^|[\n.!?])[\"“'‘]?\s*not\s+(?!only\b)[^.\n]{0,40}?\bbut\b"
+            r"|"
+            r"\b(?:is|are|was|were|be|been|being|'s|'re|'m)\s+not\b(?!\s+only\b)[^.\n]{0,50}?\bbut\b"
+            r"|"
+            r"\bnot\s+(?:a|an|the|just|merely|simply|exactly|because)\b[^.\n]{0,40}?\bbut\b"
+            r")"
+            r"(?!\s+(?:I|he|she|it|they|we|you|there)\b)",
+            re.I | re.M,
+        ),
     ),
     (
         "not only X but also Y template",
