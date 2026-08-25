@@ -13,6 +13,11 @@ from core.prompt_loader import PromptLoader
 from core.config import ConfigLoader
 from core.text_utils import normalize_text, parse_json_response
 from core.workspace import init_workspace
+from core.chapter_utils import (
+    chapter_draft_write_path,
+    remove_legacy_chapter_draft,
+    resolve_chapter_draft_path,
+)
 from core.adaptation import (
     append_adaptation_report,
     format_forbidden_terms,
@@ -790,11 +795,19 @@ def _finalized_chapters_path(ws):
     return os.path.join(ws.file_system, "finalized_chapters.json")
 
 
+def _draft_chapter_dir(ws, volume):
+    return os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}")
+
+
 def _draft_chapter_path(ws, volume, chapter):
-    return os.path.join(
-        ws.file_system, "chapters", f"vol_{volume:02d}",
-        f"{chapter:03d}_第{chapter}章.md",
-    )
+    return resolve_chapter_draft_path(_draft_chapter_dir(ws, volume), chapter)
+
+
+def _write_draft_chapter(out_dir, chapter_num, content):
+    path = chapter_draft_write_path(out_dir, chapter_num)
+    _write_file(path, content)
+    remove_legacy_chapter_draft(out_dir, chapter_num)
+    return path
 
 
 def _content_hash(content):
@@ -5040,26 +5053,35 @@ def refine_chapter_outlines(ws, volume, arc_idx, instruction):
     return {"adjustment_note": f"Adjusted {len(written)} chapter outlines per the instruction.", "artifacts": written}
 
 
+def _raw_chapter_dir(ws, volume):
+    return os.path.join(ws.file_system, "drafts", f"vol_{volume:02d}", "raw_chapters")
+
+
 def _raw_chapter_backup_path(ws, volume, chapter_num):
-    raw_dir = os.path.join(ws.file_system, "drafts", f"vol_{volume:02d}", "raw_chapters")
-    return os.path.join(raw_dir, f"{chapter_num:03d}_第{chapter_num}章.raw.md")
+    return resolve_chapter_draft_path(_raw_chapter_dir(ws, volume), chapter_num, raw=True)
 
 
 def _backup_raw_chapter(ws, volume, chapter_num, content):
     """Save the draft from before the last polish, and archive distinct older snapshots under versions."""
-    backup_path = _raw_chapter_backup_path(ws, volume, chapter_num)
-    previous = _read_file(backup_path)
+    raw_dir = _raw_chapter_dir(ws, volume)
+    existing_path = resolve_chapter_draft_path(raw_dir, chapter_num, raw=True)
+    write_path = chapter_draft_write_path(raw_dir, chapter_num, raw=True)
+    previous = _read_file(existing_path)
     current = str(content or "").strip()
-    if previous is not None and previous != current:
+    if previous is not None and previous != current and os.path.isfile(existing_path):
         import shutil
-        raw_dir = os.path.dirname(backup_path)
         versions_dir = os.path.join(raw_dir, "versions")
         os.makedirs(versions_dir, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        version_name = f"{chapter_num:03d}_第{chapter_num}章_{stamp}.raw.md"
-        shutil.copy2(backup_path, os.path.join(versions_dir, version_name))
-    _write_file(backup_path, content)
-    return backup_path
+        stem = os.path.basename(existing_path)
+        if stem.endswith(".raw.md"):
+            version_name = stem[:-len(".raw.md")] + f"_{stamp}.raw.md"
+        else:
+            version_name = f"{stem}_{stamp}"
+        shutil.copy2(existing_path, os.path.join(versions_dir, version_name))
+    _write_file(write_path, content)
+    remove_legacy_chapter_draft(raw_dir, chapter_num, raw=True)
+    return write_path
 
 
 _PARAGRAPH_PAIR_CLOSERS = {
@@ -5362,7 +5384,7 @@ def gen_serial_chapters(
             ) + 1,
         )
     for ch_num in range(effective_start, range_end + 1):
-        out_file = os.path.join(out_dir, f"{ch_num:03d}_第{ch_num}章.md")
+        out_file = resolve_chapter_draft_path(out_dir, ch_num)
         if os.path.exists(out_file):
             if ch_num in finalized:
                 print(f"  Chapter {ch_num} draft is marked final; skipping.")
@@ -5412,7 +5434,7 @@ def gen_serial_chapters(
             pause_event.wait()
         if stop_event is not None and stop_event.is_set():
             break
-        out_file = os.path.join(out_dir, f"{ch_num:03d}_第{ch_num}章.md")
+        existing_path = resolve_chapter_draft_path(out_dir, ch_num)
         if progress_callback:
             progress_callback("generating", idx, len(tasks), f"Processing chapter {ch_num} draft")
 
@@ -5422,7 +5444,7 @@ def gen_serial_chapters(
             print(f"\n--- Humanizing chapter {ch_num} ({idx + 1}/{len(tasks)}) ---")
 
         if task_mode == "humanize_existing":
-            existing_text = _read_file(out_file)
+            existing_text = _read_file(existing_path)
             if not existing_text:
                 print(f"  Warning: chapter {ch_num} draft is empty; skipping.")
                 continue
@@ -5430,7 +5452,7 @@ def gen_serial_chapters(
             if result is None:
                 break
             result = _format_chapter_paragraphs(result)
-            _write_file(out_file, result)
+            out_file = _write_draft_chapter(out_dir, ch_num, result)
             processed_chapters.append(ch_num)
             if progress_callback:
                 progress_callback("generating", idx + 1, len(tasks), f"Chapter {ch_num} draft polished and written")
@@ -5447,7 +5469,7 @@ def gen_serial_chapters(
 
         current_draft_section = ""
         if regenerate_existing and refinement_mode == "revise":
-            current_draft = _read_file(out_file)
+            current_draft = _read_file(existing_path)
             if current_draft:
                 current_draft_section = (
                     "=== Current chapter original draft (revise from this) ===\n"
@@ -5457,7 +5479,7 @@ def gen_serial_chapters(
         # Read the previous 2 chapter drafts (not truncated)
         prev_texts = []
         for i in range(max(1, ch_num - 2), ch_num):
-            prev_file = os.path.join(out_dir, f"{i:03d}_第{i}章.md")
+            prev_file = resolve_chapter_draft_path(out_dir, i)
             content = _read_file(prev_file)
             if content:
                 prev_texts.append(content.strip())
@@ -5536,15 +5558,15 @@ def gen_serial_chapters(
                 print(f"  Warning: chapter {ch_num} humanize got no model output; not written. You can retry.")
                 continue
         result = _format_chapter_paragraphs(result)
-        if regenerate_existing and os.path.exists(out_file):
+        if regenerate_existing and os.path.isfile(existing_path):
             import shutil
             backup_dir = os.path.join(out_dir, "versions")
             os.makedirs(backup_dir, exist_ok=True)
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = os.path.join(backup_dir, f"{os.path.basename(out_file)}_{stamp}")
+            backup_path = os.path.join(backup_dir, f"{os.path.basename(existing_path)}_{stamp}")
             if not os.path.exists(backup_path):
-                shutil.copy2(out_file, backup_path)
-        _write_file(out_file, result)
+                shutil.copy2(existing_path, backup_path)
+        out_file = _write_draft_chapter(out_dir, ch_num, result)
         processed_chapters.append(ch_num)
         if progress_callback:
             progress_callback("generating", idx + 1, len(tasks), f"Chapter {ch_num} draft written")
@@ -5557,12 +5579,12 @@ def gen_serial_chapters(
     completed = 0
     artifacts = []
     for ch_num in processed_chapters:
-        path = os.path.join(out_dir, f"{ch_num:03d}_第{ch_num}章.md")
+        path = resolve_chapter_draft_path(out_dir, ch_num)
         if _read_file(path):
             completed += 1
             artifacts.append({
                 "label": f"chapter {ch_num} draft",
-                "path": f"file_system/chapters/vol_{volume:02d}/{ch_num:03d}_第{ch_num}章.md",
+                "path": f"file_system/chapters/vol_{volume:02d}/{os.path.basename(path)}",
             })
     stopped = stop_event is not None and stop_event.is_set()
     print(f"\n  -> Volume {volume} drafts processed ({completed} chapters).")
@@ -5589,7 +5611,7 @@ def chapter_draft_resume_status(ws, volume, arc_idx):
         return {"can_resume": False, "completed": 0, "total": 0, "next_chapter": None}
     out_dir = os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}")
     chapters = list(range(arc["start_ch"], arc["end_ch"] + 1))
-    existing = [ch for ch in chapters if _read_file(os.path.join(out_dir, f"{ch:03d}_第{ch}章.md"))]
+    existing = [ch for ch in chapters if _read_file(resolve_chapter_draft_path(out_dir, ch))]
     missing = [ch for ch in chapters if ch not in existing]
     return {
         "can_resume": bool(existing and missing), "completed": len(existing), "total": len(chapters),
@@ -5604,7 +5626,7 @@ def route_chapter_draft_refinement(ws, volume, arc_idx, instruction, cancel_even
     out_dir = os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}")
     current = []
     for ch in range(arc["start_ch"], arc["end_ch"] + 1):
-        text = _read_file(os.path.join(out_dir, f"{ch:03d}_第{ch}章.md"))
+        text = _read_file(resolve_chapter_draft_path(out_dir, ch))
         if text:
             current.append(f"[Chapter {ch} draft]\n{text}")
     llm = _get_lite_llm()

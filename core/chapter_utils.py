@@ -1,3 +1,5 @@
+import glob
+import os
 import re
 
 
@@ -9,6 +11,59 @@ _CN_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '�
 
 _CH_NUM_RE = re.compile(r'第([一二三四五六七八九十百千零\d]+)章')
 _EN_CH_NUM_RE = re.compile(r'(?:Chapter|Ch\.?)\s+(\d+)', re.I)
+
+
+def chapter_draft_basename(chapter_num, *, raw=False, legacy=False):
+    chapter_num = int(chapter_num)
+    stem = (
+        f"{chapter_num:03d}_第{chapter_num}章"
+        if legacy
+        else f"{chapter_num:03d}_chapter_{chapter_num}"
+    )
+    return f"{stem}.raw.md" if raw else f"{stem}.md"
+
+
+def chapter_draft_write_path(directory, chapter_num, *, raw=False):
+    return os.path.join(str(directory), chapter_draft_basename(chapter_num, raw=raw))
+
+
+def resolve_chapter_draft_path(directory, chapter_num, *, raw=False):
+    directory = str(directory)
+    english = chapter_draft_write_path(directory, chapter_num, raw=raw)
+    if os.path.isfile(english):
+        return english
+    legacy = os.path.join(directory, chapter_draft_basename(chapter_num, raw=raw, legacy=True))
+    if os.path.isfile(legacy):
+        return legacy
+    return english
+
+
+def remove_legacy_chapter_draft(directory, chapter_num, *, raw=False):
+    directory = str(directory)
+    english = os.path.abspath(chapter_draft_write_path(directory, chapter_num, raw=raw))
+    legacy = os.path.abspath(os.path.join(
+        directory, chapter_draft_basename(chapter_num, raw=raw, legacy=True),
+    ))
+    if legacy != english and os.path.isfile(legacy):
+        os.remove(legacy)
+
+
+def chapter_draft_delete_paths(refined_dir, raw_dir, chapter_num):
+    chapter_num = int(chapter_num)
+    refined_dir = str(refined_dir)
+    raw_dir = str(raw_dir)
+    paths = [
+        os.path.join(refined_dir, chapter_draft_basename(chapter_num)),
+        os.path.join(refined_dir, chapter_draft_basename(chapter_num, legacy=True)),
+        os.path.join(raw_dir, chapter_draft_basename(chapter_num, raw=True)),
+        os.path.join(raw_dir, chapter_draft_basename(chapter_num, raw=True, legacy=True)),
+    ]
+    n = chapter_num
+    paths.extend(glob.glob(os.path.join(refined_dir, "versions", f"{n:03d}_chapter_{n}.md_*")))
+    paths.extend(glob.glob(os.path.join(refined_dir, "versions", f"{n:03d}_第{n}章.md_*")))
+    paths.extend(glob.glob(os.path.join(raw_dir, "versions", f"{n:03d}_chapter_{n}_*.raw.md")))
+    paths.extend(glob.glob(os.path.join(raw_dir, "versions", f"{n:03d}_第{n}章_*.raw.md")))
+    return paths
 
 
 def _cn_to_int(s):

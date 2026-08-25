@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from core.chapter_utils import chapter_draft_delete_paths
 from core.llm_provider import LLMCallCancelled
 from core.prompt_trace import capture_prompts
 from core.workspace import init_workspace
@@ -290,18 +291,11 @@ class DraftChatManager:
 
         chapters = list(range(arc["start_ch"], arc["end_ch"] + 1))
         refined_dir = Path(ws.file_system) / "chapters" / f"vol_{volume:02d}"
-        refined_versions = refined_dir / "versions"
         raw_dir = Path(ws.file_system) / "drafts" / f"vol_{volume:02d}" / "raw_chapters"
-        raw_versions = raw_dir / "versions"
         deleted = 0
         for chapter in chapters:
-            targets = [
-                refined_dir / f"{chapter:03d}_第{chapter}章.md",
-                raw_dir / f"{chapter:03d}_第{chapter}章.raw.md",
-            ]
-            targets.extend(refined_versions.glob(f"{chapter:03d}_第{chapter}章.md_*"))
-            targets.extend(raw_versions.glob(f"{chapter:03d}_第{chapter}章_*.raw.md"))
-            for path in targets:
+            for path in chapter_draft_delete_paths(refined_dir, raw_dir, chapter):
+                path = Path(path)
                 if path.is_file():
                     path.unlink()
                     deleted += 1
