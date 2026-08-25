@@ -41,7 +41,7 @@ def normalize_text(text: str) -> str:
 def parse_json_response(raw: str) -> dict:
     """Clean and parse LLM JSON, handling control characters and fenced code blocks."""
     import re as _re
-    cleaned = raw.strip()
+    cleaned = (raw or "").strip()
     # Strip markdown code fences.
     if cleaned.startswith("```"):
         first_newline = cleaned.find("\n")
@@ -51,6 +51,12 @@ def parse_json_response(raw: str) -> dict:
             cleaned = cleaned[:-3].strip()
     # Drop illegal control characters inside JSON values.
     cleaned = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', cleaned)
-    # Fix trailing commas.
-    cleaned = cleaned.replace(",}", "}").replace(",]", "]")
-    return json.loads(cleaned)
+    # Fix trailing commas, including those with whitespace before the closer.
+    cleaned = _re.sub(r',\s*([}\]])', r'\1', cleaned)
+    start = cleaned.find('{')
+    if start == -1:
+        raise json.JSONDecodeError("No JSON object found", cleaned, 0)
+    obj, _end = json.JSONDecoder().raw_decode(cleaned[start:])
+    if not isinstance(obj, dict):
+        raise ValueError("Top level must be a JSON object")
+    return obj

@@ -1158,6 +1158,23 @@ def _previous_system_panel(ws, volume, chapter_num):
     }
 
 
+def _panel_state_for_prompt(previous):
+    """Current panel only. Last chapter's changelog is omitted so the model does not copy it."""
+    previous = previous if isinstance(previous, dict) else {}
+    payload = {
+        "chapter": previous.get("chapter", 0),
+        "panel": previous.get("panel") if isinstance(previous.get("panel"), dict) else {},
+    }
+    if "enabled" in previous:
+        payload["enabled"] = previous["enabled"]
+    return payload
+
+
+SYSTEM_PANEL_MAX_PANEL_FIELDS = 40
+SYSTEM_PANEL_MAX_CHANGES = 30
+SYSTEM_PANEL_MAX_CHARS = 50000
+
+
 class SystemPanelValidationError(RuntimeError):
     """The model-returned system panel failed JSON or basic-structure validation."""
 
@@ -1198,12 +1215,16 @@ def _validate_system_panel_response(payload):
     changes = payload.get("changes")
     if not isinstance(panel, dict):
         raise ValueError("panel must be an object")
-    if len(panel) > 40:
-        raise ValueError("panel may contain at most 40 top-level fields")
+    if len(panel) > SYSTEM_PANEL_MAX_PANEL_FIELDS:
+        raise ValueError(
+            f"panel may contain at most {SYSTEM_PANEL_MAX_PANEL_FIELDS} top-level fields"
+        )
     if not isinstance(changes, list):
         raise ValueError("changes must be an array")
-    if len(changes) > 30:
-        raise ValueError("changes may contain at most 30 items")
+    # Changelog is a summary; the panel is the source of truth. Truncate instead of
+    # failing generation when the model lists every nested field that moved.
+    if len(changes) > SYSTEM_PANEL_MAX_CHANGES:
+        changes = changes[:SYSTEM_PANEL_MAX_CHANGES]
     normalized = []
     for index, change in enumerate(changes, 1):
         if not isinstance(change, dict):
@@ -1222,13 +1243,17 @@ def _validate_system_panel_response(payload):
             "after": change["after"],
             "reason": reason.strip(),
         })
+    result = {"panel": panel, "changes": normalized}
     try:
-        serialized = json.dumps(payload, ensure_ascii=False, allow_nan=False)
+        serialized = json.dumps(result, ensure_ascii=False, allow_nan=False)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"panel contains an illegal JSON value: {exc}") from exc
-    if len(serialized) > 50000:
+    while len(serialized) > SYSTEM_PANEL_MAX_CHARS and result["changes"]:
+        result["changes"].pop()
+        serialized = json.dumps(result, ensure_ascii=False, allow_nan=False)
+    if len(serialized) > SYSTEM_PANEL_MAX_CHARS:
         raise ValueError("System panel content is too long")
-    return {"panel": panel, "changes": normalized}
+    return result
 
 
 def _generate_chapter_system_panel(llm, ws, volume, chapter_num, chapter_outline,
@@ -1248,7 +1273,9 @@ def _generate_chapter_system_panel(llm, ws, volume, chapter_num, chapter_outline
             "chapter_system_panel",
             chapter_num=chapter_num,
             system_panel_definition=json.dumps(definition, ensure_ascii=False, indent=2),
-            previous_system_panel=json.dumps(previous, ensure_ascii=False, indent=2),
+            previous_system_panel=json.dumps(
+                _panel_state_for_prompt(previous), ensure_ascii=False,
+            ),
             chapter_outline=chapter_outline,
             validation_feedback=validation_feedback,
         )
@@ -1268,9 +1295,16 @@ def _generate_chapter_system_panel(llm, ws, volume, chapter_num, chapter_outline
                 "Fix it and output complete JSON again. Do not explain."
             )
     else:
-        raise SystemPanelValidationError(
-            f"System panel failed JSON validation 3 times in a row: {last_error}"
+        inherited = previous.get("panel") if isinstance(previous.get("panel"), dict) else {}
+        print(
+            f"  Warning: chapter {chapter_num} system panel failed JSON validation "
+            f"({last_error}); inheriting the previous panel so generation can continue."
         )
+        panel = {
+            "chapter": chapter_num,
+            "panel": inherited,
+            "changes": [],
+        }
     path = _system_panel_chapter_path(ws, volume, chapter_num)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     _write_json_file(path, panel)

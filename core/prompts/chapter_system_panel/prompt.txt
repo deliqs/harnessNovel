@@ -19,7 +19,7 @@ Maintenance rules:
 2. Set columns from the work's actual needs. Do not pad fields mechanically. Common columns include: Name, Identity, Race, Realm, Cultivation, Level, Talent, Jing-Qi-Shen, Skills, Arts, Equipment, Resources, Special abilities, Current state.
 3. Field values may be strings, numbers, arrays, or grouped objects. For example Realm may be written "Late Initial Realm (Blood Refining seventh layer)"; Skills may be an array with name, stage, and note.
 4. Maintain only content in the protagonist panel that is worth tracking over time. Do not copy the outline's story line, relationship changes, foreshadowing, emotion, conflict, or next-chapter bind.
-5. changes lists only panel fields that truly changed this chapter relative to the previous chapter. before and after keep their natural types; they need not all be numbers.
+5. changes lists only panel fields that truly changed this chapter relative to the previous chapter. Do not copy the previous chapter's changes list. before and after keep their natural types; they need not all be numbers. Keep at most 30 items; if more fields changed, keep the most important 30 and drop the rest. Keep before/after compact — do not paste a whole long field.
 6. When this chapter has no change, fully inherit the previous chapter's panel and output an empty array for changes.
 7. If the outline has no clear basis, do not upgrade, add skills, reward resources, or change state on your own.
 8. Do not output Markdown code blocks, comments, explanations, or any text outside JSON.
