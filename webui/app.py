@@ -60,9 +60,9 @@ CONFIG_GROUPS = {
     "data_builder": ("Reference deconstruction model", "DATA_BUILDER"),
     "adaptive_builder": ("Book design and stage design model (Pro recommended)", "ADAPTIVE_BUILDER"),
     "adaptive_builder_lite": ("Story arcs and chapter outlines (fallback model)", "ADAPTIVE_BUILDER_LITE"),
-    "draft": ("Draft generation model (optional; Lite fallback)", "DRAFT"),
-    "editor": ("Editing and humanization model (optional; Lite fallback)", "EDITOR"),
-    "critic": ("Critique and validation model (optional; Lite fallback)", "CRITIC"),
+    "draft": ("Chapter prose model (optional; Lite fallback)", "DRAFT"),
+    "editor": ("Refinement and humanization model (optional; Lite fallback)", "EDITOR"),
+    "critic": ("Story-arc/chapter-outline planning, routing, validation, and lightweight decisions model (optional; Lite fallback)", "CRITIC"),
 }
 PROMPT_TRACE_MODES = {"off", "metadata", "full"}
 

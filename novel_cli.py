@@ -35,6 +35,8 @@ ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
 ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
 
 # Optional production roles. Leave a role unset to inherit each missing value from Lite.
+# DRAFT writes chapter prose; EDITOR refines and humanizes it; CRITIC handles
+# story-arc/chapter-outline planning, routing, validation, and lightweight decisions.
 # DRAFT_MODEL=
 # DRAFT_BASE_URL=
 # DRAFT_API_KEY=

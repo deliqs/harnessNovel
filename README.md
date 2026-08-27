@@ -188,6 +188,8 @@ ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
 ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
 
 # Optional production roles. An omitted field inherits the matching Lite value.
+# DRAFT writes chapter prose; EDITOR refines and humanizes it; CRITIC handles
+# story-arc/chapter-outline planning, routing, validation, and lightweight decisions.
 # DRAFT_MODEL=
 # DRAFT_BASE_URL=
 # DRAFT_API_KEY=
@@ -202,7 +204,7 @@ ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
 HARNESS_NOVEL_PROMPT_TRACE_MODE=metadata
 ```
 
-You can also override these settings with environment variables of the same names. `DATA_BUILDER` handles reference extraction, `ADAPTIVE_BUILDER` handles book and stage design, and Lite handles story arcs and chapter outlines. `DRAFT`, `EDITOR`, and `CRITIC` are optional role overrides: each missing model, base URL, or key falls back independently to `ADAPTIVE_BUILDER_LITE`.
+You can also override these settings with environment variables of the same names. `DATA_BUILDER` handles reference extraction, `ADAPTIVE_BUILDER` handles book and stage design, and Lite is the exact fallback for each missing optional-role field. `DRAFT` writes chapter prose, `EDITOR` handles refinement and humanization, and `CRITIC` handles story-arc/chapter-outline planning, routing, validation, and lightweight decisions. Each missing `DRAFT`, `EDITOR`, or `CRITIC` model, base URL, or key falls back independently to `ADAPTIVE_BUILDER_LITE`.
 
 The local Web workbench uses this same global file. Open its Settings panel to edit the same model roles without revealing saved API keys. Clearing an optional role returns it to the Lite fallback.
 
