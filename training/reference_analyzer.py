@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,12 @@ from core.config import ConfigLoader
 from core.llm_provider import LLMProvider
 from core.prompt_loader import PromptLoader
 from core.text_utils import normalize_text, parse_json_response
+from training.reference_craft import (
+    compact_cards_for_craft,
+    load_reference_craft_bible,
+    normalize_reference_craft_bible,
+    render_reference_craft_bible,
+)
 
 
 ARC_FILE_RE = re.compile(r"^arc_(\d+)_ch(\d+)_(\d+)\.md$")
@@ -110,6 +117,9 @@ class ReferenceAnalyzer:
         self.max_workers = max(1, int(max_workers))
         self.segment_load_size = max(1, int(segment_load_size))
         self.max_chapters_per_segment = max(2, int(max_chapters_per_segment))
+        # This is an input-safety bound, not a forced segment boundary. Natural units may exceed the
+        # historical 12-chapter preference; unresolved material is quarantined rather than fake-closed.
+        self.max_segment_analysis_window = max(64, self.segment_load_size * 4)
         self.llm = llm
         self.rebuild = rebuild
 
@@ -117,6 +127,8 @@ class ReferenceAnalyzer:
         self.cards_index_path = self.output_dir / "chapter_cards_index.json"
         self.state_path = self.output_dir / "analysis_state.json"
         self.outlines_dir = self.output_dir / "outlines"
+        self.craft_bible_path = self.outlines_dir / "reference_craft_bible.json"
+        self.craft_bible_markdown_path = self.outlines_dir / "reference_craft_bible.md"
         self.state: dict[str, Any] = {}
 
     def run(self) -> dict[str, Any]:
@@ -138,15 +150,22 @@ class ReferenceAnalyzer:
             completed_target = previous_target
             if target <= completed_target:
                 print("  Reference deconstruction and smart volume split already done; reusing existing split.")
-                cards = self.state.get("chapter_cards") or {}
+                stored_cards = self._read_stored_cards(completed_target)
+                segment_status = self._reconcile_resegmented_segments(completed_target)
+                craft_path = self._ensure_craft_bible(stored_cards) if stored_cards else None
                 return {
                     "target_chapters": completed_target,
                     "total_chapters": total_chapters,
-                    "chapter_card_count": int(cards.get("complete_count") or 0),
-                    "segmented_chapter_count": completed_target,
-                    "pending_chapter_count": 0,
+                    "chapter_card_count": len(stored_cards),
+                    "segmented_chapter_count": segment_status["segmented_chapter_count"],
+                    "pending_chapter_count": segment_status["pending_chapter_count"],
                     "structure_updated": False,
-                    "is_complete": completed_target >= total_chapters,
+                    "is_complete": (
+                        completed_target >= total_chapters
+                        and len(stored_cards) >= completed_target
+                        and segment_status["pending_chapter_count"] == 0
+                    ),
+                    "craft_bible_path": craft_path,
                 }
             self._restore_resegmented_working_volume()
         self.previous_target = previous_target
@@ -156,6 +175,9 @@ class ReferenceAnalyzer:
         print(f"  Single-chapter fact cards: target chapters 1-{target}/{total_chapters}, concurrency {self.max_workers}")
         cards = self._extract_missing_cards(volume_specs, source_digest)
         self._write_card_index(cards, target, total_chapters)
+
+        print("\n--- Reference craft bible: transferable techniques with source evidence ---")
+        craft_path = self._ensure_craft_bible(cards)
 
         print("\n--- Stage two: rolling story-segment extraction from fact cards ---")
         segment_stats = self._extract_story_segments(volume_specs, cards)
@@ -181,6 +203,7 @@ class ReferenceAnalyzer:
             "pending_chapter_count": segment_stats["pending_chapter_count"],
             "structure_updated": structure_stats["updated"],
             "is_complete": target == total_chapters and segment_stats["pending_chapter_count"] == 0,
+            "craft_bible_path": craft_path,
         }
 
     def _load_chapters(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -275,6 +298,64 @@ class ReferenceAnalyzer:
         self.cards_index_path.unlink(missing_ok=True)
         self.state_path.unlink(missing_ok=True)
 
+    def _read_stored_cards(self, target: int) -> list[dict[str, Any]]:
+        cards = []
+        for chapter in range(1, target + 1):
+            card = _read_json(self._card_path(chapter), {})
+            if isinstance(card, dict) and card.get("chapter") is not None:
+                item = {
+                    "chapter": chapter,
+                    "volume_index": int(card.get("volume_index") or 1),
+                    "volume_title": card.get("volume_title") or "",
+                    "volume_chapter": int(card.get("volume_chapter") or chapter),
+                    "title": card.get("title") or f"Chapter {chapter}",
+                    "content": "",
+                    "content_digest": card.get("content_digest") or "",
+                }
+                normalized = self._normalize_card(
+                    card,
+                    item,
+                    str(card.get("source_digest") or self.state.get("source_digest") or ""),
+                )
+                if not card.get("content_digest"):
+                    normalized["content_digest"] = ""
+                _write_json(self._card_path(chapter), normalized)
+                cards.append(normalized)
+        return cards
+
+    def _reconcile_resegmented_segments(self, target: int) -> dict[str, int]:
+        """Migrate and recount smart-split global arc ranges before a no-work reuse return."""
+        covered: set[int] = set()
+        quarantined_count = 0
+        for arc_dir in sorted(self.outlines_dir.glob("vol_*/story_arcs")):
+            if not arc_dir.is_dir():
+                continue
+            quarantined_count += self._quarantine_placeholder_arcs(arc_dir)
+            items = self._load_arc_items(arc_dir)
+            self._write_arc_index(arc_dir, items)
+            for item in items:
+                start = max(1, int(item["start_chapter"]))
+                end = min(target, int(item["end_chapter"]))
+                if end >= start:
+                    covered.update(range(start, end + 1))
+
+        segmented_count = len(covered)
+        pending_count = max(0, target - segmented_count)
+        self.state["reuse_reconciliation"] = {
+            "segmented_ranges": _ranges(list(covered)),
+            "segmented_chapter_count": segmented_count,
+            "pending_chapter_count": pending_count,
+            "quarantined_segment_count": quarantined_count,
+            "analysis_status": "complete" if pending_count == 0 else "incomplete",
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        self.state["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        _write_json(self.state_path, self.state)
+        return {
+            "segmented_chapter_count": segmented_count,
+            "pending_chapter_count": pending_count,
+        }
+
     def _build_volume_specs(
         self,
         volumes: list[dict[str, Any]],
@@ -327,15 +408,7 @@ class ReferenceAnalyzer:
             for local, chapter_data in enumerate(spec["chapters"], start=1):
                 global_chapter = spec["global_start"] + local - 1
                 content_digest = _chapter_digest(chapter_data.get("content", ""))
-                card = self._load_card(global_chapter, source_digest, content_digest)
-                if card:
-                    # Whole-file digest change does not block chapter-card reuse; sync to the current snapshot.
-                    card["source_digest"] = source_digest
-                    card["content_digest"] = content_digest
-                    _write_json(self._card_path(global_chapter), card)
-                    existing[global_chapter] = card
-                    continue
-                planned.append({
+                item = {
                     "chapter": global_chapter,
                     "volume_index": spec["index"],
                     "volume_title": spec["title"],
@@ -343,7 +416,15 @@ class ReferenceAnalyzer:
                     "title": chapter_data.get("title", f"Chapter {global_chapter}"),
                     "content": chapter_data.get("content", ""),
                     "content_digest": content_digest,
-                })
+                }
+                card = self._load_card(global_chapter, source_digest, content_digest)
+                if card:
+                    # Normalize old cached cards into the additive schema while preserving their factual content.
+                    card = self._normalize_card(card, item, source_digest)
+                    _write_json(self._card_path(global_chapter), card)
+                    existing[global_chapter] = card
+                    continue
+                planned.append(item)
 
         if planned:
             print(f"  Chapters still to extract: {len(planned)}; reused: {len(existing)}")
@@ -411,6 +492,11 @@ class ReferenceAnalyzer:
         if not isinstance(rhythm, dict):
             rhythm = {"core_content": str(rhythm)}
         outline = str(payload.get("chapter_outline_600") or payload.get("summary") or "").strip()
+        entities = payload.get("entities") if isinstance(payload.get("entities"), dict) else {}
+        perspective = payload.get("pov_tense") or payload.get("narrative_perspective") or {}
+        if not isinstance(perspective, dict):
+            perspective = {"pov": perspective}
+        source_location = payload.get("source_location") if isinstance(payload.get("source_location"), dict) else {}
         return {
             "chapter": item["chapter"],
             "volume_index": item["volume_index"],
@@ -425,7 +511,31 @@ class ReferenceAnalyzer:
             },
             "story_line": _compact_text(payload.get("story_line", ""), 500),
             "highlights": self._string_list(payload.get("highlights") or []),
-            "entities": payload.get("entities") if isinstance(payload.get("entities"), dict) else {},
+            "entities": {
+                key: self._string_list(entities.get(key) or [])
+                for key in sorted(set(entities) | {"characters", "locations", "factions", "abilities", "objects"})
+            },
+            "pov_tense": {
+                "pov": _compact_text(perspective.get("pov") or perspective.get("point_of_view"), 100),
+                "tense": _compact_text(perspective.get("tense"), 100),
+                "evidence": self._normalize_evidence(perspective.get("evidence") or []),
+            },
+            "scene_observations": self._normalize_scene_observations(
+                payload.get("scene_observations") or payload.get("scenes") or [],
+            ),
+            "craft_observations": self._normalize_craft_observations(
+                payload.get("craft_observations") or payload.get("craft") or [],
+            ),
+            "evidence": self._normalize_evidence(payload.get("evidence") or []),
+            "source_location": {
+                "chapter": item["chapter"],
+                "volume_index": item["volume_index"],
+                "volume_chapter": item["volume_chapter"],
+                "title": _compact_text(source_location.get("title") or item["title"], 160),
+                "analyzed_scope": _compact_text(source_location.get("analyzed_scope") or "full supplied chapter", 100),
+            },
+            "confidence": self._normalize_confidence(payload.get("confidence")),
+            "uncertainty": _compact_text(payload.get("uncertainty"), 400),
             "source_digest": source_digest,
             "content_digest": item.get("content_digest") or _chapter_digest(item.get("content", "")),
         }
@@ -437,6 +547,89 @@ class ReferenceAnalyzer:
         if value:
             return [_compact_text(value, 160)]
         return []
+
+    @staticmethod
+    def _normalize_confidence(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            raw_score = value.get("score", value.get("confidence"))
+            reason = _compact_text(value.get("reason") or value.get("basis"), 240)
+        else:
+            raw_score = value
+            reason = ""
+        if isinstance(raw_score, str):
+            score = {"high": 0.85, "medium": 0.6, "low": 0.35, "uncertain": 0.2}.get(
+                raw_score.strip().lower(), 0.5,
+            )
+        else:
+            try:
+                score = float(raw_score)
+            except (TypeError, ValueError):
+                score = 0.0
+                if not reason:
+                    reason = "Confidence was not recorded."
+        score = max(0.0, min(1.0, score))
+        return {
+            "level": "high" if score >= 0.75 else "medium" if score >= 0.45 else "low",
+            "score": round(score, 2),
+            "reason": reason,
+        }
+
+    @staticmethod
+    def _normalize_evidence(value: Any) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            return []
+        evidence = []
+        for item in value[:12]:
+            if not isinstance(item, dict):
+                continue
+            signal = _compact_text(item.get("observed_signal") or item.get("evidence") or item.get("signal"), 260)
+            if not signal:
+                continue
+            evidence.append({
+                "claim": _compact_text(item.get("claim"), 180),
+                "source_span": _compact_text(item.get("source_span") or "whole chapter", 100),
+                "observed_signal": signal,
+            })
+        return evidence
+
+    def _normalize_scene_observations(self, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        scenes = []
+        for item in value[:12]:
+            if not isinstance(item, dict):
+                continue
+            scenes.append({
+                "source_span": _compact_text(item.get("source_span") or "whole chapter", 100),
+                "setting": _compact_text(item.get("setting"), 160),
+                "participants": self._string_list(item.get("participants") or []),
+                "scene_function": _compact_text(item.get("scene_function") or item.get("function"), 300),
+                "entry_exit": _compact_text(item.get("entry_exit"), 260),
+                "rhythm": _compact_text(item.get("rhythm"), 260),
+                "evidence": _compact_text(item.get("evidence") or item.get("observed_signal"), 260),
+            })
+        return scenes
+
+    def _normalize_craft_observations(self, value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        observations = []
+        for item in value[:12]:
+            if not isinstance(item, dict):
+                continue
+            technique = _compact_text(item.get("technique") or item.get("observation"), 240)
+            evidence = _compact_text(item.get("evidence") or item.get("observed_signal"), 260)
+            if not technique or not evidence:
+                continue
+            observations.append({
+                "technique": technique,
+                "effect": _compact_text(item.get("effect"), 260),
+                "source_span": _compact_text(item.get("source_span") or "whole chapter", 100),
+                "evidence": evidence,
+                "confidence": self._normalize_confidence(item.get("confidence")),
+                "uncertainty": _compact_text(item.get("uncertainty"), 240),
+            })
+        return observations
 
     def _update_card_state(self, cards: dict[int, dict[str, Any]]) -> None:
         self.state["chapter_cards"] = {
@@ -463,6 +656,51 @@ class ReferenceAnalyzer:
             ],
         }
         _write_json(self.cards_index_path, payload)
+
+    def _ensure_craft_bible(self, cards: list[dict[str, Any]]) -> str:
+        fingerprint_source = "|".join(
+            f"{card.get('chapter')}:{card.get('content_digest') or json.dumps(card, ensure_ascii=False, sort_keys=True)}"
+            for card in cards
+        )
+        fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()
+        existing = load_reference_craft_bible(self.outlines_dir)
+        if existing and existing.get("source_fingerprint") == fingerprint and existing.get("techniques"):
+            if not self.craft_bible_markdown_path.is_file():
+                _write_text(self.craft_bible_markdown_path, render_reference_craft_bible(existing))
+            print("  Reusing the existing reference craft bible.")
+            return str(self.craft_bible_path.relative_to(self.output_dir))
+
+        chapter_cards_json = compact_cards_for_craft(cards)
+        supplied_cards = json.loads(chapter_cards_json)
+        supplied_chapters = {
+            int(card["chapter"])
+            for card in supplied_cards
+            if isinstance(card, dict) and card.get("chapter") is not None
+        }
+        if not supplied_chapters:
+            raise ValueError("No bounded chapter-card evidence was available for the reference craft bible.")
+        prompt = PromptLoader.load(
+            "reference_craft_bible",
+            card_count=len(supplied_chapters),
+            first_chapter=min(supplied_chapters),
+            last_chapter=max(supplied_chapters),
+            chapter_cards_json=chapter_cards_json,
+        )
+        payload = self._generate_json(prompt, "reference craft bible")
+        bible = normalize_reference_craft_bible(payload, cards, fingerprint, supplied_chapters)
+        _write_json(self.craft_bible_path, bible)
+        _write_text(self.craft_bible_markdown_path, render_reference_craft_bible(bible))
+        craft_state = self.state.setdefault("craft_bible", {})
+        craft_state.update({
+            "source_fingerprint": fingerprint,
+            "technique_count": len(bible["techniques"]),
+            "path": str(self.craft_bible_path.relative_to(self.output_dir)),
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        })
+        self.state["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        _write_json(self.state_path, self.state)
+        print(f"  Reference craft bible saved: {self.craft_bible_markdown_path}")
+        return str(self.craft_bible_path.relative_to(self.output_dir))
 
     def _extract_story_segments(self, specs: list[dict[str, Any]], cards: list[dict[str, Any]]) -> dict[str, int]:
         cards_by_chapter = {int(card["chapter"]): card for card in cards}
@@ -495,6 +733,7 @@ class ReferenceAnalyzer:
         volume_dir: Path = spec["directory"]
         arc_dir = volume_dir / "story_arcs"
         arc_dir.mkdir(parents=True, exist_ok=True)
+        self._quarantine_placeholder_arcs(arc_dir)
         existing = self._load_arc_items(arc_dir)
         self._reconsider_previous_tail(spec, cards, arc_dir, existing)
         existing = self._load_arc_items(arc_dir)
@@ -504,9 +743,18 @@ class ReferenceAnalyzer:
         carryover: list[dict[str, Any]] = []
         cursor = 0
         force_final = spec["target_count"] == spec["total_count"]
+        pending_reason = ""
 
         while cursor < len(remaining) or (carryover and force_final):
+            if len(carryover) >= self.max_segment_analysis_window:
+                pending_reason = (
+                    f"No evidence-supported natural boundary was found within the bounded "
+                    f"{self.max_segment_analysis_window}-chapter analysis window."
+                )
+                break
             new_cards = remaining[cursor : cursor + self.segment_load_size]
+            room = self.max_segment_analysis_window - len(carryover)
+            new_cards = new_cards[:room]
             cursor += len(new_cards)
             if not new_cards and not carryover:
                 break
@@ -525,16 +773,23 @@ class ReferenceAnalyzer:
                 max_chapters=self.max_chapters_per_segment,
                 is_final_window="yes" if is_final_window else "no",
                 previous_tail_context="(none; this round uses a normal rolling window.)",
-                chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
+                chapter_cards_json=self._segment_cards_json(window),
             )
             payload = self._generate_json(prompt, f"volume {spec['index']} story segments")
             segments = self._normalize_segments(payload, window)
             if not segments:
-                if is_final_window or len(window) >= self.max_chapters_per_segment:
-                    segments = [self._fallback_segment(window[: self.max_chapters_per_segment], "Window hit the cap or the current range ended; close with a fact-card fallback.")]
-                else:
-                    carryover = window
-                    continue
+                carryover = window
+                carryover_reason = _compact_text(payload.get("carryover_reason"), 500)
+                if is_final_window:
+                    pending_reason = carryover_reason or "The available range ends before an evidence-supported natural boundary."
+                    break
+                if len(window) >= self.max_segment_analysis_window:
+                    pending_reason = carryover_reason or (
+                        f"No evidence-supported natural boundary was found within the bounded "
+                        f"{self.max_segment_analysis_window}-chapter analysis window."
+                    )
+                    break
+                continue
 
             consumed = int(segments[-1]["end_chapter"])
             for segment in segments:
@@ -551,8 +806,12 @@ class ReferenceAnalyzer:
 
         existing = self._load_arc_items(arc_dir)
         closed_through = self._contiguous_end(existing)
+        pending_cards = [card for card in cards if int(card["chapter"]) > closed_through]
+        if pending_cards and not pending_reason:
+            pending_reason = "No evidence-supported natural boundary has closed yet."
+        self._write_pending_segment(arc_dir, pending_cards, pending_reason)
         self._write_arc_index(arc_dir, existing)
-        self._update_volume_state(spec, closed_through, len(cards))
+        self._update_volume_state(spec, closed_through, len(cards), pending_reason)
         segmented_global = [spec["global_start"] + local - 1 for local in range(1, min(closed_through, len(cards)) + 1)]
         pending_global = [spec["global_start"] + local - 1 for local in range(closed_through + 1, len(cards) + 1)]
         return {"segmented_global": segmented_global, "pending_global": pending_global}
@@ -595,7 +854,7 @@ class ReferenceAnalyzer:
             max_chapters=self.max_chapters_per_segment,
             is_final_window="no",
             previous_tail_context=tail["content"],
-            chapter_cards_json=json.dumps(window, ensure_ascii=False, indent=2),
+            chapter_cards_json=self._segment_cards_json(window),
         )
         payload = self._generate_json(prompt, f"volume {spec['index']} tail-segment boundary re-eval")
         segments = self._normalize_segments(payload, window)
@@ -603,18 +862,93 @@ class ReferenceAnalyzer:
             print("    -> Re-evaluation did not form a reliable new boundary; keeping the original tail segment.")
             return
 
-        tail["path"].unlink(missing_ok=True)
         next_index = int(tail["index"])
-        for segment in segments:
-            segment["segment_id"] = next_index
-            _write_text(
-                arc_dir / f"arc_{next_index:03d}_ch{segment['start_chapter']:03d}_{segment['end_chapter']:03d}.md",
-                self._render_segment(segment),
-            )
-            next_index += 1
+        replacements = []
+        with tempfile.TemporaryDirectory(prefix=".tail_resegment_stage_", dir=str(arc_dir)) as staging_name:
+            staging_dir = Path(staging_name)
+            for segment in segments:
+                segment["segment_id"] = next_index
+                filename = f"arc_{next_index:03d}_ch{segment['start_chapter']:03d}_{segment['end_chapter']:03d}.md"
+                staged_path = staging_dir / filename
+                _write_text(staged_path, self._render_segment(segment))
+                replacements.append((staged_path, arc_dir / filename))
+                next_index += 1
+            self._commit_tail_replacements(tail["path"], replacements, arc_dir)
         print(
             f"    -> Tail boundary re-split; current re-eval covers through chapter {segments[-1]['end_chapter']}."
         )
+
+    @staticmethod
+    def _commit_tail_replacements(
+        old_tail_path: Path,
+        replacements: list[tuple[Path, Path]],
+        arc_dir: Path,
+    ) -> None:
+        """Commit fully staged tail files, restoring every prior path if a rename fails."""
+        backup_dir = Path(tempfile.mkdtemp(prefix=".tail_resegment_backup_", dir=str(arc_dir)))
+        prior_paths = {old_tail_path}
+        prior_paths.update(destination for _, destination in replacements if destination.exists())
+        moved: list[tuple[Path, Path]] = []
+        committed: list[Path] = []
+        remove_backup_dir = True
+        try:
+            for original in sorted(prior_paths, key=lambda path: path.name):
+                if not original.exists():
+                    continue
+                backup = backup_dir / original.name
+                original.replace(backup)
+                moved.append((original, backup))
+            for staged, destination in replacements:
+                staged.replace(destination)
+                committed.append(destination)
+        except Exception as commit_error:
+            rollback_errors = []
+            for destination in reversed(committed):
+                try:
+                    destination.unlink(missing_ok=True)
+                except OSError as exc:
+                    rollback_errors.append(f"remove {destination.name}: {exc}")
+            for original, backup in reversed(moved):
+                try:
+                    if backup.exists():
+                        backup.replace(original)
+                except OSError as exc:
+                    rollback_errors.append(f"restore {original.name}: {exc}")
+            if rollback_errors:
+                remove_backup_dir = False
+                raise RuntimeError(
+                    f"Tail resegmentation commit failed and rollback was incomplete; "
+                    f"recoverable backups remain in {backup_dir}: {'; '.join(rollback_errors)}"
+                ) from commit_error
+            raise
+        finally:
+            if remove_backup_dir:
+                shutil.rmtree(backup_dir, ignore_errors=True)
+
+    @staticmethod
+    def _segment_cards_json(cards: list[dict[str, Any]]) -> str:
+        """Keep a long rolling window bounded without dropping its early or late chapter facts."""
+        compact_cards = []
+        for card in cards:
+            rhythm = card.get("chapter_rhythm") if isinstance(card.get("chapter_rhythm"), dict) else {}
+            compact_cards.append({
+                "chapter": card.get("chapter"),
+                "global_chapter": card.get("global_chapter", card.get("chapter")),
+                "title": _compact_text(card.get("title"), 120),
+                "chapter_outline_600": _compact_text(
+                    card.get("chapter_outline_600") or card.get("summary"), 700,
+                ),
+                "chapter_rhythm": {
+                    "core_content": _compact_text(rhythm.get("core_content"), 240),
+                    "emotion_tone": _compact_text(rhythm.get("emotion_tone"), 180),
+                    "beat_detail": _compact_text(rhythm.get("beat_detail"), 240),
+                },
+                "story_line": _compact_text(card.get("story_line"), 360),
+                "entities": card.get("entities") or {},
+                "evidence": (card.get("evidence") or [])[:4],
+                "uncertainty": _compact_text(card.get("uncertainty"), 180),
+            })
+        return json.dumps(compact_cards, ensure_ascii=False, separators=(",", ":"))
 
     def _load_arc_items(self, arc_dir: Path) -> list[dict[str, Any]]:
         items = []
@@ -630,6 +964,22 @@ class ReferenceAnalyzer:
                 "content": _read_text(path),
             })
         return items
+
+    def _quarantine_placeholder_arcs(self, arc_dir: Path) -> int:
+        quarantine_dir = arc_dir / "quarantine"
+        quarantined_count = 0
+        for path in sorted(arc_dir.glob("arc_*_ch*_*.md")):
+            content = _read_text(path)
+            if content and not self._is_placeholder(content):
+                continue
+            quarantine_dir.mkdir(parents=True, exist_ok=True)
+            destination = quarantine_dir / path.name
+            if destination.exists():
+                destination = quarantine_dir / f"{path.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{path.suffix}"
+            path.replace(destination)
+            quarantined_count += 1
+            print(f"  Quarantined incomplete reference segment: {destination}")
+        return quarantined_count
 
     @staticmethod
     def _contiguous_end(items: list[dict[str, Any]]) -> int:
@@ -655,11 +1005,37 @@ class ReferenceAnalyzer:
                 end = int(raw.get("end_chapter"))
             except (TypeError, ValueError):
                 continue
-            if end < start or start != expected or end - start + 1 > self.max_chapters_per_segment:
+            if end < start or start != expected:
                 break
             if any(number not in available for number in range(start, end + 1)):
                 break
-            accepted.append({
+            analysis_status = _compact_text(raw.get("analysis_status") or "complete", 40).lower()
+            quality_status = _compact_text(raw.get("quality_status") or "evidence_supported", 60).lower()
+            required = [
+                raw.get("narrative_function"),
+                raw.get("boundary_reason"),
+                raw.get("structure"),
+            ]
+            if analysis_status != "complete" or quality_status not in {
+                "evidence_supported", "verified", "complete",
+            }:
+                break
+            if any(not str(value or "").strip() or self._is_placeholder(value) for value in required):
+                break
+            evidence_chapters = []
+            raw_evidence = raw.get("evidence_chapters") or []
+            if isinstance(raw_evidence, list):
+                for value in raw_evidence:
+                    try:
+                        chapter = int(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if start <= chapter <= end and chapter not in evidence_chapters:
+                        evidence_chapters.append(chapter)
+            if not evidence_chapters:
+                # Older model/cache responses did not emit this additive field; their validated range is the provenance.
+                evidence_chapters = list(range(start, end + 1))
+            normalized = {
                 "start_chapter": start,
                 "end_chapter": end,
                 "title": _compact_text(raw.get("title") or f"Chapters {start}-{end} plot", 180),
@@ -672,31 +1048,42 @@ class ReferenceAnalyzer:
                 "character_changes": _compact_text(raw.get("character_changes"), 900),
                 "gains_costs": _compact_text(raw.get("gains_costs"), 800),
                 "foreshadowing": _compact_text(raw.get("foreshadowing"), 900),
-            })
+                "evidence_chapters": evidence_chapters,
+                "confidence": self._normalize_confidence(raw.get("confidence")),
+                "uncertainty": _compact_text(raw.get("uncertainty"), 400),
+                "analysis_status": "complete",
+                "quality_status": "evidence_supported",
+            }
+            if any(self._is_placeholder(value) for value in normalized.values() if isinstance(value, str)):
+                break
+            accepted.append(normalized)
             expected = end + 1
         return accepted
 
-    def _fallback_segment(self, cards: list[dict[str, Any]], reason: str) -> dict[str, Any]:
-        start = int(cards[0]["chapter"])
-        end = int(cards[-1]["chapter"])
-        return {
-            "start_chapter": start,
-            "end_chapter": end,
-            "title": f"Chapters {start}-{end} transition plot",
-            "narrative_function": "Phase advance based on saved single-chapter fact cards.",
-            "boundary_reason": reason,
-            "structure": "；".join(card.get("chapter_outline_600", "") or card.get("summary", "") for card in cards),
-            "protagonist_action": "；".join(card.get("story_line", "") for card in cards if card.get("story_line")),
-            "emotion_rhythm": " -> ".join(
-                (card.get("chapter_rhythm") or {}).get("emotion_tone", "") for card in cards if (card.get("chapter_rhythm") or {}).get("emotion_tone")
-            ),
-            "satisfaction_point": "To be filled by later segments or by hand.",
-            "character_changes": "；".join(
-                (card.get("chapter_rhythm") or {}).get("beat_detail", "") for card in cards if (card.get("chapter_rhythm") or {}).get("beat_detail")
-            ),
-            "gains_costs": "To be filled by later segments or by hand.",
-            "foreshadowing": "；".join("；".join(card.get("highlights", [])) for card in cards if card.get("highlights")),
-        }
+    @staticmethod
+    def _is_placeholder(value: Any) -> bool:
+        text = str(value or "").strip().lower()
+        return bool(re.search(
+            r"\b(?:tbd|todo|placeholder|to be filled|fill (?:this|later)|unknown for now)\b|待补|待填写|占位",
+            text,
+        ))
+
+    @staticmethod
+    def _write_pending_segment(arc_dir: Path, cards: list[dict[str, Any]], reason: str) -> None:
+        path = arc_dir / "_pending_segment.json"
+        if not cards:
+            path.unlink(missing_ok=True)
+            return
+        _write_json(path, {
+            "analysis_status": "incomplete",
+            "quality_status": "quarantined",
+            "start_chapter": int(cards[0]["chapter"]),
+            "end_chapter": int(cards[-1]["chapter"]),
+            "card_count": len(cards),
+            "reason": reason or "No evidence-supported natural boundary has closed yet.",
+            "resume_from_chapter": int(cards[0]["chapter"]),
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        })
 
     @staticmethod
     def _render_segment(segment: dict[str, Any]) -> str:
@@ -712,6 +1099,10 @@ class ReferenceAnalyzer:
             f"Character and relationship change: {segment['character_changes']}",
             f"Gains and costs: {segment['gains_costs']}",
             f"Foreshadowing and next bind: {segment['foreshadowing']}",
+            f"Evidence chapters: {', '.join(str(value) for value in segment['evidence_chapters'])}",
+            f"Analysis status: {segment['analysis_status']} / {segment['quality_status']}",
+            f"Confidence: {segment['confidence']['level']} ({segment['confidence']['score']})",
+            f"Uncertainty: {segment['uncertainty'] or 'No additional uncertainty stated.'}",
         ])
 
     @staticmethod
@@ -726,7 +1117,13 @@ class ReferenceAnalyzer:
             for item in items
         ])
 
-    def _update_volume_state(self, spec: dict[str, Any], closed_through: int, available_through: int) -> None:
+    def _update_volume_state(
+        self,
+        spec: dict[str, Any],
+        closed_through: int,
+        available_through: int,
+        pending_reason: str = "",
+    ) -> None:
         volumes = self.state.setdefault("volumes", {})
         volumes[str(spec["index"])] = {
             "title": spec["title"],
@@ -736,6 +1133,9 @@ class ReferenceAnalyzer:
             "available_through": available_through,
             "closed_through": closed_through,
             "pending_start": closed_through + 1 if closed_through < available_through else None,
+            "analysis_status": "complete" if closed_through >= available_through else "incomplete",
+            "pending_quality": None if closed_through >= available_through else "quarantined",
+            "pending_reason": pending_reason if closed_through < available_through else "",
         }
         self.state["updated_at"] = datetime.now().isoformat(timespec="seconds")
         _write_json(self.state_path, self.state)

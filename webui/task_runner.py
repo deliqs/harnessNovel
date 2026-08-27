@@ -314,6 +314,8 @@ class WorkspaceStore:
         story_arcs = self._count_files(fs / "story_arcs", {".md"})
         chapter_outlines = self._count_files(fs / "chapter_outlines", {".md"})
         chapters = self._count_files(fs / "chapters", {".md", ".txt"})
+        from training.quality_report import build_quality_report
+        quality_report = build_quality_report(base)
 
         steps = [
             ("Reference deconstruction", sample.exists() and ref_chapters > 0),
@@ -398,6 +400,7 @@ class WorkspaceStore:
                 "chapter_outline_count": chapter_outlines,
                 "chapter_count": chapters,
             },
+            "quality_report": quality_report,
             "steps": [{"name": step, "done": bool(done)} for step, done in steps],
             "progress": {"completed": completed, "total": len(steps)},
             "next_action": next_action,
@@ -796,7 +799,7 @@ class TaskManager:
         }
 
     def prompts(self, task_id: str) -> dict[str, Any]:
-        """Return prompts actually sent to the model while the task ran."""
+        """Return retained prompt content or safe call metadata while the task ran."""
         task = self.get(task_id)
         if not task:
             raise KeyError(task_id)
@@ -808,7 +811,7 @@ class TaskManager:
                     item = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if isinstance(item, dict) and item.get("prompt"):
+                if isinstance(item, dict) and item.get("id"):
                     items.append(item)
         return {"task": self._public(task), "items": items[-50:]}
 
@@ -900,6 +903,10 @@ class TaskManager:
         env["HARNESS_NOVEL_PROMPT_TRACE_FILE"] = str(
             self.task_dir / f"{task.id}.prompts.jsonl"
         )
+        # The Web UI's stored policy is activated in this process; pass it explicitly
+        # so a child process cannot inherit an unrelated shell trace setting.
+        from core.config import ConfigLoader
+        env["HARNESS_NOVEL_PROMPT_TRACE_MODE"] = ConfigLoader.get_prompt_trace_mode()
         try:
             process = subprocess.Popen(
                 command,

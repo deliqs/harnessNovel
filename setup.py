@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from setuptools import setup, find_packages
 
 setup(
@@ -5,14 +7,14 @@ setup(
     version="2.0.2",
     author="飞鸟 one the way",
     description="AI agent for long-form web novel writing",
-    long_description=open("README.md", encoding="utf-8").read(),
+    long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     url="https://github.com/XTmingyue/harnessNovel",
     license="GPL-3.0",
     packages=find_packages(),
     py_modules=["novel_cli"],
     package_data={
-        "core": ["prompts/*/prompt.txt"],
+        "core": ["prompts/*/prompt.txt", "system_prompt.md", "agents.md"],
         "webui": ["static/*"],
     },
     entry_points={
@@ -21,7 +23,7 @@ setup(
         ],
     },
     install_requires=[
-        "openai",
+        "openai>=1.0.0",
         "charset-normalizer>=3.0",
         "fastapi>=0.110",
         "uvicorn>=0.27",

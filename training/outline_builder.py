@@ -39,13 +39,57 @@ VOLUME_TITLE_RE = re.compile(
 # Volume directory name format: vol_01_<title>
 VOL_DIR_RE = re.compile(r'^vol_(\d+)_(.+)$')
 PROMPT_JOIN_MAX_CHARS = 26000
+PROMPT_PART_TRUNCATION_MARKER = "\n[... content truncated; later obligations retained ...]\n"
 
 
 def _join_prompt_parts(parts, sep="\n\n---\n\n", max_chars=PROMPT_JOIN_MAX_CHARS):
-    joined = sep.join(part for part in parts if part)
+    kept = [str(part) for part in parts if part]
+    joined = sep.join(kept)
     if len(joined) <= max_chars:
         return joined
-    return joined[:max_chars] + "\n\n(content was too long; the above is a truncated summary.)"
+    if max_chars <= 0 or not kept:
+        return ""
+
+    separator_chars = len(sep) * (len(kept) - 1)
+    if separator_chars >= max_chars:
+        # Pathological many-part input: retain explicit early/middle/late representatives.
+        representatives = [kept[0]]
+        if len(kept) > 2:
+            representatives.append(kept[len(kept) // 2])
+        if len(kept) > 1:
+            representatives.append(kept[-1])
+        if len(representatives) - 1 >= max_chars:
+            return PROMPT_PART_TRUNCATION_MARKER[:max_chars]
+        return _join_prompt_parts(representatives, sep="\n", max_chars=max_chars)
+
+    available = max_chars - separator_chars
+    budgets = [0] * len(kept)
+    remaining = set(range(len(kept)))
+    while remaining:
+        share = available // len(remaining)
+        completed = {index for index in remaining if len(kept[index]) <= share}
+        if not completed:
+            for index in sorted(remaining):
+                budgets[index] = share
+            for index in sorted(remaining)[: available - share * len(remaining)]:
+                budgets[index] += 1
+            break
+        for index in completed:
+            budgets[index] = len(kept[index])
+            available -= budgets[index]
+        remaining -= completed
+
+    def truncate_part(part, budget):
+        if len(part) <= budget:
+            return part
+        if budget <= len(PROMPT_PART_TRUNCATION_MARKER):
+            return PROMPT_PART_TRUNCATION_MARKER[:budget]
+        content_budget = budget - len(PROMPT_PART_TRUNCATION_MARKER)
+        head = (content_budget + 1) // 2
+        tail = content_budget - head
+        return part[:head] + PROMPT_PART_TRUNCATION_MARKER + (part[-tail:] if tail else "")
+
+    return sep.join(truncate_part(part, budget) for part, budget in zip(kept, budgets))
 
 
 ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
@@ -771,50 +815,6 @@ def _extract_segment_ranges(batch_dir):
     return segments
 
 
-def _parse_batch_chapter_outlines(result):
-    """Parse multi-chapter-outline LLM output into {chapter_num: outline_text}."""
-    outlines = {}
-    parts = re.split(r'[【]?第(\d+)章\s*章纲[】]?', result)
-    for i in range(1, len(parts) - 1, 2):
-        ch_num = int(parts[i])
-        content = parts[i + 1].strip() if i + 1 < len(parts) else ""
-        if content:
-            outlines[ch_num] = content
-    return outlines
-
-
-def _generate_chapter_outlines_batch(chapters_batch, llm):
-    """Generate chapter outlines in a batch. chapters_batch: [(global_ch_num, chapter_dict), ...].
-    Return {global_ch_num: outline_text} in input order, without depending on LLM-returned numbers.
-    """
-    chapters_text_parts = []
-    for ch_num, ch in chapters_batch:
-        chapters_text_parts.append(f"=== Chapter {ch_num} ===\n{ch['content']}")
-    chapters_text = "\n\n".join(chapters_text_parts)
-
-    prompt = PromptLoader.load("chapter_outline_extract", chapters_text=chapters_text)
-    result = normalize_text(llm.generate(prompt))
-    parsed = _parse_batch_chapter_outlines(result)
-
-    # Match in input order: exact number first, then sequential fallback
-    outlines = {}
-    used_indices = set()
-    # Pass 1: exact match
-    for i, (ch_num, _) in enumerate(chapters_batch):
-        if ch_num in parsed and i not in used_indices:
-            outlines[ch_num] = parsed[ch_num]
-            used_indices.add(i)
-    # Pass 2: unmatched inputs take unused parse results in order
-    parsed_values = [v for k, v in sorted(parsed.items()) if k not in outlines]
-    pi = 0
-    for i, (ch_num, _) in enumerate(chapters_batch):
-        if i not in used_indices and pi < len(parsed_values):
-            outlines[ch_num] = parsed_values[pi]
-            pi += 1
-
-    return outlines
-
-
 def _load_existing_volumes(outlines_dir, groups, chapters):
     """If complete story-arc units / old batch summaries and volume outlines exist, return {volume_outlines, groups}.
 
@@ -955,8 +955,7 @@ def run_outline_build(txt_path=None, output_dir=None, batch_size=20, skip_chapte
     """Run a resumable three-stage reference-novel deconstruction.
 
     Keep the original function name and story-segment output dir so later stage design and narrative-pattern
-    extract still read from ``reference/outlines/vol_xx/story_arcs``. The old implementation is kept only as
-    internal compatibility code and is no longer the default entry.
+    extraction still read from ``reference/outlines/vol_xx/story_arcs``.
     """
     if txt_path is None:
         txt_path = os.path.join(DATA_DIR, "sample_novel.txt")
@@ -1080,9 +1079,6 @@ def resegment(outlines_dir):
     segment_endpoints = _extract_segment_endpoints(all_batch_dir)
     virtual_volumes = _snap_to_segments(virtual_volumes, segment_endpoints, total_ch)
 
-    # If a volume has fewer than 60 chapters, merge it into a neighbor
-    virtual_volumes = _ensure_min_chapters(virtual_volumes, min_chapters=60)
-
     # Cover every chapter: volume 1 starts at 1, last volume ends at total_ch
     virtual_volumes = _ensure_full_coverage(virtual_volumes, total_ch)
 
@@ -1150,51 +1146,6 @@ def _ensure_full_coverage(virtual_volumes, total_ch):
             e = end_ch
         result.append((vi, title, s, e))
     return result
-
-
-def _ensure_min_chapters(virtual_volumes, min_chapters=60):
-    """Merge virtual volumes under min_chapters into a neighboring volume."""
-    if not virtual_volumes:
-        return virtual_volumes
-
-    result = list(virtual_volumes)
-    changed = True
-    while changed:
-        changed = False
-        new_result = []
-        i = 0
-        while i < len(result):
-            vi, title, start_ch, end_ch = result[i]
-            ch_count = end_ch - start_ch + 1
-            if ch_count < min_chapters:
-                # Try merging into the next volume
-                if i + 1 < len(result):
-                    nvi, ntitle, ns, ne = result[i + 1]
-                    merged = (nvi, ntitle, start_ch, ne)
-                    new_result.append(merged)
-                    print(f"  -> Volume {vi} ({ch_count} chapters) is under {min_chapters} chapters; merging into volume {nvi}")
-                    i += 2
-                    changed = True
-                # Try merging into the previous volume
-                elif new_result:
-                    pvi, ptitle, ps, pe = new_result[-1]
-                    new_result[-1] = (pvi, ptitle, ps, end_ch)
-                    print(f"  -> Volume {vi} ({ch_count} chapters) is under {min_chapters} chapters; merging into volume {pvi}")
-                    i += 1
-                    changed = True
-                else:
-                    new_result.append(result[i])
-                    i += 1
-            else:
-                new_result.append(result[i])
-                i += 1
-        result = new_result
-
-    # Renumber
-    final = []
-    for idx, (vi, title, start_ch, end_ch) in enumerate(result):
-        final.append((idx + 1, title, start_ch, end_ch))
-    return final
 
 
 if __name__ == "__main__":

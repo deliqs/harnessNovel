@@ -443,8 +443,9 @@ button:disabled { cursor: not-allowed; }
 .config-status.ready { color: #176450; background: #e3f3eb; }
 .config-status.missing { color: #92611d; background: #fff2d8; }
 .model-config-group label { display: grid; gap: 5px; color: #52635b; font-size: 11px; font-weight: 700; }
-.model-config-group input { width: 100%; height: 35px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--ink); background: #fff; outline: none; font-size: 12px; }
-.model-config-group input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(11,119,105,.1); }
+.model-config-group input, .model-config-group select { width: 100%; height: 35px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--ink); background: #fff; outline: none; font-size: 12px; }
+.model-config-group input:focus, .model-config-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(11,119,105,.1); }
+.settings-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .settings-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 2px; }
 .workspace-scrim { position: fixed; inset: 0; z-index: 6; display: none; background: rgba(24,40,34,.3); }
 .workspace-scrim.open { display: block; }

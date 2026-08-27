@@ -4,39 +4,53 @@
 import sys
 import os
 import argparse
+import json
 import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 
 def cmd_config(args):
-      """Initialize the global config file ~/.harnessNovel/.env"""
-      import os
-      config_dir = os.path.join(os.path.expanduser("~"), ".harnessNovel")
-      env_path = os.path.join(config_dir, ".env")
-      if os.path.exists(env_path) and not args.force:
-          print(f"Config file already exists: {env_path}")
-          print("Use --force to overwrite")
-          return
-      os.makedirs(config_dir, exist_ok=True)
-      template = """# Reference novel story-arc extraction (init flow; flash model recommended)
-  DATA_BUILDER_MODEL=deepseek-v4-flash
-  DATA_BUILDER_BASE_URL=https://api.deepseek.com
-  DATA_BUILDER_API_KEY=your-api-key
+    """Initialize the global config file ~/.harnessNovel/.env."""
+    from core.config import write_private_text
 
-  # Book design and stage design (pro model recommended)
-  ADAPTIVE_BUILDER_MODEL=deepseek-v4-pro
-  ADAPTIVE_BUILDER_BASE_URL=https://api.deepseek.com
-  ADAPTIVE_BUILDER_API_KEY=your-api-key
+    config_dir = os.path.join(os.path.expanduser("~"), ".harnessNovel")
+    env_path = os.path.join(config_dir, ".env")
+    if os.path.exists(env_path) and not args.force:
+        print(f"Config file already exists: {env_path}")
+        print("Use --force to overwrite")
+        return
+    template = """# Reference novel extraction (init flow; flash model recommended)
+DATA_BUILDER_MODEL=deepseek-v4-flash
+DATA_BUILDER_BASE_URL=https://api.deepseek.com
+DATA_BUILDER_API_KEY=your-api-key
 
-  # Story arcs, chapter outlines, drafts, and lightweight tasks (flash model recommended)
-  ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
-  ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
-  ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
-  """
-      with open(env_path, "w", encoding="utf-8") as f:
-          f.write(template)
-      print(f"Config file created: {env_path}")
-      print("Edit the file and fill in your API key")
+# Book and stage design (pro model recommended)
+ADAPTIVE_BUILDER_MODEL=deepseek-v4-pro
+ADAPTIVE_BUILDER_BASE_URL=https://api.deepseek.com
+ADAPTIVE_BUILDER_API_KEY=your-api-key
+
+# Story arcs and chapter outlines. This is also the fallback for optional roles below.
+ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
+ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
+ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
+
+# Optional production roles. Leave a role unset to inherit each missing value from Lite.
+# DRAFT_MODEL=
+# DRAFT_BASE_URL=
+# DRAFT_API_KEY=
+# EDITOR_MODEL=
+# EDITOR_BASE_URL=
+# EDITOR_API_KEY=
+# CRITIC_MODEL=
+# CRITIC_BASE_URL=
+# CRITIC_API_KEY=
+
+# Prompt diagnostics: off, metadata (default), or full. Full saves bounded, redacted prompts locally.
+HARNESS_NOVEL_PROMPT_TRACE_MODE=metadata
+"""
+    write_private_text(env_path, template)
+    print(f"Config file created: {env_path}")
+    print("Edit the file and fill in your API key")
 
 def cmd_list(args):
     from core.workspace import list_novels
@@ -591,6 +605,22 @@ def cmd_write(args):
                         humanize_existing=args.humanize_existing)
 
 
+def cmd_quality_report(args):
+    """Inspect saved provenance and diagnostics without generating content."""
+    from core.workspace import NovelWorkspace
+    from training.quality_report import build_quality_report, format_quality_report
+
+    ws = NovelWorkspace(args.workspace)
+    if not os.path.isdir(ws.root):
+        print("Error: workspace does not exist: %s" % args.workspace)
+        return
+    report = build_quality_report(ws)
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(format_quality_report(report))
+
+
 def cmd_web(args):
     """Start the local visual workbench."""
     try:
@@ -749,6 +779,11 @@ def main():
     p.add_argument("--no-humanize", action="store_true", help="Disable automatic humanization after draft generation")
     p.add_argument("--humanize-existing", action="store_true", help="Humanize existing chapter files; by default only newly generated chapters are humanized")
 
+    # quality-report
+    p = sub.add_parser("quality-report", help="Inspect saved quality diagnostics and provenance without generation")
+    p.add_argument("workspace", help="Workspace name")
+    p.add_argument("--json", action="store_true", help="Emit the read-only report as JSON")
+
     # web
     p = sub.add_parser("web", help="Start the local visual workbench")
     p.add_argument("--host", default="127.0.0.1", help="Listen address (default 127.0.0.1, local only)")
@@ -779,6 +814,7 @@ def main():
         "story-arcs": cmd_story_arcs,
         "chapter-outlines": cmd_chapter_outlines,
         "write": cmd_write,
+        "quality-report": cmd_quality_report,
         "web": cmd_web,
         "config": cmd_config
     }

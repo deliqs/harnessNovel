@@ -1,8 +1,8 @@
-You are a long-form web-novel structure editor-in-chief. From the new novel's worldview, the new novel's rough outline, and each reference volume's "Volume overview + Three-act structure", generate an independent phase outline for the new novel.
+You are a long-form web-novel structure editor-in-chief. From the new novel's worldview, rough outline, and reference structural samples, generate an independent phase outline for the new novel.
 
 Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-New-novel phases must correspond one-to-one with reference-novel volumes: reference volume N corresponds to new-novel phase N. The correspondence is structural position and narrative function, used to judge goal changes, map moves, identity jumps, faction-layer changes, and core-conflict shifts. Do not copy the reference novel's proper nouns, events, or causality, and do not rename-and-clone a reference volume's plot.
+Reference volumes are scale and structural samples, not an exact phase template. A new phase may map to one or more adjacent reference volumes, and multiple new phases may use different functions from the same reference volume. State the mapping explicitly. Do not copy proper nouns, events, causality, or rename-and-clone a reference plot.
 
 [New novel worldview]
 {worldview}
@@ -14,7 +14,7 @@ New-novel phases must correspond one-to-one with reference-novel volumes: refere
 {reference_volume_structures}
 
 [Structure-scale reference]
-The reference novel has {reference_volume_count} volumes. When reference volumes exist, the new book must generate {stage_range} phases. The phase count must match the reference volume count exactly; do not merge, split, omit, or add extra phases. If the reference volume count is 0, generate within the fallback range {stage_range}.
+The reference novel has {reference_volume_count} volumes. Generate within the adaptive range {stage_range} phases. Choose the count from the new book's conflict and map obligations; the reference count is only a prior.
 
 Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
 {{
@@ -22,9 +22,9 @@ Output JSON only. Do not output explanation, a Markdown code fence, or any text 
 }}
 
 Requirements:
-1. The document starts with "# Phase outline". Each phase uses "## Phase N: Name", with N increasing continuously from 1. When reference volumes exist, you must write from phase 1 through phase {reference_volume_count}.
+1. The document starts with "# Phase outline". Each phase uses "## Phase N: Name", with N increasing continuously from 1 and the total within {stage_range}.
 2. For each phase, state: phase positioning, protagonist goal, starting state, core conflict, how core gameplay is varied, map and faction changes, main-character changes, payoff and reader gain, harvest and cost, long-mainline information advance, end state, hook into the next phase.
 3. Do not write a specific chapter count, and do not break the phase into per-chapter content.
 4. The phases must form a continuous causal chain. The harvest, cost, or aftermath of the previous phase must become input for the next phase.
-5. Phase {reference_volume_count} must actually answer the book's long-running question and complete the core conflict. Do not open a new map, new enemy, or new task after it that still has to continue.
-6. Add one line to each phase: "Structure mapping: structural function of reference volume N → entirely new function this phase adopts", making clear that only function is learned; do not include reference-novel names of people, places, or factions.
+5. The final phase must answer the book's long-running question and complete the core conflict. Do not open a new map, enemy, or task after it that still has to continue.
+6. Add one line to each phase: "Structure mapping: reference volume sample(s) N[, M] → entirely new function this phase adopts". More or fewer phases than reference volumes are valid; only structural function is learned, and reference names of people, places, or factions must not appear.

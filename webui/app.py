@@ -25,6 +25,7 @@ from webui.design_chat import DesignChatManager
 from webui.arc_chat import ArcsChatManager
 from webui.chapter_chat import ChapterOutlineChatManager
 from webui.draft_chat import DraftChatManager
+from core.config import write_private_text
 from core.workspace import init_workspace
 
 
@@ -44,12 +45,26 @@ CONFIG_KEYS = [
     "ADAPTIVE_BUILDER_LITE_MODEL",
     "ADAPTIVE_BUILDER_LITE_BASE_URL",
     "ADAPTIVE_BUILDER_LITE_API_KEY",
+    "DRAFT_MODEL",
+    "DRAFT_BASE_URL",
+    "DRAFT_API_KEY",
+    "EDITOR_MODEL",
+    "EDITOR_BASE_URL",
+    "EDITOR_API_KEY",
+    "CRITIC_MODEL",
+    "CRITIC_BASE_URL",
+    "CRITIC_API_KEY",
+    "HARNESS_NOVEL_PROMPT_TRACE_MODE",
 ]
 CONFIG_GROUPS = {
     "data_builder": ("Reference deconstruction model", "DATA_BUILDER"),
     "adaptive_builder": ("Book design and stage design model (Pro recommended)", "ADAPTIVE_BUILDER"),
-    "adaptive_builder_lite": ("Story-arc, chapter-outline, and draft model (Flash recommended)", "ADAPTIVE_BUILDER_LITE"),
+    "adaptive_builder_lite": ("Story arcs and chapter outlines (fallback model)", "ADAPTIVE_BUILDER_LITE"),
+    "draft": ("Draft generation model (optional; Lite fallback)", "DRAFT"),
+    "editor": ("Editing and humanization model (optional; Lite fallback)", "EDITOR"),
+    "critic": ("Critique and validation model (optional; Lite fallback)", "CRITIC"),
 }
+PROMPT_TRACE_MODES = {"off", "metadata", "full"}
 
 
 def _effective_config_path() -> Path:
@@ -83,8 +98,10 @@ def _load_web_settings() -> dict[str, Any]:
 
 
 def _save_web_settings(data: dict[str, Any]) -> None:
-    WEB_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    WEB_SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_private_text(
+        WEB_SETTINGS_PATH,
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+    )
 
 
 def _read_env() -> tuple[list[str], dict[str, str]]:
@@ -106,24 +123,47 @@ def _config_for_client() -> dict[str, Any]:
     _, values = _read_env()
     groups = {}
     for group_id, (label, prefix) in CONFIG_GROUPS.items():
+        optional_role = prefix in {"DRAFT", "EDITOR", "CRITIC"}
+        fallback_prefix = "ADAPTIVE_BUILDER_LITE"
+        fallback_fields = [
+            field for field in ("MODEL", "BASE_URL", "API_KEY")
+            if optional_role
+            and not values.get(f"{prefix}_{field}", "")
+            and values.get(f"{fallback_prefix}_{field}", "")
+        ]
         groups[group_id] = {
             "label": label,
             "model": values.get(f"{prefix}_MODEL", ""),
             "base_url": values.get(f"{prefix}_BASE_URL", ""),
-            "api_key_configured": bool(values.get(f"{prefix}_API_KEY", "")),
+            "api_key_configured": bool(
+                values.get(f"{prefix}_API_KEY", "")
+                or (optional_role and values.get(f"{fallback_prefix}_API_KEY", ""))
+            ),
+            "inherited": bool(fallback_fields),
+            "fallback_fields": fallback_fields,
         }
-    return {"config_path": str(_effective_config_path()), "groups": groups}
+    trace_mode = values.get("HARNESS_NOVEL_PROMPT_TRACE_MODE", "metadata").lower()
+    if trace_mode not in PROMPT_TRACE_MODES:
+        trace_mode = "metadata"
+    return {
+        "config_path": str(_effective_config_path()),
+        "groups": groups,
+        "prompt_trace_mode": trace_mode,
+    }
 
 
-def _update_env(updates: dict[str, str]) -> None:
+def _update_env(updates: dict[str, str], removals: set[str] | None = None) -> None:
     config_path = _effective_config_path()
     lines, _ = _read_env()
     remaining = dict(updates)
+    removals = removals or set()
     output: list[str] = []
     for line in lines:
         stripped = line.strip()
         if stripped and not stripped.startswith("#") and "=" in stripped:
             key = stripped.split("=", 1)[0].strip()
+            if key in removals:
+                continue
             if key in remaining:
                 output.append(f"{key}={remaining.pop(key)}")
                 continue
@@ -135,12 +175,17 @@ def _update_env(updates: dict[str, str]) -> None:
         for key in CONFIG_KEYS:
             if key in remaining:
                 output.append(f"{key}={remaining.pop(key)}")
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
+    write_private_text(config_path, "\n".join(output).rstrip() + "\n")
 
 
 class WebRuntime:
     def __init__(self, workspace_root: str | None):
+        # The Web workbench owns its trace policy; do not inherit an unrelated shell setting.
+        _, config_values = _read_env()
+        trace_mode = config_values.get("HARNESS_NOVEL_PROMPT_TRACE_MODE", "metadata").lower()
+        os.environ["HARNESS_NOVEL_PROMPT_TRACE_MODE"] = (
+            trace_mode if trace_mode in PROMPT_TRACE_MODES else "metadata"
+        )
         saved = _load_web_settings()
         root = workspace_root or saved.get("workspace_root") or _default_workspace_root()
         self.store = WorkspaceStore(root)
@@ -260,6 +305,15 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         if not isinstance(raw_values, dict):
             raise _http_error(ValueError("Invalid config format."))
         updates: dict[str, str] = {}
+        removals: set[str] = set()
+        raw_clear_keys = payload.get("clear_keys") or []
+        if not isinstance(raw_clear_keys, list):
+            raise _http_error(ValueError("Invalid config clear list."))
+        optional_role_keys = {
+            key for key in CONFIG_KEYS
+            if key.startswith(("DRAFT_", "EDITOR_", "CRITIC_"))
+        }
+        removals.update(str(key) for key in raw_clear_keys if str(key) in optional_role_keys)
         for key in CONFIG_KEYS:
             value = raw_values.get(key)
             if value is None:
@@ -268,14 +322,23 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             # Leaving API Key blank keeps the existing value so the browser cannot wipe a hidden key.
             if key.endswith("_API_KEY") and not value:
                 continue
+            if key.startswith(("DRAFT_", "EDITOR_", "CRITIC_")) and not value:
+                removals.add(key)
+                continue
+            if key == "HARNESS_NOVEL_PROMPT_TRACE_MODE":
+                if value.lower() not in PROMPT_TRACE_MODES:
+                    raise _http_error(ValueError("Prompt trace mode must be off, metadata, or full."))
+                value = value.lower()
             if value:
                 updates[key] = value
-        if updates:
-            _update_env(updates)
+        removals.difference_update(updates)
+        if updates or removals:
+            _update_env(updates, removals)
             # Also update the current web process. ConfigLoader prefers os.environ,
             # so writing only .env would leave in-process chat and later subprocesses on the old startup values.
             from core.config import ConfigLoader
             ConfigLoader.activate(updates)
+            ConfigLoader.deactivate(removals)
         return _config_for_client()
 
     @app.get("/api/workspaces")
@@ -322,6 +385,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     def write_workspace_file(name: str, payload: dict[str, Any] = Body(...)) -> dict[str, bool]:
         try:
             path = str(payload.get("path") or "")
+            # Workspace text is author-controlled, untrusted data; storage only, never executable input.
             content = payload.get("content")
             if not isinstance(content, str):
                 raise ValueError("Saved content must be text.")
@@ -616,6 +680,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             for item in raw_attachments:
                 if not isinstance(item, dict):
                     continue
+                # Attachments are untrusted author/reference data passed to the generation workflow.
                 attachments.append({
                     "name": str(item.get("name") or "attachment"),
                     "content": str(item.get("content") or ""),
@@ -700,6 +765,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
 
     @app.post("/api/uploads")
     async def upload_file(file: UploadFile = File(...)) -> dict[str, Any]:
+        # Uploaded material is untrusted data. Keep it as an opaque local file until a workflow reads it.
         suffix = Path(file.filename or "").suffix.lower()
         if suffix not in UPLOAD_EXTENSIONS:
             raise _http_error(ValueError("Only text sources such as txt, md, json, csv, and yaml are supported."))

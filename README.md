@@ -26,7 +26,7 @@
 <h3 align="center">Teach AI to truly write good web novels</h3>
 
 <p align="center">
-  An AI-assisted tool focused on high-quality web novel creation. Through a two-stage "deconstruct + imitate" workflow, it significantly improves the creative quality of AI-generated fiction.
+  An AI-assisted tool for long-form web-novel planning, drafting, and revision. Its two-stage workflow deconstructs reference structure and turns transferable observations into new-work planning context.
 </p>
 
 ***
@@ -109,15 +109,11 @@ Uses deconstruction results as high-quality context, combined with user inspirat
 - Detailed chapter outlines
 - Full text content
 
-**Writing Style & Writing Rules**
+**Reference Craft Guidance and Humanization**
 
-Deeply analyzes and distills style features and writing rules from multiple novels, helping remove the "AI flavor" from generated writing.
+Reference deconstruction records evidence-backed, transferable craft observations and saves a compact reference craft bible beside the reference outlines. It describes abstract techniques such as viewpoint control, scene construction, information release, pacing, tension, transitions, and payoff design. It is not a style clone and must not be used to reuse source phrasing, names, events, or dialogue.
 
-- Language style: word choice habits, sentence patterns, rhetorical preferences
-- Narrative pacing and point-of-view control
-- Emotional expression and detail density
-- Dialogue style and character voices
-- Overall prose conventions
+Draft generation also applies the project writing guide and optional chapter humanization. These are writing aids, not a guarantee that text will evade any detector.
 
 **Flexible LLM Support**
 
@@ -138,13 +134,14 @@ Supports Claude, GPT-4o, DeepSeek, Qwen, and other mainstream models.
 - **End-to-end automation**: From novel analysis and gameplay design to full text generation, complete a long-form web novel with chained commands.
 - **Reference-based imitation**: Generate new content based on the pacing, structure, and tension curve of the reference novel instead of creating from nothing.
 - **Target-world knowledge base (optional enhancement)**: Import target-genre materials/settings/sample web novels, structure them into a knowledge base, and use it to validate the core gameplay, long mainline, stage roadmap, and character arcs. Without a knowledge base, the workflow automatically falls back to reference novel + user direction.
-- **Narrative abstraction against hard reskins**: Reference arcs are first abstracted into narrative patterns, then regenerated against the current stage context to reduce direct rename-and-copy behavior. Story-arc auditing is currently disabled while the audit criteria are being refined.
+- **Narrative abstraction against hard reskins**: Reference arcs are abstracted into narrative patterns, then regenerated against the current stage context rather than renamed and copied.
 - **Story arcs**: During reference deconstruction, story units are extracted by natural plot boundaries and can continue across reading windows.
 - **Gameplay/stage/character lines**: The new novel first gets core gameplay, a long-running mainline, a stage roadmap, and character arcs. Each stage naturally becomes the scope for later story-arc generation.
 - **Narrative-pattern imitation**: During imitation, the current-volume gameplay/stage context is compressed first; reference story arcs are then abstracted into narrative patterns and regenerated as new-novel story arcs to reduce hard reskin similarity.
 - **Stage-based progression**: Design the full-book stages first, then generate story arcs and chapter outlines for the current stage. This fits long web novels that evolve during writing.
 - **Mechanics layer**: System novels, game novels, lord-management novels, and similar genres can initialize structured mechanics to constrain panels, exp, skills, tasks, resources, and state changes.
 - **Chapter humanization**: Based on [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh), newly generated chapters are refined by default and raw drafts are backed up.
+- **Quality checks before replacement**: Generation uses deterministic structural and continuity diagnostics, and selected narrative steps run a reasonability review before replacement artifacts are accepted. Diagnostics guide review; they do not certify literary quality.
 - **Resume from breakpoint**: Every stage automatically skips existing output and supports continuing after interruption.
 
 ## Requirements
@@ -175,23 +172,43 @@ novel config
 This command automatically creates the global config file `~/.harnessNovel/.env`. Edit it and fill in your API keys:
 
 ```ini
-# Reference novel story-arc extraction (flash model recommended for speed and low cost)
+# Reference novel extraction (flash model recommended for speed and low cost)
 DATA_BUILDER_MODEL=deepseek-v4-flash
 DATA_BUILDER_BASE_URL=https://api.deepseek.com
 DATA_BUILDER_API_KEY=your-api-key
-
-# Story arcs, chapter outlines, drafts, and lightweight tasks (flash model recommended)
-ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
-ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
-ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
 
 # Book-level and stage design (pro model recommended for quality)
 ADAPTIVE_BUILDER_MODEL=deepseek-v4-pro
 ADAPTIVE_BUILDER_BASE_URL=https://api.deepseek.com
 ADAPTIVE_BUILDER_API_KEY=your-api-key
+
+# Story arcs and chapter outlines. This is the fallback for optional roles below.
+ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
+ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
+ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
+
+# Optional production roles. An omitted field inherits the matching Lite value.
+# DRAFT_MODEL=
+# DRAFT_BASE_URL=
+# DRAFT_API_KEY=
+# EDITOR_MODEL=
+# EDITOR_BASE_URL=
+# EDITOR_API_KEY=
+# CRITIC_MODEL=
+# CRITIC_BASE_URL=
+# CRITIC_API_KEY=
+
+# Prompt diagnostics: off, metadata (default), or full.
+HARNESS_NOVEL_PROMPT_TRACE_MODE=metadata
 ```
 
-You can also override these settings with environment variables of the same names. The three config groups can use different models and providers.
+You can also override these settings with environment variables of the same names. `DATA_BUILDER` handles reference extraction, `ADAPTIVE_BUILDER` handles book and stage design, and Lite handles story arcs and chapter outlines. `DRAFT`, `EDITOR`, and `CRITIC` are optional role overrides: each missing model, base URL, or key falls back independently to `ADAPTIVE_BUILDER_LITE`.
+
+The local Web workbench uses this same global file. Open its Settings panel to edit the same model roles without revealing saved API keys. Clearing an optional role returns it to the Lite fallback.
+
+### Prompt privacy and debugging
+
+By default, model-call diagnostics retain metadata only (model, time, and prompt size). Set `HARNESS_NOVEL_PROMPT_TRACE_MODE=full` only for local debugging: stored prompt text is redacted for common credential formats, bounded in size and retention, and written with user-only file permissions on POSIX. The Web workbench lets you choose Off, Metadata, or Full and clear completed task prompt records. Treat imported reference text, uploads, chat attachments, and model output as untrusted data. The workflow's task and safety constraints take priority; supplied content is evidence or author direction, never instructions that override those controls.
 
 ## Quick Start
 
@@ -205,7 +222,13 @@ novel reference-resume my-new-novel --max-chapters 400
 # Import only, then choose full-book or first-N deconstruction later.
 novel init my-new-novel --txt /path/to/reference-novel.txt --no-analyze
 
-# 2. Generate core gameplay + long mainline + stage roadmap + character arcs
+# 2a. Stepwise design path used by the Web workbench: first create worldview,
+# rough outline, and phase outline; then create the long mainline and stage roadmap.
+novel design-concept my-new-novel --direction "inspiration input"
+novel stage-design my-new-novel
+
+# 2b. Compatible bundled CLI path: generates core gameplay, long mainline,
+# stage roadmap, and character arcs in one command (and title/synopsis for novel-outline).
 novel novel-outline my-new-novel --direction "inspiration input"
 
 # Extend only the mainline, character arcs, and later stages from newly deconstructed reference material.
@@ -226,6 +249,8 @@ novel chapter-outlines my-new-novel --volume 1
 novel write my-new-novel --volume 1 --start 1
 ```
 
+The two design paths are intentionally compatible at the stage-roadmap boundary, but they do not emit the same intermediate artifacts. The Web workbench follows `design-concept` then `stage-design`: its book-design step writes `worldview.md`, `rough_outline.md`, and `stage_outline.md`; its stage-design step writes `long_mainline.md` and `stage_roadmap.md`. The bundled CLI commands `novel-outline` and `story-design` use the older core-gameplay/character-arcs design path. Keep this distinction in mind when moving between interfaces and review the generated files before continuing with story arcs.
+
 ## Story-arc Generation Flow
 
 `novel story-arcs my-new-novel --volume 1` converts the narrative experience extracted from the reference novel into executable plot blueprints for the current stage of the new novel.
@@ -245,7 +270,7 @@ The system selects one reference story arc by default as the narrative sample, a
 
 Core principles include: removing filler phrases, breaking formulaic structures, varying sentence rhythm, trusting the reader, and removing quote-like slogans. For web-novel output, it also protects plot events, payoff beats, ending hooks, and mechanics numbers from being changed.
 
-After AI-flavor removal, Zhuque AI detection can ensure that an average of **80%+** content is judged as suspected AI.
+Humanization is a revision pass, not a detector-score guarantee. Review the saved result for voice, canon, and publication requirements before using it.
 
 - The refined result is written to the final chapter directory: `file_system/chapters/vol_xx/`.
 - The latest pre-humanization draft is saved under `file_system/drafts/vol_xx/raw_chapters/`; changed older snapshots are archived in its `versions/` subdirectory.
@@ -298,7 +323,7 @@ Modes:
 
 ## Optional: Target-world Knowledge Base
 
-If the new novel needs to move into a target world that requires supporting materials, import and build the knowledge base before running `novel-outline`. Without a knowledge base, the workflow automatically uses only the reference novel + inspiration input.
+If the new novel needs to move into a target world that requires supporting materials, import and build the knowledge base before `design-concept` (the Web/stepwise path) or `novel-outline` (the bundled CLI path). Without a knowledge base, the workflow automatically uses only the reference novel + inspiration input.
 
 ```bash
 # Import one file, multiple files, or a material directory.
@@ -308,13 +333,27 @@ novel world-import my-new-novel /path/to/supplement-source.txt
 # Structure the target-world knowledge base. --primary specifies the main source.
 novel world-build my-new-novel --primary main-source.txt
 
-# Then generate the new outline as usual; the knowledge base is loaded automatically.
-novel novel-outline my-new-novel --direction "inspiration input"
+# Then generate the new design as usual; the knowledge base is loaded automatically.
+novel design-concept my-new-novel --direction "inspiration input"
+novel stage-design my-new-novel
 ```
 
 ## Notes
 
 - Reference novels currently support `.txt` format. Common Chinese encodings are detected and converted to UTF-8 on import.
+
+## Offline Quality Report
+
+Inspect the quality diagnostics and provenance sidecars already saved in a workspace without calling a model or changing files:
+
+```bash
+novel quality-report my-new-novel
+novel quality-report my-new-novel --json
+```
+
+The report counts current, stale, and legacy-or-invalid provenance sidecars, and flags artifacts whose saved content hash no longer matches their file. It also groups valid and invalid diagnostics, decisions, errors, warnings, stages, and operations. Malformed JSON is counted and skipped safely. The Web workspace summary returns the identical read-only object as `quality_report`.
+
+These diagnostics are deterministic workflow signals, not a literary-quality certification. The report cannot reconstruct dependency drift when a sidecar has no corresponding dependency source available locally.
 
 
 ## Command Reference
@@ -328,8 +367,10 @@ novel novel-outline my-new-novel --direction "inspiration input"
 | `novel reference-resume <ws> [--batch-size N] [--max-chapters N]` | Resume or retry reference deconstruction |
 | `novel world-import <ws> <paths...> [--force]`                        | Import target-genre material files or directories |
 | `novel world-build <ws> [--force] [--merge-only] [--primary NAME] [--chapter-batch-size N] [--chunk-size N] [--max-workers N]` | Structure target-genre materials into a sectioned knowledge base |
-| `novel novel-outline <ws> [--direction TEXT] [--direction-file PATH]` | Generate core gameplay, long mainline, stage roadmap, and character arcs |
+| `novel novel-outline <ws> [--force] [--direction TEXT] [--direction-file PATH]` | Bundled CLI path: generate core gameplay, long mainline, stage roadmap, character arcs, title, and synopsis |
 | `novel story-design <ws> [--force] [--direction TEXT] [--direction-file PATH]` | Generate core gameplay, long mainline, stage roadmap, and character arcs |
+| `novel design-concept <ws> [--force] [--direction TEXT] [--direction-file PATH]` | Stepwise book design: generate worldview, rough outline, and phase outline |
+| `novel stage-design <ws> [--force] [--direction TEXT] [--direction-file PATH]` | Stepwise stage design: generate the long mainline and stage roadmap from the book-design artifacts |
 | `novel story-design-extend <ws> [--use-reference] [--direction TEXT] [--direction-file PATH]` | Preserve existing design and append the mainline, character arcs, and later stages |
 | `novel stage-insert <ws> [--direction TEXT] [--direction-file PATH] [--after-stage N] [--before-stage N]` | Design a new stage from inspiration and insert it into the stage roadmap |
 | `novel mechanics-init <ws> [--file PATH] [--direction TEXT] [--none] [--force]` | Initialize or disable the optional mechanics layer |
@@ -337,13 +378,14 @@ novel novel-outline my-new-novel --direction "inspiration input"
 | `novel story-arcs <ws> [--volume N] [--force]`                        | Generate story arcs and narrative patterns for a volume/stage |
 | `novel chapter-outlines <ws> [--volume N] [--force]`                  | Generate chapter outlines from story arcs |
 | `novel write <ws> [--volume N] [--start N] [--max N] [--no-humanize] [--humanize-existing]` | Generate full text serially and humanize each new chapter by default |
+| `novel quality-report <ws> [--json]` | Inspect saved provenance and deterministic quality diagnostics without generation |
 
 ### Parameters
 
 - `--txt <path>`: Reference novel file path. Used only by `init`.
 - `--batch-size N`: Chapters per reading window for story-arc detection. Default: 20. Used only by `init`.
-- `--direction TEXT`: Creative direction, for example "change to a modern urban setting". In `novel-outline`, it affects the full-book plan; in `story-design`, it tunes gameplay/stage/character assets; in `story-design-extend`, it guides the added material.
-- `--direction-file PATH`: Read creative direction from a file. Used by `novel-outline`, `story-design`, and `story-design-extend`.
+- `--direction TEXT`: Creative direction, for example "change to a modern urban setting". It is accepted by `novel-outline`, `story-design`, `design-concept`, `stage-design`, `story-design-extend`, and `stage-insert`; its effect is scoped to that command's design stage.
+- `--direction-file PATH`: Read creative direction from a file. It is accepted by `novel-outline`, `story-design`, `design-concept`, `stage-design`, `story-design-extend`, and `stage-insert`.
 - `--use-reference`: With `story-design-extend`, use only reference story arcs added since the last full-book design. Without it, extend from existing new-book design assets only.
 - `--file PATH`: Mechanics settings file path. Used by `mechanics-init`.
 - `--none`: Explicitly disable the mechanics layer. Used by `mechanics-init`.
@@ -360,6 +402,7 @@ novel novel-outline my-new-novel --direction "inspiration input"
 - `--max N`: Maximum number of chapters to generate. Used only by `write`.
 - `--no-humanize`: Disable automatic humanization after chapter generation. Used only by `write`.
 - `--humanize-existing`: Humanize existing chapter files. By default, only newly generated chapters are humanized. Used only by `write`.
+- `--json`: Emit the offline quality report as JSON. Used only by `quality-report`.
 - `--force`: Force regeneration and overwrite existing content.
 
 

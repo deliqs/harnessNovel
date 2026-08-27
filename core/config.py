@@ -1,7 +1,35 @@
 import os
+import tempfile
 
 _GLOBAL_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".harnessNovel")
 _GLOBAL_ENV_PATH = os.path.join(_GLOBAL_CONFIG_DIR, ".env")
+
+
+def write_private_text(path, content):
+    """Atomically write private local configuration or diagnostic data on POSIX."""
+    path = os.fspath(path)
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, temporary_path = tempfile.mkstemp(prefix=".harness-novel-", dir=directory)
+    try:
+        if os.name == "posix":
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        if os.name == "posix":
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+    except Exception:
+        try:
+            os.unlink(temporary_path)
+        except OSError:
+            pass
+        raise
 
 
 def _load_env():
@@ -41,6 +69,13 @@ class ConfigLoader:
         cls.reload()
 
     @classmethod
+    def deactivate(cls, keys):
+        """Remove runtime overrides so optional settings resume their file fallback."""
+        for key in keys:
+            os.environ.pop(str(key), None)
+        cls.reload()
+
+    @classmethod
     def _get_env(cls):
         if cls._env is None:
             cls._env = _load_env()
@@ -70,3 +105,48 @@ class ConfigLoader:
     def get_adaptive_builder_lite_config(cls):
         """Story-arc, chapter-outline, draft, and light helper-task config (flash recommended)."""
         return cls._build_config("ADAPTIVE_BUILDER_LITE")
+
+    @classmethod
+    def get_model_role_config(cls, role):
+        """Return an optional production-role config with field-wise Lite fallback.
+
+        ``DRAFT_*``, ``EDITOR_*``, and ``CRITIC_*`` are intentionally optional.
+        A partially configured role inherits every missing field from
+        ``ADAPTIVE_BUILDER_LITE_*``, preserving existing installations exactly.
+        """
+        prefix = str(role or "").strip().upper()
+        if prefix not in {"DRAFT", "EDITOR", "CRITIC"}:
+            raise ValueError("Unknown model role: %s" % role)
+        role_config = cls._build_config(prefix)
+        lite_config = cls.get_adaptive_builder_lite_config()
+        return {
+            key: role_config.get(key) or lite_config.get(key, "")
+            for key in ("model", "base_url", "api_key")
+        }
+
+    @classmethod
+    def get_draft_config(cls):
+        """Draft-generation config; defaults exactly to the Lite role."""
+        return cls.get_model_role_config("DRAFT")
+
+    @classmethod
+    def get_editor_config(cls):
+        """Editing/humanization config; defaults exactly to the Lite role."""
+        return cls.get_model_role_config("EDITOR")
+
+    @classmethod
+    def get_critic_config(cls):
+        """Critique/validation config; defaults exactly to the Lite role."""
+        return cls.get_model_role_config("CRITIC")
+
+    @classmethod
+    def get_prompt_trace_mode(cls):
+        """Return the supported prompt diagnostic mode, defaulting to metadata only."""
+        env = cls._get_env()
+        value = (
+            os.getenv("HARNESS_NOVEL_PROMPT_TRACE_MODE")
+            or env.get("HARNESS_NOVEL_PROMPT_TRACE_MODE", "metadata")
+        ).strip().lower()
+        if value in {"off", "metadata", "full"}:
+            return value
+        return "metadata"

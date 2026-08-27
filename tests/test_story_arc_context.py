@@ -105,9 +105,23 @@ class PromptJoinTests(unittest.TestCase):
         joined = _join_prompt_parts(["a" * 20000, "b" * 20000], max_chars=26000)
         uncapped = 40000
         self.assertLess(len(joined), uncapped)
-        self.assertLessEqual(len(joined), 26000 + 80)
+        self.assertLessEqual(len(joined), 26000)
         self.assertTrue(joined.startswith("a"))
-        self.assertIn("截断", joined)
+        self.assertTrue(joined.endswith("b"))
+        self.assertIn("content truncated", joined)
+
+    def test_join_prompt_parts_retains_early_middle_and_late_obligations(self):
+        joined = _join_prompt_parts([
+            "EARLY_REQUIRED\n" + ("a" * 12000) + "\nEARLY_TAIL",
+            "MIDDLE_REQUIRED\n" + ("b" * 12000) + "\nMIDDLE_TAIL",
+            "LATE_REQUIRED\n" + ("c" * 12000) + "\nLATE_TAIL",
+        ], max_chars=12000)
+        self.assertLessEqual(len(joined), 12000)
+        for marker in (
+            "EARLY_REQUIRED", "EARLY_TAIL", "MIDDLE_REQUIRED", "MIDDLE_TAIL",
+            "LATE_REQUIRED", "LATE_TAIL",
+        ):
+            self.assertIn(marker, joined)
 
 
 if __name__ == "__main__":

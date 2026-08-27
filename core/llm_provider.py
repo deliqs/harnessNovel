@@ -1,9 +1,10 @@
 import os
 import threading
+from urllib.parse import urlsplit, urlunsplit
 
 from openai import OpenAI, Timeout
 from core.text_utils import normalize_text
-from core.prompt_trace import record_prompt
+from core.prompt_trace import record_prompt, redact_sensitive_text
 
 # HTTP status codes that are not worth retrying (auth / billing / deterministic errors).
 _NO_RETRY_CODES = {401, 402, 403}
@@ -122,6 +123,43 @@ class LLMProvider:
             }
         return kwargs
 
+    def _metadata_base_url(self):
+        """Return a reproducible provider endpoint without embedded credentials."""
+        value = str(self.base_url or "")
+        try:
+            parsed = urlsplit(value)
+            host = parsed.hostname or ""
+            if parsed.port:
+                host = "%s:%s" % (host, parsed.port)
+            return urlunsplit((parsed.scheme, host, parsed.path, "", ""))
+        except (TypeError, ValueError):
+            return redact_sensitive_text(value)
+
+    def generate_with_metadata(
+        self, prompt, temperature=0.7, is_json=False, max_retries=2, max_tokens=None,
+    ):
+        """Generate text plus safe, additive request metadata for reports.
+
+        ``generate`` intentionally continues to return a string for every existing
+        caller. This method never exposes the configured API key.
+        """
+        content = self.generate(
+            prompt,
+            temperature=temperature,
+            is_json=is_json,
+            max_retries=max_retries,
+            max_tokens=max_tokens,
+        )
+        return {
+            "content": content,
+            "model": self.model,
+            "base_url": self._metadata_base_url(),
+            "temperature": temperature,
+            "is_json": bool(is_json),
+            "max_tokens": max_tokens or self.max_tokens,
+            "succeeded": bool(content),
+        }
+
     def generate(self, prompt, temperature=0.7, is_json=False, max_retries=2, max_tokens=None):
         """Call the LLM and return generated content.
 
@@ -146,9 +184,15 @@ class LLMProvider:
                     break
                 kind = "timed out" if _is_timeout_error(e) else "failed"
                 if attempt < max_retries:
-                    print(f"[LLMProvider] API call {kind} (attempt {attempt+1}), retrying... error: {e}")
+                    print(
+                        f"[LLMProvider] API call {kind} (attempt {attempt+1}), retrying... "
+                        f"error: {redact_sensitive_text(e)}"
+                    )
                 else:
-                    print(f"[LLMProvider] API call {kind}, retried {max_retries} times. error: {e}")
+                    print(
+                        f"[LLMProvider] API call {kind}, retried {max_retries} times. "
+                        f"error: {redact_sensitive_text(e)}"
+                    )
 
         print("[LLMProvider] Call failed, returning empty content (check API Key / balance / network).")
         return ""
@@ -211,7 +255,7 @@ class LLMProvider:
             kind = "timed out" if _is_timeout_error(error) else "failed"
             print(
                 f"[LLMProvider] Cancelable request {kind} (attempt {attempt + 1}), "
-                f"retrying in {wait_seconds:g}s... error: {error}"
+                f"retrying in {wait_seconds:g}s... error: {redact_sensitive_text(error)}"
             )
             if cancel_event is not None:
                 if cancel_event.wait(wait_seconds):

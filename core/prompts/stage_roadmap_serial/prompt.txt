@@ -2,7 +2,7 @@ You are a long-form web-novel stage and volume-structure designer. Generate only
 
 Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
 
-Stage {stage_number} corresponds to new-novel phase {stage_number} and reference-novel volume {reference_volume_number}. The reference volume outline is only for learning this volume's structural density, three-act advance, character setup, foreshadowing organization, and payoff setup. Do not copy names of people, places, factions, abilities, events, or unique causal chains.
+Stage {stage_number} realizes new-novel phase {stage_number} and may draw structural lessons from mapped reference-volume sample(s) {reference_volume_number}. The reference material is only for learning structural density, three-act advance, character setup, foreshadowing organization, and payoff setup. Do not copy names of people, places, factions, abilities, events, or unique causal chains.
 
 [Book-length long mainline]
 {long_mainline}
@@ -10,24 +10,24 @@ Stage {stage_number} corresponds to new-novel phase {stage_number} and reference
 [Current phase outline] (this round inputs only this one phase)
 {current_stage_outline}
 
-[Matching reference volume outline: reference volume {reference_volume_number} "{reference_volume_title}"] (this round inputs only this one volume)
+[Mapped reference volume structural sample(s): {reference_volume_number} "{reference_volume_title}"]
 {reference_volume_outline}
 
 [Matching reference volume chapter scale]
-Reference volume {reference_volume_number} has about {reference_chapter_count} chapters. That number is derived from the reference volume's volume boundaries and three-act chapter ranges.
+Reference volume {reference_volume_number} has about {reference_chapter_count} chapters. Treat this only as a structural prior. Choose the new stage's own planned count within {chapter_prior_min}-{chapter_prior_max} chapters according to its obligations and density; do not copy the reference count mechanically.
 
 [Stage generated in the previous round]
 {previous_stage}
 
 Output JSON only. Do not output explanation, a Markdown code fence, or any text outside the JSON:
 {{
-  "stage_roadmap_md": "# Stage {stage_number}: Stage name\n\nPlanned chapters: {reference_chapter_count} chapters\n\n# Volume overview\n..."
+  "stage_roadmap_md": "# Stage {stage_number}: Stage name\n\nPlanned chapters: <one chosen integer from {chapter_prior_min} to {chapter_prior_max}> chapters\n\n# Volume overview\n..."
 }}
 
 The output must strictly follow this structure, matching the five blocks of a reference-novel volume outline:
 
 # Stage {stage_number}: Stage name
-Planned chapters: {reference_chapter_count} chapters
+Planned chapters: <one chosen integer from {chapter_prior_min} to {chapter_prior_max}> chapters
 
 # Volume overview
 1. Summarize this stage's core conflict and the protagonist's goal in one sentence.
@@ -55,5 +55,5 @@ Hard requirements:
 3. The previous stage is the source of continuity facts; the current stage's protagonist state, character relationships, resources, injuries, identity, and unpaid foreshadowing must connect to it.
 4. The reference volume outline supplies only a structural skeleton. The new stage's plot must be decided by the new novel's worldview, long mainline, and current phase outline.
 5. Do not output Markdown tables, code fences, or extra commentary.
-6. Do not invent a fixed chapter count or a generic range. This stage maps directly onto the chapter scale of reference volume {reference_volume_number}; Planned chapters must be written as {reference_chapter_count} chapters.
-7. The three-act structure uses relative chapter numbers inside the stage, starting at chapter 1, with the last act ending at chapter {reference_chapter_count}; the three acts must cover every chapter in a continuous run, with no overlap and no gap.
+6. Write one concrete Planned chapters integer within {chapter_prior_min}-{chapter_prior_max}. The reference count is a prior, while this stage's obligations determine the chosen count.
+7. The three-act structure uses relative chapter numbers inside the stage, starting at chapter 1, with the last act ending at the chosen Planned chapters count; the three acts must cover every chapter in a continuous run, with no overlap and no gap.

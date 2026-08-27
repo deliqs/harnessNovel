@@ -36,6 +36,22 @@ from training.reference_finder import (
     load_reference_novel_outline,
     load_reference_volume_outline,
 )
+from training.artifact_provenance import (
+    atomic_write_text,
+    mark_stale,
+    write_artifact,
+)
+from training.generation_quality import (
+    diagnose_chapter,
+    diagnose_chapter_outline,
+    diagnose_rewrite,
+    diagnose_story_arc,
+    extract_critical_anchors,
+)
+from training.story_context import (
+    build_story_context,
+    enrich_arc_plans,
+)
 
 BATCH_SIZE = 20
 STORY_ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
@@ -123,6 +139,37 @@ def _get_lite_llm():
     return LLMProvider(**config)
 
 
+def _get_role_llm(role):
+    """Resolve an optional production role, with the exact Lite path as fallback."""
+    role_getters = {
+        "draft": ConfigLoader.get_draft_config,
+        "editor": ConfigLoader.get_editor_config,
+        "critic": ConfigLoader.get_critic_config,
+    }
+    config = role_getters[role]()
+    lite_config = ConfigLoader.get_adaptive_builder_lite_config()
+    if config == lite_config:
+        return _get_lite_llm()
+    if not config.get("api_key"):
+        config["api_key"] = os.getenv("OPENAI_API_KEY")
+    if not config.get("api_key"):
+        print("Error: API Key not detected.")
+        return None
+    return LLMProvider(**config)
+
+
+def _get_draft_llm():
+    return _get_role_llm("draft")
+
+
+def _get_editor_llm():
+    return _get_role_llm("editor")
+
+
+def _get_critic_llm():
+    return _get_role_llm("critic")
+
+
 def _read_file(path):
     if not os.path.exists(path):
         return None
@@ -160,13 +207,11 @@ def _load_world_knowledge_optional(ws, purpose, max_chars=80000, require_ready=F
 
 
 def _write_file(path, content):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content + "\n")
+    atomic_write_text(path, str(content or "").rstrip() + "\n")
 
 
 def run_step(*, llm, folder, prompt_vars, output_path, label=None,
-             header=None, save=None, write_guard=False, cancel_event=None):
+             header=None, save=None, write_guard=True, cancel_event=None):
     """Core generate triple: load -> generate -> normalize -> write, with optional header/save prints.
 
     label is also the default basis for header/save (header=">>> Generating {label} <<<",
@@ -345,10 +390,14 @@ def _mark_concept_revision(ws):
     state.setdefault("stage_synced_concept_revision", 0)
     state["concept_updated_at"] = datetime.now().isoformat(timespec="seconds")
     _write_json_file(_story_design_state_path(ws), state)
+    _mark_generation_tree_stale(
+        ws, "Book design changed; regenerate or review dependent stage and prose artifacts.",
+        include_stage_roadmap=True,
+    )
     return state["concept_revision"]
 
 
-def _mark_stage_design_synced(ws):
+def _mark_stage_design_synced(ws, content_changed=True):
     """Record that stage design has absorbed the current book design."""
     state = _load_story_design_state(ws)
     revision = int(state.get("concept_revision") or 0)
@@ -357,7 +406,58 @@ def _mark_stage_design_synced(ws):
     state["pending_reference_stage_sync"] = False
     state.pop("reference_stage_increment", None)
     _write_json_file(_story_design_state_path(ws), state)
+    if content_changed:
+        _mark_generation_tree_stale(
+            ws, "Stage roadmap changed; dependent story arcs, outlines, and drafts may be stale.",
+        )
     return revision
+
+
+def _mark_generation_tree_stale(ws, reason, include_stage_roadmap=False):
+    """Conservatively expose upstream drift while keeping every artifact readable."""
+    if include_stage_roadmap:
+        mark_stale(_story_design_path(ws, "stage_roadmap.md"), reason, "book_design")
+    roots = (
+        os.path.join(ws.file_system, "story_arcs"),
+        os.path.join(ws.file_system, "chapter_outlines"),
+        os.path.join(ws.file_system, "chapters"),
+    )
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for directory, child_dirs, names in os.walk(root):
+            child_dirs[:] = [
+                name for name in child_dirs
+                if name.lower() not in {"versions", "quarantine", ".quarantine"}
+            ]
+            for name in names:
+                if not name.endswith(".md") or name.endswith(".provenance.json"):
+                    continue
+                mark_stale(os.path.join(directory, name), reason, "upstream_design")
+
+
+def _record_stage_design_artifacts(ws, long_mainline, stage_roadmap):
+    """Record a validated stage-design pair and its current design dependencies."""
+    worldview = _read_file(_worldview_path(ws))
+    rough = _read_file(_rough_outline_path(ws))
+    phase_outline = _read_file(_stage_outline_path(ws))
+    common_dependencies = {
+        "worldview": worldview,
+        "rough_outline": rough,
+        "phase_outline": phase_outline,
+    }
+    write_artifact(
+        _story_design_path(ws, "long_mainline.md"),
+        long_mainline,
+        "long_mainline",
+        dependencies=common_dependencies,
+    )
+    write_artifact(
+        _story_design_path(ws, "stage_roadmap.md"),
+        stage_roadmap,
+        "stage_roadmap",
+        dependencies=dict(common_dependencies, long_mainline=long_mainline),
+    )
 
 
 def _arc_usage_state_path(ws):
@@ -1123,7 +1223,7 @@ def _ensure_system_panel_decision(ws, cancel_event=None):
     if status["selection_mode"] != "auto" or status["decided"]:
         return status
     assets = _load_story_design_assets(ws)
-    llm = _get_lite_llm()
+    llm = _get_critic_llm()
     if not llm:
         raise RuntimeError("No usable model is configured; cannot auto-decide whether a system panel is needed.")
     prompt = PromptLoader.load(
@@ -1452,6 +1552,7 @@ def init_mechanics(ws, force=False, creative_direction=None, direction_file=None
                    mechanics_file=None, disable=False):
     """Initialize the optional mechanics layer: none / light_state / explicit_mechanics."""
     profile_path = _mechanics_path(ws, "system_panel.json")
+    existing_payload = _read_json_file(profile_path)
     if os.path.exists(profile_path) and not force:
         print(f"Mechanics layer already exists: {profile_path}")
         print("Use --force to overwrite.")
@@ -1497,9 +1598,23 @@ def init_mechanics(ws, force=False, creative_direction=None, direction_file=None
     try:
         payload = parse_json_response(raw)
     except Exception as exc:
+        if force and existing_payload:
+            print(f"  Warning: mechanics JSON parse failed; existing mechanics were kept. Reason: {exc}")
+            return existing_payload
         print(f"  Warning: mechanics JSON parse failed; defaulting to off. Reason: {exc}")
         payload = _default_mechanics_disabled("Mechanics-layer init JSON parse failed; defaulting to off.")
         payload["design"] += "\n\n# Raw return\n" + raw
+
+    profile = payload.get("profile") if isinstance(payload, dict) else None
+    if not isinstance(profile, dict) or profile.get("mode") not in {
+        "none", "light_state", "explicit_mechanics",
+    }:
+        if force and existing_payload:
+            print("  Warning: mechanics output had an invalid profile; existing mechanics were kept.")
+            return existing_payload
+        payload = _default_mechanics_disabled(
+            "LLM did not return a valid mechanics profile; defaulting to off."
+        )
 
     payload = _normalize_mechanics_payload(payload)
     _write_mechanics_payload(ws, payload)
@@ -1682,12 +1797,13 @@ def _reference_volume_stage_structure(ws, volume):
 
 
 def _design_structure_guidance(ws):
-    """New-book phase count matches reference volume count one-to-one; without reference volumes use a fallback range."""
+    """Use reference volume count as a bounded scale prior, not an equality contract."""
     volume_count = len(list_reference_volumes(ws.reference_outlines))
     if volume_count == 0:
         stage_min, stage_max = 5, 7
     else:
-        stage_min = stage_max = volume_count
+        stage_min = max(1, math.floor(volume_count * 0.75))
+        stage_max = max(stage_min + 1, math.ceil(volume_count * 1.25))
     map_min = max(3, math.ceil(stage_min * 0.75))
     map_max = max(map_min + 2, stage_max)
     return {
@@ -1699,6 +1815,42 @@ def _design_structure_guidance(ws):
         "map_min": map_min,
         "map_max": map_max,
     }
+
+
+def _reference_volumes_for_phase(reference_volumes, phase_number, total_phases):
+    """Map a phase to one or more structural samples, supporting unequal counts."""
+    volumes = list(reference_volumes or [])
+    if not volumes:
+        return []
+    phase = max(1, min(int(phase_number), max(1, int(total_phases))))
+    total = max(1, int(total_phases))
+    if total <= len(volumes):
+        start = math.floor((phase - 1) * len(volumes) / total)
+        end = max(start + 1, math.floor(phase * len(volumes) / total))
+        return volumes[start:end]
+    index = min(len(volumes) - 1, math.floor((phase - 1) * len(volumes) / total))
+    return [volumes[index]]
+
+
+def _reference_group_for_stage(ws, reference_volumes, stage_number, total_stages):
+    group = _reference_volumes_for_phase(reference_volumes, stage_number, total_stages)
+    outlines = []
+    counts = []
+    for volume in group:
+        outline = load_reference_volume_outline(ws.reference_outlines, volume["vol_idx"]) or ""
+        outlines.append(
+            f"[Reference volume {volume['vol_idx']}: {volume['title']}]\n"
+            + (outline or "(outline missing)")
+        )
+        counts.append(_reference_volume_chapter_count(volume, outline))
+    if not group:
+        return [], "(no mapped reference structural sample; use the new-book obligations only)", 20
+    reuse = sum(
+        group[0] in _reference_volumes_for_phase(reference_volumes, number, total_stages)
+        for number in range(1, total_stages + 1)
+    )
+    prior = max(1, round(sum(counts) / max(1, reuse)))
+    return group, "\n\n---\n\n".join(outlines), prior
 
 
 def _design_structure_counts(rough, worldview):
@@ -1900,6 +2052,12 @@ def _reference_volume_chapter_count(volume, volume_outline):
     )
 
 
+def _chapter_count_prior_range(reference_count):
+    """Turn a reference scale into a flexible planning prior, never a hard mandate."""
+    count = max(1, int(reference_count))
+    return max(1, round(count * 0.8)), max(1, round(count * 1.2))
+
+
 def gen_design_concept(
     ws, force=False, creative_direction=None, direction_file=None,
     progress_callback=None,
@@ -1920,16 +2078,14 @@ def gen_design_concept(
         if progress_callback:
             progress_callback(phase, completed, 3, detail)
     structure_guidance = _design_structure_guidance(ws)
-    expected_existing_stages = structure_guidance["reference_volume_count"]
     existing_stage_count, _ = _design_structure_counts(existing_stage_outline, "")
     existing_stage_valid = _is_real_design_field(existing_stage_outline) and (
-        expected_existing_stages == 0
-        or existing_stage_count == expected_existing_stages
+        structure_guidance["stage_min"] <= existing_stage_count <= structure_guidance["stage_max"]
     )
     if _is_real_design_field(existing_stage_outline) and not existing_stage_valid:
         print(
             f"  -> Existing phase outline has {existing_stage_count} phases, "
-            f"which does not match the reference novel's {expected_existing_stages} volumes; regenerating the phase outline."
+            f"outside the supported prior range {structure_guidance['stage_range']}; regenerating the phase outline."
         )
         existing_stage_outline = ""
     if (
@@ -1945,7 +2101,7 @@ def gen_design_concept(
             "stage_outline": existing_stage_outline,
         }
 
-    # Book design is a core creative task; use the user-configured ADAPTIVE_BUILDER (pro) model.
+    # Book design is a core creative task; preserve the user-configured Pro model.
     llm = _get_llm()
     if not llm:
         return {}
@@ -1970,7 +2126,8 @@ def gen_design_concept(
         worldview = _normalize_design_field(payload, "worldview_md", "# Worldview")
         if not _is_real_design_field(worldview):
             raise RuntimeError("Worldview generation failed: the model did not return valid content. Please retry.")
-        _write_file(worldview_path, worldview)
+        if not force:
+            _write_file(worldview_path, worldview)
         print(f"  -> Worldview saved: {worldview_path}")
     else:
         print("  -> Reusing the generated worldview.")
@@ -1990,7 +2147,8 @@ def gen_design_concept(
         rough = _remove_stage_outline_section(rough)
         if not _is_real_design_field(rough):
             raise RuntimeError("Rough-outline generation failed: the model did not return valid content. Please retry.")
-        _write_file(rough_path, rough)
+        if not force:
+            _write_file(rough_path, rough)
         print(f"  -> Rough outline saved: {rough_path}")
     else:
         print("  -> Reusing the generated rough outline.")
@@ -2005,14 +2163,13 @@ def gen_design_concept(
             reference_volume_structures=_reference_volume_structure_context(ws),
             **structure_guidance,
         )
-        expected_count = structure_guidance["reference_volume_count"]
         actual_count = 0
         for attempt in range(1, 3):
             prompt = base_prompt
             if attempt > 1:
                 prompt += (
                     "\n\n[Previous output failed the count check]\n"
-                    f"Last time generated {actual_count} phases; this time must generate exactly {expected_count} phases."
+                    f"Last time generated {actual_count} phases; generate within {structure_guidance['stage_range']} phases."
                 )
             payload = parse_json_response(
                 _call_design_llm(llm, prompt, f"new-novel phase outline (attempt {attempt})")
@@ -2021,34 +2178,39 @@ def gen_design_concept(
             if not _is_real_design_field(candidate):
                 continue
             actual_count, _ = _design_structure_counts(candidate, "")
-            if expected_count == 0 or actual_count == expected_count:
+            if structure_guidance["stage_min"] <= actual_count <= structure_guidance["stage_max"]:
                 stage_outline = candidate
                 break
             print(
                 f"  -> Phase-count check failed: generated {actual_count},"
-                f"expected {expected_count}; retrying automatically."
+                f"expected range {structure_guidance['stage_range']}; retrying automatically."
             )
         if not _is_real_design_field(stage_outline) or (
-            expected_count > 0 and actual_count != expected_count
+            not structure_guidance["stage_min"] <= actual_count <= structure_guidance["stage_max"]
         ):
             raise RuntimeError(
-                f"Phase-outline generation failed: expected {expected_count} phases, "
+                f"Phase-outline generation failed: expected {structure_guidance['stage_range']} phases, "
                 f"the model produced {actual_count}; nothing was written. Please retry."
             )
-        _write_file(stage_outline_path, stage_outline)
+        if not force:
+            _write_file(stage_outline_path, stage_outline)
         print(f"  -> Phase outline saved: {stage_outline_path}")
     else:
         print("  -> Reusing the generated phase outline.")
+    if force:
+        _backup_design_files(ws, "concept_force", {
+            "worldview": worldview_path,
+            "rough_outline": rough_path,
+            "stage_outline": stage_outline_path,
+        })
+        _write_file(worldview_path, worldview)
+        _write_file(rough_path, rough)
+        _write_file(stage_outline_path, stage_outline)
     report("stage_outline_complete", 3, "Worldview, rough outline, and phase outline are all generated")
 
     stage_count, map_count = _design_structure_counts(stage_outline, worldview)
     structure_warning = ""
-    expected_stage_count = structure_guidance["reference_volume_count"]
-    stage_invalid = (
-        stage_count != expected_stage_count
-        if expected_stage_count > 0
-        else stage_count < structure_guidance["stage_min"]
-    )
+    stage_invalid = not structure_guidance["stage_min"] <= stage_count <= structure_guidance["stage_max"]
     if stage_invalid or map_count < structure_guidance["map_min"]:
         structure_warning = (
             "Structure coverage may be insufficient: "
@@ -2090,11 +2252,9 @@ def gen_stage_design(
     if not rough or not worldview or not stage_outline:
         print("Error: finish book design (worldview, rough outline, and phase outline) before stage design.")
         return {}
-    if len(stage_sections) != len(reference_volumes):
-        raise RuntimeError(
-            f"Phase outline count does not match reference volumes: {len(stage_sections)} phases, "
-            f"{len(reference_volumes)} reference volumes. Please regenerate the phase outline first."
-        )
+    guidance = _design_structure_guidance(ws)
+    if not guidance["stage_min"] <= len(stage_sections) <= guidance["stage_max"]:
+        raise RuntimeError(f"Phase outline count must stay within {guidance['stage_range']} phases.")
 
     direction = _load_creative_direction(ws, creative_direction, direction_file)
     record_creative_direction(ws, direction, "stage_design")
@@ -2102,13 +2262,15 @@ def gen_stage_design(
     stage_path = _story_design_path(ws, "stage_roadmap.md")
     existing_long = _read_file(long_path)
     existing_stage = _read_file(stage_path)
+    stored_long = existing_long
+    stored_stage = existing_stage
     design_state = _load_story_design_state(ws)
     if int(design_state.get("stage_pipeline_version") or 0) != STAGE_DESIGN_PIPELINE_VERSION:
         existing_long = ""
         existing_stage = ""
         print("  -> Detected a legacy stage-design artifact; regenerating with the serial flow.")
 
-    # Stage design is a core creative task; use the user-configured Pro model.
+    # Stage design is a core creative task; preserve the user-configured Pro model.
     llm = _get_llm()
     if not llm:
         return {}
@@ -2129,11 +2291,12 @@ def gen_stage_design(
         long_mainline = _normalize_design_field(payload, "long_mainline_md", "# Long mainline")
         if not _is_real_design_field(long_mainline):
             raise RuntimeError("Long-mainline generation failed: the model did not return valid content. Please retry.")
-        _write_file(long_path, long_mainline)
-        design_state = _load_story_design_state(ws)
-        design_state["stage_pipeline_version"] = STAGE_DESIGN_PIPELINE_VERSION
-        design_state["stage_pipeline_updated_at"] = datetime.now().isoformat(timespec="seconds")
-        _write_json_file(_story_design_state_path(ws), design_state)
+        if not force:
+            _write_file(long_path, long_mainline)
+            design_state = _load_story_design_state(ws)
+            design_state["stage_pipeline_version"] = STAGE_DESIGN_PIPELINE_VERSION
+            design_state["stage_pipeline_updated_at"] = datetime.now().isoformat(timespec="seconds")
+            _write_json_file(_story_design_state_path(ws), design_state)
         long_generated = True
         print(f"  -> Long mainline saved: {long_path}")
     else:
@@ -2157,24 +2320,15 @@ def gen_stage_design(
         stage_roadmap = "\n\n".join(completed_parts)
         print("  -> Stage roadmap is already complete; skipping.")
     else:
-        # Write back the trusted contiguous prefix; drop old content after a gap that cannot guarantee serial deps.
-        if completed_parts:
-            _write_file(stage_path, "\n\n".join(completed_parts))
-        elif os.path.exists(stage_path):
-            _write_file(stage_path, "")
-
         for number in range(len(completed_parts) + 1, len(stage_sections) + 1):
             report(
                 "stage_generating", number - 1,
                 f"Generating stage {number}/{total_stages}",
             )
-            volume = reference_volumes[number - 1]
-            reference_volume_outline = load_reference_volume_outline(
-                ws.reference_outlines, volume["vol_idx"]
-            ) or "(matching reference volume outline is missing)"
-            reference_chapter_count = _reference_volume_chapter_count(
-                volume, reference_volume_outline,
+            mapped_volumes, reference_volume_outline, reference_chapter_count = _reference_group_for_stage(
+                ws, reference_volumes, number, len(stage_sections),
             )
+            chapter_prior_min, chapter_prior_max = _chapter_count_prior_range(reference_chapter_count)
             previous_stage = completed_parts[-1] if completed_parts else "(this is the first stage; no previous stage)"
             prompt = PromptLoader.load(
                 "stage_roadmap_serial",
@@ -2182,9 +2336,11 @@ def gen_stage_design(
                 total_stages=len(stage_sections),
                 long_mainline=long_mainline,
                 current_stage_outline=stage_sections[number],
-                reference_volume_number=volume["vol_idx"],
-                reference_volume_title=volume["title"],
+                reference_volume_number=", ".join(str(item["vol_idx"]) for item in mapped_volumes) or "none",
+                reference_volume_title=" / ".join(item["title"] for item in mapped_volumes) or "none",
                 reference_chapter_count=reference_chapter_count,
+                chapter_prior_min=chapter_prior_min,
+                chapter_prior_max=chapter_prior_max,
                 reference_volume_outline=reference_volume_outline,
                 previous_stage=previous_stage,
             )
@@ -2216,13 +2372,15 @@ def gen_stage_design(
                 )
             completed_parts.append(stage)
             stage_roadmap = "\n\n".join(completed_parts)
-            _write_file(stage_path, stage_roadmap)
+            if not force:
+                _write_file(stage_path, stage_roadmap)
             mapped_arc_paths = []
-            for arc in list_reference_story_arcs(ws.reference_outlines, volume["vol_idx"]):
-                try:
-                    mapped_arc_paths.append(os.path.relpath(arc["path"], ws.reference_outlines))
-                except ValueError:
-                    mapped_arc_paths.append(arc["path"])
+            for mapped_volume in mapped_volumes:
+                for arc in list_reference_story_arcs(ws.reference_outlines, mapped_volume["vol_idx"]):
+                    try:
+                        mapped_arc_paths.append(os.path.relpath(arc["path"], ws.reference_outlines))
+                    except ValueError:
+                        mapped_arc_paths.append(arc["path"])
             if mapped_arc_paths:
                 _mark_arcs_used(ws, mapped_arc_paths, [number])
             print(f"  -> Stage {number} saved ({number}/{len(stage_sections)}): {stage_path}")
@@ -2238,7 +2396,20 @@ def gen_stage_design(
     stage_roadmap = "\n\n".join(completed_parts) if completed_parts else ""
     if not _is_real_design_field(stage_roadmap):
         raise RuntimeError("Stage-roadmap generation failed: no valid stage content was generated.")
-    _mark_stage_design_synced(ws)
+    if force:
+        _backup_design_files(ws, "stage_force", {
+            "long_mainline": long_path, "stage_roadmap": stage_path,
+        })
+    stage_design_changed = (
+        stored_long.strip() != long_mainline.strip()
+        or stored_stage.strip() != stage_roadmap.strip()
+    )
+    _record_stage_design_artifacts(ws, long_mainline, stage_roadmap)
+    design_state = _load_story_design_state(ws)
+    design_state["stage_pipeline_version"] = STAGE_DESIGN_PIPELINE_VERSION
+    design_state["stage_pipeline_updated_at"] = datetime.now().isoformat(timespec="seconds")
+    _write_json_file(_story_design_state_path(ws), design_state)
+    _mark_stage_design_synced(ws, content_changed=stage_design_changed)
     report(
         "name_synopsis", total_stages,
         "Stage roadmap generated; generating title and synopsis",
@@ -2316,11 +2487,6 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
         raise RuntimeError("The current phase outline is empty. Finish the first book design first.")
     if not reference_volumes:
         raise RuntimeError("Reference-novel volume structure not found.")
-    if len(reference_volumes) < len(sections):
-        raise RuntimeError(
-            f"The reference novel currently has only {len(reference_volumes)} volumes, but the phase outline already has {len(sections)} phases; "
-            "cannot safely run tail incremental sync."
-        )
 
     llm = _get_llm()
     if not llm:
@@ -2331,17 +2497,17 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
     if not worldview or not rough_outline:
         raise RuntimeError("Finish the new-novel worldview and rough outline first.")
     old_count = len(sections)
-    target_count = len(reference_volumes)
-    start_number = old_count if target_count == old_count else old_count + 1
-    operation_for_first = (
-        OPERATION_ADJUST_LAST_PHASE if target_count == old_count else OPERATION_ADD_PHASE
-    )
+    target_count = old_count
+    start_number = old_count
+    operation_for_first = OPERATION_ADJUST_LAST_PHASE
 
     for number in range(start_number, target_count + 1):
         sections = _stage_outline_sections(stage_outline)
         operation = operation_for_first if number == start_number else OPERATION_ADD_PHASE
-        volume = reference_volumes[number - 1]
-        reference_structure = _reference_volume_stage_structure(ws, volume)
+        mapped_volumes = _reference_volumes_for_phase(reference_volumes, number, target_count)
+        reference_structure = "\n\n---\n\n".join(
+            _reference_volume_stage_structure(ws, volume) for volume in mapped_volumes
+        ) or "(no mapped reference structural sample)"
         if operation in (OPERATION_ADJUST_LAST_PHASE, "调整最后阶段"):
             stage_context = (
                 "[Second-to-last phase]\n"
@@ -2383,7 +2549,7 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
     state["pending_reference_stage_sync"] = True
     state["reference_stage_increment"] = {
         "concept_revision": revision,
-        "kind": "adjust_last" if target_count == old_count else "append",
+        "kind": "adjust_last",
         "previous_stage_count": old_count,
         "current_stage_count": target_count,
         "reference_chapters": [number for number, _ in new_cards],
@@ -2393,7 +2559,7 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
     operation_note = (
         f"Adjusted the last phase (phase {old_count}) from newly added deconstruction chapters."
         if target_count == old_count else
-        f"Reference novel grew from {old_count} to {target_count} volumes; appended phases {old_count + 1}-{target_count}."
+        f"Adjusted phase {old_count} using the latest mapped reference structural samples."
     )
     return {
         "stage_outline": stage_outline,
@@ -2419,11 +2585,6 @@ def refine_stage_design(
     total_stages = len(stage_sections)
     if not long_mainline or not original_roadmap or not stage_sections:
         raise RuntimeError("Generate the long mainline, phase outline, and stage roadmap first.")
-    if total_stages != len(reference_volumes):
-        raise RuntimeError(
-            f"Phase outline count does not match reference volumes: {total_stages} phases, "
-            f"{len(reference_volumes)} reference volumes. Please sync the phase outline first."
-        )
     original_parts = [
         _extract_stage_from_roadmap(original_roadmap, number)
         for number in range(1, total_stages + 1)
@@ -2537,7 +2698,6 @@ def refine_stage_design(
         if not updated_long:
             raise RuntimeError("Long-mainline adjustment did not return valid content; stages were not rewritten this round.")
         long_mainline = updated_long
-        _write_file(long_path, long_mainline)
 
     completed_parts = original_parts[:start_stage - 1]
 
@@ -2548,13 +2708,10 @@ def refine_stage_design(
             "stage_refining", number - 1,
             f"Adjusting stage {number}/{total_stages}",
         )
-        volume = reference_volumes[number - 1]
-        reference_volume_outline = load_reference_volume_outline(
-            ws.reference_outlines, volume["vol_idx"]
-        ) or "(matching reference volume outline is missing)"
-        reference_chapter_count = _reference_volume_chapter_count(
-            volume, reference_volume_outline,
+        mapped_volumes, reference_volume_outline, reference_chapter_count = _reference_group_for_stage(
+            ws, reference_volumes, number, total_stages,
         )
+        chapter_prior_min, chapter_prior_max = _chapter_count_prior_range(reference_chapter_count)
         previous_stage = completed_parts[-1] if completed_parts else "(this is the first stage; no previous stage)"
         current_stage = (
             original_parts[number - 1]
@@ -2568,9 +2725,11 @@ def refine_stage_design(
             total_stages=total_stages,
             long_mainline=long_mainline,
             current_stage_outline=stage_sections[number],
-            reference_volume_number=volume["vol_idx"],
-            reference_volume_title=volume["title"],
+            reference_volume_number=", ".join(str(item["vol_idx"]) for item in mapped_volumes) or "none",
+            reference_volume_title=" / ".join(item["title"] for item in mapped_volumes) or "none",
             reference_chapter_count=reference_chapter_count,
+            chapter_prior_min=chapter_prior_min,
+            chapter_prior_max=chapter_prior_max,
             reference_volume_outline=reference_volume_outline,
             previous_stage=previous_stage,
             current_stage=current_stage,
@@ -2591,21 +2750,21 @@ def refine_stage_design(
                 f"Stage {number} adjustment result has incomplete format or number; previously written stages were kept."
             )
         completed_parts.append(stage)
-        # Keep unprocessed old stages in the file; replace them one by one only after a new result returns,
-        # so pause/stop does not delete still-usable original content early.
-        pending_original_parts = original_parts[number:]
-        _write_file(
-            stage_path,
-            "\n\n".join(completed_parts + pending_original_parts),
-        )
         report(
             "stage_refine_complete", number,
             f"Stage {number}/{total_stages} adjust complete",
         )
 
+    updated_roadmap = "\n\n".join(completed_parts)
+    stage_design_changed = (
+        _read_file(long_path).strip() != long_mainline.strip()
+        or original_roadmap.strip() != updated_roadmap.strip()
+    )
+    _record_stage_design_artifacts(ws, long_mainline, updated_roadmap)
+    _mark_stage_design_synced(ws, content_changed=stage_design_changed)
     return {
         "long_mainline": long_mainline,
-        "stage_roadmap": "\n\n".join(completed_parts),
+        "stage_roadmap": updated_roadmap,
         "adjustment_note": (
             f"Per the instruction, serially processed from stage {start_stage} "
             f"{total_stages - start_stage + 1} stages."
@@ -2630,11 +2789,6 @@ def _sync_later_stages_serial(ws, instruction, cancel_event=None):
     reference_volumes = list_reference_volumes(ws.reference_outlines)
     if not long_mainline or not stage_roadmap or not stage_sections:
         raise RuntimeError("Finish the long mainline, phase outline, and existing stage design first.")
-    if len(stage_sections) != len(reference_volumes):
-        raise RuntimeError(
-            f"Phase outline count does not match reference volumes: {len(stage_sections)} phases, "
-            f"{len(reference_volumes)} reference volumes. Please regenerate the phase outline first."
-        )
 
     completed_parts = _completed_stage_prefix(stage_roadmap, len(stage_sections))
     if not completed_parts:
@@ -2651,13 +2805,10 @@ def _sync_later_stages_serial(ws, instruction, cancel_event=None):
     if not llm:
         raise RuntimeError("No usable model is configured.")
     for number in range(next_stage, len(stage_sections) + 1):
-        volume = reference_volumes[number - 1]
-        reference_volume_outline = load_reference_volume_outline(
-            ws.reference_outlines, volume["vol_idx"]
-        ) or "(matching reference volume outline is missing)"
-        reference_chapter_count = _reference_volume_chapter_count(
-            volume, reference_volume_outline,
+        mapped_volumes, reference_volume_outline, reference_chapter_count = _reference_group_for_stage(
+            ws, reference_volumes, number, len(stage_sections),
         )
+        chapter_prior_min, chapter_prior_max = _chapter_count_prior_range(reference_chapter_count)
         previous_stage = completed_parts[-1] if completed_parts else "(this is the first stage; no previous stage)"
         prompt = PromptLoader.load(
             "stage_roadmap_serial",
@@ -2665,9 +2816,11 @@ def _sync_later_stages_serial(ws, instruction, cancel_event=None):
             total_stages=len(stage_sections),
             long_mainline=long_mainline,
             current_stage_outline=stage_sections[number],
-            reference_volume_number=volume["vol_idx"],
-            reference_volume_title=volume["title"],
+            reference_volume_number=", ".join(str(item["vol_idx"]) for item in mapped_volumes) or "none",
+            reference_volume_title=" / ".join(item["title"] for item in mapped_volumes) or "none",
             reference_chapter_count=reference_chapter_count,
+            chapter_prior_min=chapter_prior_min,
+            chapter_prior_max=chapter_prior_max,
             reference_volume_outline=reference_volume_outline,
             previous_stage=previous_stage,
         )
@@ -2686,19 +2839,22 @@ def _sync_later_stages_serial(ws, instruction, cancel_event=None):
                 f"Synced new stage {number} has incomplete format or number; previously generated stages were kept."
             )
         completed_parts.append(stage)
-        _write_file(stage_path, "\n\n".join(completed_parts))
         mapped_paths = []
-        for arc in list_reference_story_arcs(ws.reference_outlines, volume["vol_idx"]):
-            try:
-                mapped_paths.append(os.path.relpath(arc["path"], ws.reference_outlines))
-            except ValueError:
-                mapped_paths.append(arc["path"])
+        for mapped_volume in mapped_volumes:
+            for arc in list_reference_story_arcs(ws.reference_outlines, mapped_volume["vol_idx"]):
+                try:
+                    mapped_paths.append(os.path.relpath(arc["path"], ws.reference_outlines))
+                except ValueError:
+                    mapped_paths.append(arc["path"])
         _mark_arcs_used(ws, mapped_paths, [number])
 
-    _mark_stage_design_synced(ws)
+    updated_roadmap = "\n\n".join(completed_parts)
+    stage_design_changed = stage_roadmap.strip() != updated_roadmap.strip()
+    _record_stage_design_artifacts(ws, long_mainline, updated_roadmap)
+    _mark_stage_design_synced(ws, content_changed=stage_design_changed)
     return {
         "long_mainline": long_mainline,
-        "stage_roadmap": "\n\n".join(completed_parts),
+        "stage_roadmap": updated_roadmap,
         "adjustment_note": (
             f"Phase count did not grow; only the last stage (stage {next_stage}) was regenerated."
             if adjust_last else
@@ -2819,12 +2975,12 @@ def _refine_design(ws, scope, instruction, compact_summary, prompt_folder, field
     payload = parse_json_response(_call_design_llm(llm, prompt_with_instruction, f"{scope} refine"))
     if "stage_outline_md" in output_keys:
         candidate_stage = _normalize_design_field(payload, "stage_outline_md", "")
-        expected_stages = _design_structure_guidance(ws)["reference_volume_count"]
+        guidance = _design_structure_guidance(ws)
         candidate_count, _ = _design_structure_counts(candidate_stage, "")
-        if expected_stages > 0 and candidate_count != expected_stages:
+        if not guidance["stage_min"] <= candidate_count <= guidance["stage_max"]:
             raise RuntimeError(
-                f"Phase-outline adjustment failed validation: reference novel has {expected_stages} volumes, "
-                f"the model returned {candidate_count} phases; none of the three files were written. Please retry."
+                f"Phase-outline adjustment failed validation: expected {guidance['stage_range']} phases, "
+                f"the model returned {candidate_count}; none of the files were written. Please retry."
             )
     result = {}
     _backup_design_files(ws, scope, fields)
@@ -3484,10 +3640,19 @@ def _list_novel_story_arcs(ws, volume):
     arc_dir = _volume_story_arc_dir(ws, volume)
     if not os.path.isdir(arc_dir):
         return []
+    indexed_names = None
+    index_payload = _read_json_file(os.path.join(arc_dir, "arcs_index.json"))
+    if isinstance(index_payload, list) and index_payload:
+        names = {
+            item.get("file") for item in index_payload
+            if isinstance(item, dict) and item.get("file")
+        }
+        if names:
+            indexed_names = names
     items = []
     for fname in sorted(os.listdir(arc_dir)):
         m = STORY_ARC_FILE_RE.match(fname)
-        if not m:
+        if not m or (indexed_names is not None and fname not in indexed_names):
             continue
         path = os.path.join(arc_dir, fname)
         content = _read_file(path)
@@ -3521,13 +3686,19 @@ def _write_story_arc_index(ws, volume, arc_items):
     _write_file(index_path, "\n".join(lines))
 
 
-def _clear_story_arc_files(ws, volume):
-    arc_dir = _volume_story_arc_dir(ws, volume)
-    if not os.path.isdir(arc_dir):
-        return
-    for fname in os.listdir(arc_dir):
-        if STORY_ARC_FILE_RE.match(fname) or fname == "arcs_index.json":
-            os.remove(os.path.join(arc_dir, fname))
+def _mark_chapter_dependencies_stale(ws, volume, start_ch, end_ch, reason):
+    """Expose downstream drift without deleting readable outlines or drafts."""
+    outline_dir = os.path.join(ws.file_system, "chapter_outlines", f"vol_{volume:02d}")
+    draft_dir = os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}")
+    for chapter in range(int(start_ch), int(end_ch) + 1):
+        mark_stale(
+            os.path.join(outline_dir, f"chapter_{chapter:03d}.md"),
+            reason, changed_dependency="story_arc",
+        )
+        mark_stale(
+            resolve_chapter_draft_path(draft_dir, chapter),
+            reason, changed_dependency="story_arc",
+        )
 
 
 def _target_story_arc_count(total_chapters):
@@ -3559,8 +3730,7 @@ def _reference_story_arc_average_chars(ws, stage_number=None):
     lengths = []
     volumes = list_reference_volumes(ws.reference_outlines)
     if stage_number is not None:
-        mapped = _reference_volume_for_stage(ws, stage_number)
-        volumes = [mapped] if mapped else []
+        volumes = _reference_volumes_for_stage(ws, stage_number)
     for volume in volumes:
         for arc in list_reference_story_arcs(ws.reference_outlines, volume["vol_idx"]):
             content = arc.get("content", "")
@@ -3574,21 +3744,28 @@ def _reference_story_arc_average_chars(ws, stage_number=None):
 
 
 def _reference_volume_for_stage(ws, stage_number):
-    """Phase N maps one-to-one to reference volume N in order."""
+    """Return the primary structural sample for compatibility callers."""
+    group = _reference_volumes_for_stage(ws, stage_number)
+    return group[0] if group else None
+
+
+def _reference_volumes_for_stage(ws, stage_number):
     volumes = list_reference_volumes(ws.reference_outlines)
-    if 1 <= int(stage_number) <= len(volumes):
-        return volumes[int(stage_number) - 1]
-    return None
+    stage_outline = _read_file(_stage_outline_path(ws)) or ""
+    total = len(_stage_outline_sections(stage_outline)) or len(volumes) or int(stage_number)
+    return _reference_volumes_for_phase(volumes, stage_number, total)
 
 
 def _reference_volume_story_arcs_summary(ws, stage_number):
     """Matching-volume arc index (ids and chapter ranges only, no bodies)."""
-    volume = _reference_volume_for_stage(ws, stage_number)
-    if not volume:
+    volumes = _reference_volumes_for_stage(ws, stage_number)
+    if not volumes:
         return "(no reference-volume story segments found for the current stage)"
-    arcs = list_reference_story_arcs(ws.reference_outlines, volume["vol_idx"])
+    arcs = []
+    for volume in volumes:
+        arcs.extend(list_reference_story_arcs(ws.reference_outlines, volume["vol_idx"]))
     if not arcs:
-        return f"(reference volume {volume['vol_idx']} has no usable story segments)"
+        return "(mapped reference volumes have no usable story segments)"
     return "\n".join(
         f"[Reference story-arc {arc['idx']}: chapters {arc['start_ch']}-{arc['end_ch']}]"
         for arc in arcs
@@ -3596,21 +3773,34 @@ def _reference_volume_story_arcs_summary(ws, stage_number):
 
 
 def _story_arc_plans_for_volume(ws, volume, total_chapters):
-    mapped = _reference_volume_for_stage(ws, volume)
-    reference_arcs = (
-        list_reference_story_arcs(ws.reference_outlines, mapped["vol_idx"])
-        if mapped else []
-    )
+    reference_arcs = []
+    for mapped in _reference_volumes_for_stage(ws, volume):
+        reference_arcs.extend(list_reference_story_arcs(ws.reference_outlines, mapped["vol_idx"]))
     if reference_arcs:
-        return _plan_story_arcs_from_reference(reference_arcs, total_chapters)
-    return _plan_story_arcs(total_chapters)
+        plans = _plan_story_arcs_from_reference(reference_arcs, total_chapters)
+    else:
+        plans = _plan_story_arcs(total_chapters)
+    roadmap = _read_file(_story_design_path(ws, "stage_roadmap.md")) or ""
+    stage_text = _extract_stage_from_roadmap(roadmap, volume) or ""
+    return enrich_arc_plans(plans, stage_text)
 
 
-def _story_arc_prompt_context(generation_context, plan):
+def _story_arc_prompt_context(generation_context, plan, ws=None, stage_number=None):
     ctx = dict(generation_context)
     sample = str(plan.get("reference_story_arc") or "").strip()
     if sample:
         ctx["reference_story_arcs"] = sample
+    story_plan = plan.get("stage_story_plan") or ""
+    if ws is not None and stage_number is not None:
+        projection = build_story_context(
+            ws, stage_number, arc_index=plan.get("idx"), story_plan=story_plan,
+        )
+        ctx["current_stage"] = projection
+    elif story_plan:
+        ctx["current_stage"] = (
+            str(ctx.get("current_stage") or "")
+            + "\n\n[Whole-stage arc plan]\n" + story_plan
+        )
     return ctx
 
 
@@ -4016,7 +4206,7 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
     if progress_callback:
         progress_callback("preparing", 0, 0, "Reading long mainline, stage, and matching reference story segments")
 
-    llm = _get_lite_llm()
+    llm = _get_critic_llm()
     if not llm:
         return {"error": "No usable model is configured. Configure the LLM API in the top-right first.", "artifacts": []}
 
@@ -4027,8 +4217,6 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
     target_char_count = _reference_story_arc_average_chars(ws, volume)
     total_arcs = len(arc_plans)
     story_arc_dir = _volume_story_arc_dir(ws, volume)
-    if force:
-        _clear_story_arc_files(ws, volume)
     os.makedirs(story_arc_dir, exist_ok=True)
 
     print(
@@ -4088,7 +4276,9 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
                     arc_idx=arc_idx,
                     start_ch=start_ch,
                     end_ch=end_ch,
-                    generation_context=_story_arc_prompt_context(generation_context, plan),
+                    generation_context=_story_arc_prompt_context(
+                        generation_context, plan, ws=ws, stage_number=volume,
+                    ),
                     target_char_count=target_char_count,
                     cancel_event=cancel_event,
                 )
@@ -4112,8 +4302,47 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
             print(
                 f"  Warning: story-arc unit {arc_idx} got no model output; not written. You can retry."
             )
+            if existing:
+                generated_items.append({
+                    "idx": arc_idx, "start_ch": start_ch, "end_ch": end_ch,
+                    "file": arc_name, "path": arc_file, "content": existing,
+                })
             continue
-        _write_file(arc_file, result)
+        diagnostics = diagnose_story_arc(
+            result, arc_idx, start_ch, end_ch,
+            target_chars=target_char_count,
+            required_anchors=extract_critical_anchors(
+                "\n".join((plan.get("arc_obligations") or []) + (plan.get("chapter_beats") or []))
+            ),
+            reference_text=plan.get("reference_story_arc") or "",
+        )
+        if not diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+            print(f"  Warning: story-arc unit {arc_idx} failed deterministic validation; not written: {reasons}")
+            if existing:
+                generated_items.append({
+                    "idx": arc_idx, "start_ch": start_ch, "end_ch": end_ch,
+                    "file": arc_name, "path": arc_file, "content": existing,
+                })
+            continue
+        if existing and existing != result:
+            _mark_chapter_dependencies_stale(
+                ws, volume, start_ch, end_ch,
+                f"Story-arc unit {arc_idx} was replaced after validation.",
+            )
+        write_artifact(
+            arc_file, result, "story_arc",
+            dependencies={
+                "canonical_context": generation_context.get("current_stage", ""),
+                "stage_story_plan": plan.get("stage_story_plan", ""),
+                "reference_structure_sample": plan.get("reference_story_arc", ""),
+            },
+            metadata={
+                "stage": volume, "arc": arc_idx,
+                "start_chapter": start_ch, "end_chapter": end_ch,
+                "diagnostics": diagnostics,
+            },
+        )
         generated_items.append({
             "idx": arc_idx,
             "start_ch": start_ch,
@@ -4129,7 +4358,10 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
             )
         print(f"  -> Story-arc unit {arc_idx} saved: {arc_file}")
 
-    _write_story_arc_index(ws, volume, generated_items)
+    if len(generated_items) == total_arcs:
+        _write_story_arc_index(ws, volume, generated_items)
+    elif generated_items:
+        print("  Warning: story-arc plan is incomplete; the previous arc index was kept unchanged.")
     stopped = stop_event is not None and stop_event.is_set()
     if progress_callback:
         progress_callback(
@@ -4164,7 +4396,7 @@ def refine_story_arcs(ws, volume, instruction, cancel_event=None):
         print("Error: this volume has no story-arc units yet. Generate them in the chat box first.")
         return {}
 
-    llm = _get_lite_llm()
+    llm = _get_editor_llm()
     if not llm:
         return {}
 
@@ -4181,14 +4413,29 @@ def refine_story_arcs(ws, volume, instruction, cancel_event=None):
 
     # Split on the separator and write back one by one
     segments = [seg.strip() for seg in raw.split("===") if seg.strip()]
+    if len(segments) != len(arcs):
+        print("  Warning: story-arc adjustment was empty or incomplete; existing files were left unchanged.")
+        return {"adjustment_note": "Adjustment was rejected because it did not return every existing story-arc unit.", "artifacts": []}
+    target_chars = _reference_story_arc_average_chars(ws, volume)
+    for arc, segment in zip(arcs, segments):
+        diagnostics = diagnose_story_arc(
+            segment, arc["idx"], arc["start_ch"], arc["end_ch"],
+            target_chars=target_chars,
+        )
+        if not diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+            print(f"  Warning: story-arc adjustment failed validation; existing files were left unchanged: {reasons}")
+            return {"adjustment_note": "Adjustment failed deterministic validation; existing story arcs were kept.", "artifacts": []}
     # Back up old files
+    import shutil
     import time as _time
     stamp = _time.strftime("%Y%m%d_%H%M%S")
     backup_dir = os.path.join(_volume_story_arc_dir(ws, volume), "versions")
     os.makedirs(backup_dir, exist_ok=True)
     for arc in arcs:
         backup_path = os.path.join(backup_dir, f"{arc['file']}_{stamp}")
-        os.rename(arc["path"], backup_path) if os.path.exists(arc["path"]) else None
+        if os.path.exists(arc["path"]):
+            shutil.copy2(arc["path"], backup_path)
 
     written = []
     for idx, seg in enumerate(segments):
@@ -4211,7 +4458,11 @@ def refine_story_arcs(ws, volume, instruction, cancel_event=None):
         arc_idx_num = idx + 1
         arc_path = _story_arc_path(ws, volume, arc_idx_num, start_ch, end_ch)
         arc_name = _story_arc_file_name(arc_idx_num, start_ch, end_ch)
-        _write_file(arc_path, seg)
+        write_artifact(
+            arc_path, seg, "story_arc",
+            dependencies={"previous_story_arc": arcs[idx]["content"] if idx < len(arcs) else "", "instruction": instruction},
+            metadata={"stage": volume, "arc": arc_idx_num, "operation": "refine"},
+        )
         written.append({"label": f"story-arc unit {arc_idx_num} (chapters {start_ch}-{end_ch})",
                         "path": f"file_system/story_arcs/vol_{volume:02d}/{arc_name}"})
         print(f"  -> Story-arc unit {arc_idx_num} updated: {arc_path}")
@@ -4299,7 +4550,7 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
     arcs = _list_novel_story_arcs(ws, volume)
     if not arcs:
         return {"error": "This volume has no story-arc units yet.", "artifacts": []}
-    llm = _get_lite_llm()
+    llm = _get_editor_llm()
     if not llm:
         return {"error": "No usable model is configured.", "artifacts": []}
 
@@ -4359,7 +4610,9 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
             )
         prompt = PromptLoader.load(
             "story_arc_serial_refine",
-            **_story_arc_prompt_context(generation_context, target),
+            **_story_arc_prompt_context(
+                generation_context, target, ws=ws, stage_number=volume,
+            ),
             instruction=instruction,
             previous_story_arc=previous,
             current_story_arc=(
@@ -4400,11 +4653,39 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
                 f"  Warning: story-arc unit {target['idx']} got no model output; not written. You can retry."
             )
             continue
+        diagnostics = diagnose_story_arc(
+            result, target["idx"], target["start_ch"], target["end_ch"],
+            target_chars=target_char_count,
+            required_anchors=extract_critical_anchors(
+                "\n".join((target.get("arc_obligations") or []) + (target.get("chapter_beats") or []))
+            ),
+            reference_text=target.get("reference_story_arc") or "",
+        )
+        if not diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+            print(f"  Warning: story-arc unit {target['idx']} adjustment failed validation; existing content kept: {reasons}")
+            continue
 
         backup_path = os.path.join(backup_dir, f"{target['file']}_{stamp}")
         if target["existed"] and not os.path.exists(backup_path):
             shutil.copy2(target["path"], backup_path)
-        _write_file(target["path"], result)
+        if target["existed"] and target["content"] != result:
+            _mark_chapter_dependencies_stale(
+                ws, volume, target["start_ch"], target["end_ch"],
+                f"Story-arc unit {target['idx']} was adjusted after validation.",
+            )
+        write_artifact(
+            target["path"], result, "story_arc",
+            dependencies={
+                "previous_story_arc": previous,
+                "instruction": instruction,
+                "stage_story_plan": target.get("stage_story_plan", ""),
+            },
+            metadata={
+                "stage": volume, "arc": target["idx"],
+                "operation": refinement_mode, "diagnostics": diagnostics,
+            },
+        )
         generated_by_idx[target["idx"]] = result
         written.append({
             "label": f"story-arc unit {target['idx']} (chapters {target['start_ch']}-{target['end_ch']})",
@@ -4516,7 +4797,7 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
         print("Error: no story-arc units found; cannot generate chapter outlines. Run story-arcs first.")
         return
 
-    llm = _get_lite_llm()
+    llm = _get_critic_llm()
     if not llm:
         return
     _ensure_system_panel_decision(ws)
@@ -4525,6 +4806,10 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
     )
     print(f">>> Generating volume {volume} chapter outlines serially <<<")
     os.makedirs(ch_out_dir, exist_ok=True)
+    arc_plans = {
+        plan["idx"]: plan
+        for plan in _story_arc_plans_for_volume(ws, volume, total_chapters)
+    }
 
     for arc in story_arcs:
         arc_start = arc["start_ch"]
@@ -4551,12 +4836,17 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
             ).strip() or "(this is chapter 1; no previous chapter outline)"
 
             print(f"  Generating chapter {ch_num} outline...")
+            plan = arc_plans.get(arc["idx"], {})
+            canonical_context = build_story_context(
+                ws, volume, chapter_number=ch_num, arc_index=arc["idx"],
+                story_plan=plan.get("stage_story_plan", ""), current_arc=arc_content,
+            )
             prompt = PromptLoader.load(
                 "serial_chapter_outline",
                 previous_system_panel=json.dumps(
                     _previous_system_panel(ws, volume, ch_num), ensure_ascii=False, indent=2,
                 ),
-                story_arc=arc_content,
+                story_arc=canonical_context + "\n\n[Current arc artifact]\n" + arc_content,
                 previous_chapter_outline=previous_text,
                 chapter_num=ch_num,
             )
@@ -4564,9 +4854,31 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
             if not str(result).strip():
                 print(f"  Warning: chapter {ch_num} outline got no model output; not written. You can retry.")
                 continue
+            diagnostics = diagnose_chapter_outline(result, ch_num)
+            if not diagnostics["valid"]:
+                reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+                print(f"  Warning: chapter {ch_num} outline failed validation; not written: {reasons}")
+                continue
             _generate_chapter_system_panel(llm, ws, volume, ch_num, result)
             result = _cap_story_line_in_outline(result)
-            _write_file(out_file, result)
+            existing = _read_file(out_file)
+            if existing and existing != result:
+                mark_stale(
+                    resolve_chapter_draft_path(
+                        os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}"), ch_num,
+                    ),
+                    f"Chapter {ch_num} outline was replaced after validation.",
+                    changed_dependency="chapter_outline",
+                )
+            write_artifact(
+                out_file, result, "chapter_outline",
+                dependencies={
+                    "story_arc": arc_content,
+                    "canonical_context": canonical_context,
+                    "previous_outline": previous_text,
+                },
+                metadata={"stage": volume, "chapter": ch_num, "diagnostics": diagnostics},
+            )
             print(f"  -> Chapter {ch_num} outline saved: {out_file}")
 
     print(f"\n>>> Volume {volume}: all {total_chapters} chapter outlines generated.<<<")
@@ -4627,7 +4939,7 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
         print(f"Error: story-arc unit {arc_idx} of volume {volume} not found.")
         return {}
 
-    llm = _get_lite_llm()
+    llm = _get_critic_llm()
     if not llm:
         return {}
 
@@ -4658,6 +4970,13 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
     arc_start = target_arc["start_ch"]
     arc_end = target_arc["end_ch"]
     arc_content = target_arc["content"]
+    target_plan = next(
+        (
+            plan for plan in _story_arc_plans_for_volume(ws, volume, total_chapters)
+            if plan["idx"] == arc_idx
+        ),
+        {},
+    )
     print(f">>> Generating chapter outlines for volume {volume} story-arc unit {arc_idx} (chapters {arc_start}-{arc_end}) <<<")
 
     written = []
@@ -4696,12 +5015,16 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
         ).strip() or "(this is chapter 1; no previous chapter outline)"
 
         print(f"  Generating chapter {ch_num} outline...")
+        canonical_context = build_story_context(
+            ws, volume, chapter_number=ch_num, arc_index=arc_idx,
+            story_plan=target_plan.get("stage_story_plan", ""), current_arc=arc_content,
+        )
         prompt = PromptLoader.load(
             "serial_chapter_outline",
             previous_system_panel=json.dumps(
                 _previous_system_panel(ws, volume, ch_num), ensure_ascii=False, indent=2,
             ),
-            story_arc=arc_content,
+            story_arc=canonical_context + "\n\n[Current arc artifact]\n" + arc_content,
             previous_chapter_outline=previous_text,
             chapter_num=ch_num,
         )
@@ -4731,6 +5054,14 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
                     cancel_event.clear()
         if result is None:
             break
+        if not str(result).strip():
+            print(f"  Warning: chapter {ch_num} outline got no model output; not written. You can retry.")
+            continue
+        diagnostics = diagnose_chapter_outline(result, ch_num)
+        if not diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+            print(f"  Warning: chapter {ch_num} outline failed validation; not written: {reasons}")
+            continue
         if not _update_chapter_system_panel_with_controls(
             llm, ws, volume, ch_num, result, len(written),
             arc_end - arc_start + 1, progress_callback, pause_event,
@@ -4738,7 +5069,15 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
         ):
             break
         result = _cap_story_line_in_outline(result)
-        _write_file(out_file, result)
+        write_artifact(
+            out_file, result, "chapter_outline",
+            dependencies={
+                "story_arc": arc_content,
+                "canonical_context": canonical_context,
+                "previous_outline": previous_text,
+            },
+            metadata={"stage": volume, "chapter": ch_num, "diagnostics": diagnostics},
+        )
         written.append({
             "label": f"chapter {ch_num} outline",
             "path": f"file_system/chapter_outlines/vol_{volume:02d}/chapter_{ch_num:03d}.md",
@@ -4799,7 +5138,7 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
     )
     if not target_arc:
         return {"error": f"Story-arc unit {arc_idx} of volume {volume} not found.", "artifacts": []}
-    llm = _get_lite_llm()
+    llm = _get_editor_llm()
     if not llm:
         return {"error": "No usable model is configured.", "artifacts": []}
     while True:
@@ -4820,6 +5159,15 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
     ch_out_dir = os.path.join(ws.file_system, "chapter_outlines", f"vol_{volume:02d}")
     os.makedirs(ch_out_dir, exist_ok=True)
     start_ch, end_ch = target_arc["start_ch"], target_arc["end_ch"]
+    volume_context = _load_volume_outline_context(ws, volume)
+    total_chapters = volume_context[2] if volume_context else end_ch
+    target_plan = next(
+        (
+            plan for plan in _story_arc_plans_for_volume(ws, volume, total_chapters)
+            if plan["idx"] == arc_idx
+        ),
+        {},
+    )
     sync_finalized_drafts_for_outlines(
         llm, ws, volume, end_ch, progress_callback,
         pause_event, stop_event, cancel_event,
@@ -4917,9 +5265,14 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
                 "refining", len(written), len(targets),
                 f"Route: start at chapter {routed_chapter}; processing chapter {ch_num}",
             )
+        canonical_context = build_story_context(
+            ws, volume, chapter_number=ch_num, arc_index=arc_idx,
+            story_plan=target_plan.get("stage_story_plan", ""),
+            current_arc=target_arc["content"], current_outline=current or "",
+        )
         prompt = PromptLoader.load(
             "chapter_outline_serial_refine",
-            story_arc=target_arc["content"],
+            story_arc=canonical_context + "\n\n[Current arc artifact]\n" + target_arc["content"],
             instruction=instruction,
             previous_outline=previous or "(this is the first chapter of this story-arc unit)",
             previous_system_panel=json.dumps(
@@ -4951,6 +5304,14 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
                     cancel_event.clear()
         if result is None:
             break
+        if not str(result).strip():
+            print(f"  Warning: chapter {ch_num} outline adjustment was empty; existing content kept.")
+            continue
+        diagnostics = diagnose_chapter_outline(result, ch_num)
+        if not diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+            print(f"  Warning: chapter {ch_num} outline adjustment failed validation; existing content kept: {reasons}")
+            continue
         if current:
             backup_path = os.path.join(backup_dir, f"chapter_{ch_num:03d}.md_{stamp}")
             if not os.path.exists(backup_path):
@@ -4961,7 +5322,27 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
         ):
             break
         result = _cap_story_line_in_outline(result)
-        _write_file(current_path, result)
+        if current and current != result:
+            mark_stale(
+                resolve_chapter_draft_path(
+                    os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}"), ch_num,
+                ),
+                f"Chapter {ch_num} outline was adjusted after validation.",
+                changed_dependency="chapter_outline",
+            )
+        write_artifact(
+            current_path, result, "chapter_outline",
+            dependencies={
+                "story_arc": target_arc["content"],
+                "canonical_context": canonical_context,
+                "previous_outline": previous or "",
+                "instruction": instruction,
+            },
+            metadata={
+                "stage": volume, "chapter": ch_num,
+                "operation": refinement_mode, "diagnostics": diagnostics,
+            },
+        )
         written.append({
             "label": f"chapter {ch_num} outline",
             "path": f"file_system/chapter_outlines/vol_{volume:02d}/chapter_{ch_num:03d}.md",
@@ -4990,7 +5371,7 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
 
 def refine_chapter_outlines(ws, volume, arc_idx, instruction):
     """Adjust the chapter outlines of a given story-arc unit from a user instruction."""
-    llm = _get_lite_llm()
+    llm = _get_editor_llm()
     if not llm:
         return {}
 
@@ -5020,9 +5401,23 @@ def refine_chapter_outlines(ws, volume, arc_idx, instruction):
         return {}
 
     current_text = "\n\n===\n\n".join(outlines)
+    volume_context = _load_volume_outline_context(ws, volume)
+    total_chapters = volume_context[2] if volume_context else arc_end
+    target_plan = next(
+        (
+            plan for plan in _story_arc_plans_for_volume(ws, volume, total_chapters)
+            if plan["idx"] == arc_idx
+        ),
+        {},
+    )
+    canonical_context = build_story_context(
+        ws, volume, arc_index=arc_idx,
+        story_plan=target_plan.get("stage_story_plan", ""),
+        current_arc=target_arc["content"],
+    )
     prompt = PromptLoader.load(
         "chapter_outlines_refine",
-        story_arc=target_arc["content"],
+        story_arc=canonical_context + "\n\n[Current arc artifact]\n" + target_arc["content"],
         current_outlines=current_text,
         instruction=instruction,
     )
@@ -5030,6 +5425,17 @@ def refine_chapter_outlines(ws, volume, arc_idx, instruction):
 
     # Split on === and write back one by one
     segments = [seg.strip() for seg in raw.split("===") if seg.strip()]
+    if len(segments) != len(outlines):
+        print("  Warning: chapter-outline adjustment was empty or incomplete; existing outlines were kept.")
+        return {"adjustment_note": "Adjustment was rejected because it did not return every chapter outline.", "artifacts": []}
+    diagnostics_by_chapter = []
+    for offset, segment in enumerate(segments):
+        diagnostics = diagnose_chapter_outline(segment, arc_start + offset)
+        if not diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+            print(f"  Warning: chapter-outline adjustment failed validation; existing outlines were kept: {reasons}")
+            return {"adjustment_note": "Adjustment failed deterministic validation; existing outlines were kept.", "artifacts": []}
+        diagnostics_by_chapter.append(diagnostics)
     import time as _time
     stamp = _time.strftime("%Y%m%d_%H%M%S")
     backup_dir = os.path.join(ch_out_dir, "versions")
@@ -5043,7 +5449,25 @@ def refine_chapter_outlines(ws, volume, arc_idx, instruction):
             import shutil
             shutil.copy2(out_file, os.path.join(backup_dir, f"chapter_{ch_num:03d}.md_{stamp}"))
         seg = _cap_story_line_in_outline(seg)
-        _write_file(out_file, seg)
+        mark_stale(
+            resolve_chapter_draft_path(
+                os.path.join(ws.file_system, "chapters", f"vol_{volume:02d}"), ch_num,
+            ),
+            f"Chapter {ch_num} outline was adjusted after validation.",
+            changed_dependency="chapter_outline",
+        )
+        write_artifact(
+            out_file, seg, "chapter_outline",
+            dependencies={
+                "story_arc": target_arc["content"],
+                "canonical_context": canonical_context,
+                "instruction": instruction,
+            },
+            metadata={
+                "stage": volume, "chapter": ch_num, "operation": "refine",
+                "diagnostics": diagnostics_by_chapter[idx],
+            },
+        )
         written.append({
             "label": f"chapter {ch_num} outline",
             "path": f"file_system/chapter_outlines/vol_{volume:02d}/chapter_{ch_num:03d}.md",
@@ -5089,7 +5513,30 @@ _PARAGRAPH_PAIR_CLOSERS = {
     "《": "》", "〈": "〉", "（": "）", "(": ")",
     "【": "】", "[": "]", "〔": "〕",
 }
-_PARAGRAPH_SENTENCE_ENDS = frozenset("。！？!?")
+_PARAGRAPH_SENTENCE_ENDS = frozenset("。！？!?.")
+_ENGLISH_ABBREVIATIONS = frozenset({
+    "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc", "e.g", "i.e",
+})
+
+
+def _is_english_period_boundary(text, index):
+    if index > 0 and index + 1 < len(text) and text[index - 1].isdigit() and text[index + 1].isdigit():
+        return False
+    if index + 1 < len(text) and text[index + 1] == ".":
+        return False
+    prefix = text[:index]
+    match = re.search(r"([A-Za-z]+(?:\.[A-Za-z]+)?)$", prefix)
+    if match and match.group(1).casefold() in _ENGLISH_ABBREVIATIONS:
+        return False
+    return True
+
+
+def _paragraph_measure(text):
+    english_words = re.findall(r"[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*", text or "")
+    cjk_chars = re.findall(r"[\u3400-\u9fff]", text or "")
+    if len(english_words) >= len(cjk_chars):
+        return len(english_words)
+    return len(re.sub(r"\s+", "", text or ""))
 
 
 def _chapter_sentence_units(paragraph):
@@ -5109,6 +5556,8 @@ def _chapter_sentence_units(paragraph):
             closers.pop()
 
         boundary = not closers and char in _PARAGRAPH_SENTENCE_ENDS
+        if boundary and char == ".":
+            boundary = _is_english_period_boundary(text, index)
         if not closers and char == "…":
             boundary = index + 1 >= len(text) or text[index + 1] != "…"
         if (
@@ -5143,7 +5592,7 @@ def _format_chapter_paragraphs(text, target_length=140, max_length=200):
         # Keep author-written single newlines, but still handle lone overlong prose such as the line after a heading.
         for line in paragraph.splitlines():
             line = line.strip()
-            if len(line) <= max_length:
+            if _paragraph_measure(line) <= max_length:
                 rendered_lines.append(line)
                 continue
             units = _chapter_sentence_units(line)
@@ -5154,20 +5603,26 @@ def _format_chapter_paragraphs(text, target_length=140, max_length=200):
             groups = []
             current = ""
             for unit in units:
+                separator = " " if current and re.search(r"[A-Za-z0-9][.!?]?[\"'”’]?$", current) else ""
+                candidate = current + separator + unit
                 if current and (
-                    len(current) >= target_length
-                    or len(current) + len(unit) > max_length
+                    _paragraph_measure(current) >= target_length
+                    or _paragraph_measure(candidate) > max_length
                 ):
                     groups.append(current)
                     current = unit
                 else:
-                    current += unit
+                    current = candidate
             if current:
                 groups.append(current)
             # Avoid a too-short orphan at the end; merge back only if the merge still fits the max length.
-            if len(groups) > 1 and len(groups[-1]) < 60 and len(groups[-2]) + len(groups[-1]) <= max_length:
+            if (
+                len(groups) > 1
+                and _paragraph_measure(groups[-1]) < 60
+                and _paragraph_measure(groups[-2] + " " + groups[-1]) <= max_length
+            ):
                 tail = groups.pop()
-                groups[-1] += tail
+                groups[-1] += (" " if re.search(r"[A-Za-z0-9]", tail) else "") + tail
             rendered_lines.append("\n\n".join(groups))
         formatted.append("\n".join(rendered_lines))
     return "\n\n".join(formatted)
@@ -5264,6 +5719,30 @@ def _load_system_prompt_guide(ws, project_root):
     return _read_file(os.path.join(project_root, "core", "system_prompt.md"))
 
 
+def _chapter_quality_diagnostics_path(ws, volume, chapter_num, operation):
+    return os.path.join(
+        ws.file_system, "quality_diagnostics", f"vol_{volume:02d}",
+        f"chapter_{chapter_num:03d}_{operation}.json",
+    )
+
+
+def _reference_text_for_chapter(ws, volume, chapter_num):
+    mapped = _reference_volume_for_stage(ws, volume)
+    if not mapped:
+        return ""
+    arcs = list_reference_story_arcs(ws.reference_outlines, mapped["vol_idx"])
+    if not arcs:
+        return ""
+    matching = next(
+        (
+            arc for arc in arcs
+            if int(arc.get("start_ch") or 0) <= chapter_num <= int(arc.get("end_ch") or 0)
+        ),
+        None,
+    )
+    return str((matching or arcs[min(len(arcs) - 1, max(0, (chapter_num - 1) // STORY_ARC_TARGET_CHAPTERS))]).get("content") or "")
+
+
 def _humanize_chapter_text(
     llm,
     ws,
@@ -5278,23 +5757,61 @@ def _humanize_chapter_text(
         _load_system_prompt_guide(ws, project_root)
         or "(no extra prose guide; keep the author voice already in the draft to refine.)"
     )
+    outline = _read_file(os.path.join(
+        ws.file_system, "chapter_outlines", f"vol_{volume:02d}",
+        f"chapter_{chapter_num:03d}.md",
+    )) or ""
+    current_arc = _find_story_arc_for_chapter(ws, volume, chapter_num)
+    volume_context = _load_volume_outline_context(ws, volume)
+    total_chapters = volume_context[2] if volume_context else chapter_num
+    plan = next(
+        (
+            item for item in _story_arc_plans_for_volume(ws, volume, total_chapters)
+            if item["start_ch"] <= chapter_num <= item["end_ch"]
+        ),
+        {},
+    )
+    canonical_context = build_story_context(
+        ws, volume, chapter_number=chapter_num, arc_index=plan.get("idx"),
+        story_plan=plan.get("stage_story_plan", ""), current_arc=current_arc,
+        current_outline=outline,
+    )
     prompt = PromptLoader.load(
         "humanize_chapter",
         chapter_text=chapter_text,
         writing_guide=writing_guide,
+        story_context=canonical_context,
     )
-    result = normalize_text(_generate_with_cancel(llm, prompt, cancel_event))
-    result = result or chapter_text
-    violations = _chapter_style_violations(result)
-    if violations:
-        print(
-            "  -> AI polish still hits the style hard check; starting a targeted rewrite: "
-            + ", ".join(f"{item['label']} {item['count']} hits" for item in violations)
+    candidate = normalize_text(_generate_with_cancel(llm, prompt, cancel_event))
+    reference_text = _reference_text_for_chapter(ws, volume, chapter_num)
+    required_anchors = [
+        anchor for anchor in extract_critical_anchors(chapter_text + "\n" + outline)
+        if anchor.casefold() in chapter_text.casefold()
+    ]
+    if not candidate:
+        diagnostics = {
+            "valid": False,
+            "errors": [{"code": "empty_rewrite", "reason": "Editor returned no chapter text"}],
+            "warnings": [], "metrics": {},
+        }
+    else:
+        diagnostics = diagnose_rewrite(
+            chapter_text, candidate, chapter_num,
+            required_anchors=required_anchors,
+            outline_text=outline, canon_text=canonical_context,
+            reference_text=reference_text,
         )
-        result = _repair_chapter_style(
-            llm, result, violations, cancel_event=cancel_event,
-        )
-    return result
+    diagnostics["operation"] = "humanize"
+    diagnostics["decision"] = "accepted" if diagnostics["valid"] else "kept_original"
+    _write_json_file(
+        _chapter_quality_diagnostics_path(ws, volume, chapter_num, "humanize"),
+        diagnostics,
+    )
+    if not diagnostics["valid"]:
+        reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+        print(f"  -> Chapter {chapter_num} polish rejected; original kept: {reasons}")
+        return chapter_text
+    return candidate
 
 
 def gen_serial_chapters(
@@ -5361,15 +5878,18 @@ def gen_serial_chapters(
 
     print(f">>> Generating drafts serially: volume {volume}, {total_chapters} chapters <<<")
 
-    llm = _get_lite_llm()
-    if not llm:
+    draft_llm = _get_draft_llm()
+    if not draft_llm:
+        return
+    editor_llm = _get_editor_llm() if humanize else None
+    if humanize and not editor_llm:
         return
 
     def humanize_with_controls(ch_num, text, completed, total):
         while True:
             try:
                 return _humanize_chapter_text(
-                    llm, ws, volume, ch_num, text, cancel_event=cancel_event,
+                    editor_llm, ws, volume, ch_num, text, cancel_event=cancel_event,
                 )
             except LLMCallCancelled:
                 if stop_event is not None and stop_event.is_set():
@@ -5463,8 +5983,17 @@ def gen_serial_chapters(
             result = humanize_with_controls(ch_num, existing_text, idx, len(tasks))
             if result is None:
                 break
+            if result == existing_text:
+                print(f"  -> Chapter {ch_num} polish made no accepted replacement; original kept.")
+                continue
             result = _format_chapter_paragraphs(result)
-            out_file = _write_draft_chapter(out_dir, ch_num, result)
+            out_file = chapter_draft_write_path(out_dir, ch_num)
+            write_artifact(
+                out_file, result, "chapter_draft",
+                dependencies={"humanize_source": existing_text},
+                metadata={"stage": volume, "chapter": ch_num, "operation": "humanize_existing"},
+            )
+            remove_legacy_chapter_draft(out_dir, ch_num)
             processed_chapters.append(ch_num)
             if progress_callback:
                 progress_callback("generating", idx + 1, len(tasks), f"Chapter {ch_num} draft polished and written")
@@ -5499,6 +6028,18 @@ def gen_serial_chapters(
 
         # Read the current-flow story-arc unit for this chapter.
         story_arc_summary = _find_story_arc_for_chapter(ws, volume, ch_num)
+        arc_plan = next(
+            (
+                item for item in _story_arc_plans_for_volume(ws, volume, total_chapters)
+                if item["start_ch"] <= ch_num <= item["end_ch"]
+            ),
+            {},
+        )
+        canonical_context = build_story_context(
+            ws, volume, chapter_number=ch_num, arc_index=arc_plan.get("idx"),
+            story_plan=arc_plan.get("stage_story_plan", ""),
+            current_arc=story_arc_summary, current_outline=chapter_outline,
+        )
 
         # Chapter-start panel is the state after the previous chapter; this chapter panel is the end-state planned by the outline.
         # The draft must write the change between them; do not treat this chapter panel as the opening state.
@@ -5522,13 +6063,19 @@ def gen_serial_chapters(
             )
 
         context = (
+            f"=== Canonical story context (deterministic, budgeted) ===\n{canonical_context}\n\n"
             f"=== Writing guide ===\n{writing_rules}\n\n"
             f"=== Current story-arc unit ===\n{story_arc_summary or '(story-arc unit not found; follow the chapter outline strictly)'}\n\n"
             f"=== Prior prose (continuity only; must not override this chapter outline) ===\n{history_section}\n\n"
             + panel_section
             + current_draft_section
             + f"=== Current chapter outline (chapter {ch_num}, the only plot blueprint) ===\n{chapter_outline}\n\n"
-            + (f"=== User adjustment this round ===\n{writing_instruction}\n\n" if writing_instruction else "")
+            + (
+                "[BEGIN AUTHOR DIRECTION: SUBORDINATE TO TASK, SAFETY, OUTPUT, AND ANTI-COPY RULES]\n"
+                f"{writing_instruction}\n"
+                "[END AUTHOR DIRECTION]\n\n"
+                if writing_instruction else ""
+            )
             + "=== Final execution reminder ===\n"
             + "Output only this chapter's title and prose; follow the chapter outline strictly; if the system panel is enabled, "
               "the prose must naturally show the change from chapter start to chapter end, and must not apply the end state early; "
@@ -5544,7 +6091,7 @@ def gen_serial_chapters(
         )
         while True:
             try:
-                result = normalize_text(_generate_with_cancel(llm, prompt, cancel_event))
+                result = normalize_text(_generate_with_cancel(draft_llm, prompt, cancel_event))
                 break
             except LLMCallCancelled:
                 if stop_event is not None and stop_event.is_set():
@@ -5569,6 +6116,22 @@ def gen_serial_chapters(
             if not str(result).strip():
                 print(f"  Warning: chapter {ch_num} humanize got no model output; not written. You can retry.")
                 continue
+        reference_text = _reference_text_for_chapter(ws, volume, ch_num)
+        draft_diagnostics = diagnose_chapter(
+            result, ch_num,
+            required_anchors=extract_critical_anchors(chapter_outline),
+            outline_text=chapter_outline, canon_text=canonical_context,
+            reference_text=reference_text,
+        )
+        draft_diagnostics["operation"] = "draft_generation"
+        _write_json_file(
+            _chapter_quality_diagnostics_path(ws, volume, ch_num, "draft"),
+            draft_diagnostics,
+        )
+        if not draft_diagnostics["valid"]:
+            reasons = "; ".join(item["reason"] for item in draft_diagnostics["errors"])
+            print(f"  Warning: chapter {ch_num} draft failed validation; not written: {reasons}")
+            continue
         result = _format_chapter_paragraphs(result)
         if regenerate_existing and os.path.isfile(existing_path):
             import shutil
@@ -5578,7 +6141,21 @@ def gen_serial_chapters(
             backup_path = os.path.join(backup_dir, f"{os.path.basename(existing_path)}_{stamp}")
             if not os.path.exists(backup_path):
                 shutil.copy2(existing_path, backup_path)
-        out_file = _write_draft_chapter(out_dir, ch_num, result)
+        out_file = chapter_draft_write_path(out_dir, ch_num)
+        write_artifact(
+            out_file, result, "chapter_draft",
+            dependencies={
+                "chapter_outline": chapter_outline,
+                "story_arc": story_arc_summary,
+                "canonical_context": canonical_context,
+            },
+            metadata={
+                "stage": volume, "chapter": ch_num,
+                "diagnostics": draft_diagnostics,
+                "humanized": bool(humanize),
+            },
+        )
+        remove_legacy_chapter_draft(out_dir, ch_num)
         processed_chapters.append(ch_num)
         if progress_callback:
             progress_callback("generating", idx + 1, len(tasks), f"Chapter {ch_num} draft written")
@@ -5641,7 +6218,7 @@ def route_chapter_draft_refinement(ws, volume, arc_idx, instruction, cancel_even
         text = _read_file(resolve_chapter_draft_path(out_dir, ch))
         if text:
             current.append(f"[Chapter {ch} draft]\n{text}")
-    llm = _get_lite_llm()
+    llm = _get_critic_llm()
     if not llm:
         raise RuntimeError("No usable model is configured.")
     prompt = PromptLoader.load(

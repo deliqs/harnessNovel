@@ -12,6 +12,9 @@ const CONFIG_PREFIXES = {
   data_builder: "DATA_BUILDER",
   adaptive_builder: "ADAPTIVE_BUILDER",
   adaptive_builder_lite: "ADAPTIVE_BUILDER_LITE",
+  draft: "DRAFT",
+  editor: "EDITOR",
+  critic: "CRITIC",
 };
 
 const REVIEW_GROUPS = {
@@ -98,12 +101,28 @@ function closeSettings() {
 
 function modelConfigFields(groupId, group) {
   const prefix = CONFIG_PREFIXES[groupId];
-  const configured = group.api_key_configured ? "API key configured" : "API key not configured";
+  const configured = group.inherited && group.api_key_configured
+    ? "Using Lite fallback"
+    : (group.api_key_configured ? "API key configured" : "API key not configured");
+  const optional = ["draft", "editor", "critic"].includes(groupId);
   return `<section class="model-config-group">
     <header><h3>${escapeHtml(group.label)}</h3><span class="config-status ${group.api_key_configured ? "ready" : "missing"}">${configured}</span></header>
-    <label>Model name<input name="${prefix}_MODEL" value="${escapeHtml(group.model || "")}" placeholder="e.g. deepseek-v4-pro" autocomplete="off" /></label>
-    <label>Base URL<input name="${prefix}_BASE_URL" value="${escapeHtml(group.base_url || "")}" placeholder="https://api.example.com" autocomplete="off" /></label>
-    <label>API Key<input name="${prefix}_API_KEY" type="password" placeholder="${group.api_key_configured ? "Configured; leave blank to keep it" : "Enter API key"}" autocomplete="new-password" /></label>
+    <label>Model name<input name="${prefix}_MODEL" data-role-prefix="${optional ? prefix : ""}" value="${escapeHtml(group.model || "")}" placeholder="e.g. deepseek-v4-pro" autocomplete="off" /></label>
+    <label>Base URL<input name="${prefix}_BASE_URL" data-role-prefix="${optional ? prefix : ""}" value="${escapeHtml(group.base_url || "")}" placeholder="https://api.example.com" autocomplete="off" /></label>
+    <label>API Key<input name="${prefix}_API_KEY" data-role-prefix="${optional ? prefix : ""}" type="password" placeholder="${group.api_key_configured ? "Configured; leave blank to keep it" : "Enter API key"}" autocomplete="new-password" /></label>
+    ${optional ? `<button class="secondary-button role-clear-button" type="button" data-clear-role="${prefix}">Clear role and use Lite fallback</button>` : ""}
+  </section>`;
+}
+
+function promptTraceFields(mode) {
+  return `<section class="model-config-group">
+    <header><h3>Prompt debugging</h3><span class="config-status ${mode === "full" ? "missing" : "ready"}">${mode === "full" ? "Full content saved locally" : "Private by default"}</span></header>
+    <label>Prompt trace mode<select name="HARNESS_NOVEL_PROMPT_TRACE_MODE">
+      <option value="off" ${mode === "off" ? "selected" : ""}>Off — do not retain model-call diagnostics</option>
+      <option value="metadata" ${mode === "metadata" ? "selected" : ""}>Metadata — model, time, and size only</option>
+      <option value="full" ${mode === "full" ? "selected" : ""}>Full — save redacted, bounded prompt text for local debugging</option>
+    </select></label>
+    <p class="settings-note">Full prompts can contain unpublished source and instructions. Use it only on a private machine, then clear task prompts when finished.</p>
   </section>`;
 }
 
@@ -119,10 +138,21 @@ async function openSettings() {
     content.innerHTML = `<form id="model-config-form" class="model-config-form">
       <p class="config-path">${escapeHtml(config.config_path || "")}</p>
       ${groups.map(([id, group]) => modelConfigFields(id, group)).join("")}
+      ${promptTraceFields(config.prompt_trace_mode || "metadata")}
       <div class="settings-actions"><button id="cancel-settings" class="secondary-button" type="button">Cancel</button><button class="primary-button" type="submit">Save settings</button></div>
     </form>`;
     $("#cancel-settings").addEventListener("click", closeSettings);
     $("#model-config-form").addEventListener("submit", saveModelConfig);
+    $$('[data-clear-role]').forEach((button) => button.addEventListener("click", () => {
+      const prefix = button.dataset.clearRole;
+      $$(`[data-role-prefix="${prefix}"]`).forEach((input) => {
+        input.value = "";
+        input.dataset.clear = "true";
+      });
+    }));
+    $$('[data-role-prefix]').forEach((input) => input.addEventListener("input", () => {
+      delete input.dataset.clear;
+    }));
   } catch (error) {
     content.innerHTML = `<p class="settings-error">${escapeHtml(error.message || "Could not read settings.")}</p>`;
   }
@@ -133,13 +163,15 @@ async function saveModelConfig(event) {
   const form = event.currentTarget;
   const submit = form.querySelector('button[type="submit"]');
   const values = {};
-  [...form.querySelectorAll('input[name]')].forEach((input) => {
+  const clearKeys = [];
+  [...form.querySelectorAll('input[name], select[name]')].forEach((input) => {
     const value = input.value.trim();
-    if (value) values[input.name] = value;
+    if (input.dataset.clear === "true") clearKeys.push(input.name);
+    else if (value) values[input.name] = value;
   });
   submit.disabled = true;
   try {
-    await api("/api/config", { method: "PUT", body: JSON.stringify({ values }) });
+    await api("/api/config", { method: "PUT", body: JSON.stringify({ values, clear_keys: clearKeys }) });
     closeSettings();
     showToast("LLM settings saved.");
   } catch (error) {
@@ -2571,9 +2603,13 @@ function promptCardsMarkup(items, openLatest = false) {
   return items.map((item, index) => {
     const call = `Call ${index + 1}${item.model ? ` · ${escapeHtml(item.model)}` : ""}`;
     const open = openLatest && index === items.length - 1 ? " open" : "";
+    const hasPrompt = item.content_recorded === true || Object.prototype.hasOwnProperty.call(item, "prompt");
+    const content = hasPrompt
+      ? (item.prompt || "(No prompt text was sent.)")
+      : `Prompt content was not retained (${item.trace_mode || "metadata"} mode). Choose Full in Settings only for private local debugging.`;
     return `<details class="drawer-prompt-card"${open}>
       <summary><strong>${call}</strong><span>${escapeHtml(item.created_at || "")}</span></summary>
-      <pre>${escapeHtml(item.prompt || "")}</pre>
+      <pre>${escapeHtml(content)}</pre>
     </details>`;
   }).join("");
 }
@@ -2602,7 +2638,8 @@ function openPromptDialog(items, meta = "Model call") {
   const list = Array.isArray(items) ? items : [];
   $("#prompt-dialog-meta").textContent = meta;
   $("#prompt-dialog-list").innerHTML = promptCardsMarkup(list, true);
-  wizardState.currentPromptText = list.length ? String(list[list.length - 1].prompt || "") : "";
+  const latest = list[list.length - 1];
+  wizardState.currentPromptText = latest && latest.content_recorded ? String(latest.prompt || "") : "";
   if (typeof dialog.showModal === "function") dialog.showModal();
 }
 
