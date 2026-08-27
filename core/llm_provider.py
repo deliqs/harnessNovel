@@ -100,6 +100,10 @@ class LLMProvider:
         response = client.chat.completions.create(stream=False, **kwargs)
         return response.choices[0].message.content
 
+    def _is_lm_studio(self):
+        url = (self.base_url or "").lower()
+        return ":1234" in url or "lmstudio" in url
+
     def _completion_kwargs(self, prompt, temperature, is_json, max_tokens):
         kwargs = {
             "model": self.model,
@@ -109,6 +113,13 @@ class LLMProvider:
         }
         if is_json:
             kwargs["response_format"] = {"type": "json_object"}
+        # Qwen 3.8 defaults thinking to xhigh when this is omitted. LM Studio
+        # chat presets do not apply to /v1, so chapter writes must set it here.
+        if self._is_lm_studio():
+            kwargs["extra_body"] = {
+                "enable_thinking": False,
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
         return kwargs
 
     def generate(self, prompt, temperature=0.7, is_json=False, max_retries=2, max_tokens=None):

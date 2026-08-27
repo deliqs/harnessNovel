@@ -78,6 +78,26 @@ class LLMProviderTimeoutTests(unittest.TestCase):
             text = provider.generate_cancelable("prompt", threading.Event(), max_retries=0)
         self.assertEqual(text, "ok")
 
+    def test_lm_studio_kwargs_disable_thinking(self):
+        provider = LLMProvider(
+            model="8-bit",
+            base_url="http://127.0.0.1:1234/v1",
+            api_key="lm-studio",
+        )
+        kwargs = provider._completion_kwargs("prompt", 0.7, False, None)
+        extra = kwargs["extra_body"]
+        self.assertEqual(extra["enable_thinking"], False)
+        self.assertEqual(extra["chat_template_kwargs"]["enable_thinking"], False)
+
+    def test_non_lm_studio_kwargs_omit_thinking(self):
+        provider = LLMProvider(
+            model="grok-4.6",
+            base_url="http://127.0.0.1:8788/v1",
+            api_key="grok-cli",
+        )
+        kwargs = provider._completion_kwargs("prompt", 0.7, False, None)
+        self.assertNotIn("extra_body", kwargs)
+
 
 if __name__ == "__main__":
     unittest.main()
