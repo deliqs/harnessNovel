@@ -13,7 +13,10 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+
+from core.world_knowledge import world_knowledge_status
 
 
 WORKSPACE_NAME_RE = re.compile(r"^[\w\u4e00-\u9fff][\w .\-\u4e00-\u9fff]{0,79}$", re.UNICODE)
@@ -224,12 +227,9 @@ class WorkspaceStore:
         manifest = self._load_json(fs / "world_knowledge" / "manifest.json") or {}
         source_records = manifest.get("sources", []) if isinstance(manifest.get("sources", []), list) else []
         world_sources = len(source_records)
-        world_final_dir = fs / "world_knowledge" / "worlds" / "_final"
-        world_sections = sum(
-            1 for path in world_final_dir.glob("*.md")
-            if path.is_file() and path.read_text(encoding="utf-8", errors="ignore").strip()
-        ) if world_final_dir.is_dir() else 0
-        world_enabled = bool(manifest.get("enabled", True)) if isinstance(manifest, dict) else True
+        world_status = world_knowledge_status(SimpleNamespace(file_system=str(fs)))
+        world_sections = world_status["final_section_count"]
+        world_enabled = world_status["enabled"]
         design_dir = fs / "story_design"
 
         def _has(path):
@@ -301,7 +301,6 @@ class WorkspaceStore:
         if not isinstance(direction_history, list):
             direction_history = []
         mechanics = self._load_json(fs / "mechanics" / "system_panel.json") or self._load_json(fs / "mechanics" / "profile.json") or {}
-        from types import SimpleNamespace
         from training.adaptive_builder import chapter_finalization_status
         finalized_chapters = chapter_finalization_status(
             SimpleNamespace(file_system=str(fs))
@@ -358,7 +357,7 @@ class WorkspaceStore:
                 "enabled": world_enabled,
                 "source_count": world_sources,
                 "final_section_count": world_sections,
-                "ready": world_sections == 7,
+                "ready": world_status["ready"],
                 "sources": [
                     {
                         "id": str(source.get("id") or ""),

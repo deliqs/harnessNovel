@@ -340,6 +340,34 @@ def _vol_dir_name(vol_idx, title):
     return f"vol_{vol_idx + 1:02d}_{safe}"
 
 
+def _is_whole_book_dir(name):
+    return bool(VOL_DIR_RE.match(name or "")) and (
+        "whole_book" in name or "全书" in name
+    )
+
+
+def _whole_book_dir_name():
+    return _vol_dir_name(0, "whole_book")
+
+
+def _find_whole_book_dir(outlines_dir):
+    english = None
+    legacy = None
+    if not os.path.isdir(outlines_dir):
+        return None
+    for name in os.listdir(outlines_dir):
+        if not _is_whole_book_dir(name):
+            continue
+        path = os.path.join(outlines_dir, name)
+        if not os.path.isdir(path):
+            continue
+        if "全书" in name:
+            legacy = path
+        else:
+            english = path
+    return english or legacy
+
+
 def _batch_file_name(batch_start, batch_end):
     return f"batch_{batch_start + 1:03d}_{batch_end:03d}.md"
 
@@ -977,14 +1005,10 @@ def resegment(outlines_dir):
     """Re-run virtual volume split from existing story-arc units or old batch summaries.
 
     Two cases:
-    1. vol_01_全书/ exists: re-split from that directory.
-    2. Virtual volume dirs (with meta.json) already exist: gather all volume story-arc units / batch summaries into vol_01_全书/, dedupe, then re-split.
+    1. vol_01_whole_book/ (or legacy vol_01_全书/) exists: re-split from that directory.
+    2. Virtual volume dirs (with meta.json) already exist: gather all volume story-arc units / batch summaries into vol_01_whole_book/, dedupe, then re-split.
     """
-    all_batch_dir = None
-    for name in os.listdir(outlines_dir):
-        if VOL_DIR_RE.match(name) and "全书" in name:
-            all_batch_dir = os.path.join(outlines_dir, name)
-            break
+    all_batch_dir = _find_whole_book_dir(outlines_dir)
 
     if not all_batch_dir or not os.path.isdir(all_batch_dir):
         # No whole-book directory; find virtual-volume dirs and gather story-arc units / batch summaries
@@ -994,8 +1018,9 @@ def resegment(outlines_dir):
             print("Error: no volume directories found; cannot re-segment volumes.")
             return
 
-        print("  -> vol_01_全书 not found; gathering story-arc units from existing volume directories...")
-        all_batch_dir = os.path.join(outlines_dir, _vol_dir_name(0, "全书"))
+        whole_book_name = _whole_book_dir_name()
+        print(f"  -> {whole_book_name} not found; gathering story-arc units from existing volume directories...")
+        all_batch_dir = os.path.join(outlines_dir, whole_book_name)
         os.makedirs(all_batch_dir, exist_ok=True)
         os.makedirs(_arc_dir(all_batch_dir), exist_ok=True)
 
@@ -1018,7 +1043,7 @@ def resegment(outlines_dir):
             shutil.rmtree(vol_path, ignore_errors=True)
             print(f"  -> Deleted old volume directory: {name}")
 
-        print(f"  -> Gathered {len(seen)} story-arc units and {len(seen_batches)} old batch summaries into vol_01_全书/")
+        print(f"  -> Gathered {len(seen)} story-arc units and {len(seen_batches)} old batch summaries into {whole_book_name}/")
 
     # Unified handling below: prefer story arcs, older workspaces fall back to batch summaries
     arc_items = _load_story_arc_texts(all_batch_dir)

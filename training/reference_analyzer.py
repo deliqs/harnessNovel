@@ -273,7 +273,8 @@ class ReferenceAnalyzer:
             if directory.is_dir():
                 shutil.move(str(directory), str(backup / directory.name))
 
-        working = self.outlines_dir / "vol_01_全书" / "story_arcs"
+        from training.outline_builder import _whole_book_dir_name
+        working = self.outlines_dir / _whole_book_dir_name() / "story_arcs"
         working.mkdir(parents=True, exist_ok=True)
         for index, ((start, end), content) in enumerate(sorted(arc_items.items()), start=1):
             _write_text(working / f"arc_{index:03d}_ch{start:03d}_{end:03d}.md", content)

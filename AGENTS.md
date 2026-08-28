@@ -15,8 +15,7 @@ Read `README.md` when changing user-visible workflow or CLI behavior. More speci
 
 - Support Python 3.9 and later. Match the style and typing level of the module being changed; do not introduce a repository-wide typing or `pathlib` conversion as a side effect.
 - Treat CLI commands and flags, Web API payloads, workspace layout, artifact filenames, Markdown headings, JSON fields, and checkpoint files as compatibility surfaces.
-- Current generated story and chapter headings and filenames are English. Continue accepting supported Chinese and older forms when reading, parsing, resolving, or deleting existing artifacts unless compatibility removal is the explicit task.
-- Frozen world-knowledge section keys, stored headings, and filenames in `core/world_knowledge.py` are an exception: keep their canonical Chinese storage forms and map English model headings through the existing aliases.
+- Current generated story, chapter, and world-knowledge headings and filenames are English. Continue accepting supported Chinese and older forms when reading, parsing, resolving, or deleting existing artifacts unless compatibility removal is the explicit task.
 - `Stage` identifies the current volume-sized story unit. `Phase` identifies a structural subdivision inside a design. Do not make their parsers or headings interchangeable.
 - Route novel workspace paths through `NovelWorkspace`, `get_novels_dir()`, and the existing path helpers. `NOVELS_DIR` is a compatibility snapshot; new runtime code should use `get_novels_dir()`.
 - Preserve resume, idempotency, and `--force` behavior. Never silently replace valid user artifacts after an empty model response or incompatible source change.

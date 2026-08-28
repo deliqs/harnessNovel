@@ -1863,13 +1863,20 @@ function artifactDescriptor(step, path) {
   const arcMatch = filename.match(/^arc_(\d+)_ch(\d+)_(\d+)/i);
   const chapterNumber = chapterNumberFromPath(path);
   const worldDescriptions = {
+    "worldview.md": ["Worldview", "Heaven-and-earth rules, era background, and core conflicts."],
+    "power_system.md": ["Power system", "Realms, power sources, and promotion limits."],
+    "key_characters.md": ["Key characters", "Identity, relationships, abilities, and roles."],
+    "factions.md": ["Factions", "Organizations, interests, and conflict structure."],
+    "story_spine.md": ["Story spine", "Event causality with the primary source taking priority."],
+    "key_items.md": ["Key items", "Artifacts, resources, and plot function."],
+    "skills_and_techniques.md": ["Skills and techniques", "Arts, techniques, methods, and usage rules."],
     "世界观.md": ["Worldview", "Heaven-and-earth rules, era background, and core conflicts."],
     "力量体系.md": ["Power system", "Realms, power sources, and promotion limits."],
     "关键人物.md": ["Key characters", "Identity, relationships, abilities, and roles."],
     "势力描述.md": ["Factions", "Organizations, interests, and conflict structure."],
-    "故事主线.md": ["Main plot", "Event causality with the primary source taking priority."],
+    "故事主线.md": ["Story spine", "Event causality with the primary source taking priority."],
     "关键物品.md": ["Key items", "Artifacts, resources, and plot function."],
-    "技能体系.md": ["Skill system", "Arts, techniques, methods, and usage rules."],
+    "技能体系.md": ["Skills and techniques", "Arts, techniques, methods, and usage rules."],
   };
   const designDescriptions = {
     "core_gameplay.md": ["Core gameplay", "The upgrade and feedback loop that keeps readers going."],

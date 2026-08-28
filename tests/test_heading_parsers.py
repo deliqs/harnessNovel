@@ -19,7 +19,13 @@ from training.adaptive_builder import (
     gen_novel_name_synopsis,
     sync_stage_outline_from_new_reference,
 )
-from training.outline_builder import ARC_HEADER_RE, _parse_virtual_volumes
+from training.outline_builder import (
+    ARC_HEADER_RE,
+    _find_whole_book_dir,
+    _is_whole_book_dir,
+    _parse_virtual_volumes,
+    _whole_book_dir_name,
+)
 
 _VOLUME_STYLE_BLOCK = """# Stage 1: The Inn
 # Volume overview
@@ -164,6 +170,23 @@ class TestNameSynopsisAndVolumeSections(unittest.TestCase):
                 os.environ.pop("HARNESS_NOVEL_HOME", None)
             else:
                 os.environ["HARNESS_NOVEL_HOME"] = old_home
+
+
+class TestWholeBookVolumeDir(unittest.TestCase):
+    def test_write_name_is_english(self):
+        self.assertEqual(_whole_book_dir_name(), "vol_01_whole_book")
+        self.assertTrue(_is_whole_book_dir("vol_01_whole_book"))
+        self.assertTrue(_is_whole_book_dir("vol_01_全书"))
+        self.assertFalse(_is_whole_book_dir("vol_01_The_Lock"))
+
+    def test_find_prefers_english_and_still_reads_legacy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legacy = os.path.join(directory, "vol_01_全书")
+            os.makedirs(legacy)
+            self.assertEqual(_find_whole_book_dir(directory), legacy)
+            english = os.path.join(directory, "vol_01_whole_book")
+            os.makedirs(english)
+            self.assertEqual(_find_whole_book_dir(directory), english)
 
 
 if __name__ == "__main__":

@@ -340,6 +340,8 @@ novel design-concept my-new-novel --direction "inspiration input"
 novel stage-design my-new-novel
 ```
 
+`world-build` writes seven English section files under `file_system/world_knowledge/worlds/_final/` (`worldview.md`, `power_system.md`, `key_characters.md`, `factions.md`, `story_spine.md`, `key_items.md`, `skills_and_techniques.md`). Existing Chinese filenames in that folder are still read.
+
 ## Notes
 
 - Reference novels currently support `.txt` format. Common Chinese encodings are detected and converted to UTF-8 on import.

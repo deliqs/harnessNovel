@@ -39,41 +39,52 @@ VOLUME_TITLE_RE = re.compile(
 )
 
 WORLD_SECTIONS = [
-    ("世界观", "Cosmos structure, era background, heaven-and-earth rules, historical stages, core conflict, and world-running logic."),
-    ("力量体系", "Cultivation ranks, realm structure, power sources, promotion methods, combat-power differences, and limits."),
-    ("关键人物", "Important characters' identities, stances, relations, abilities, plot roles, and main experiences."),
-    ("势力描述", "Sects, churches, peoples, dynasties, alliances: positioning, relations, interests, and conflicts."),
-    ("故事主线", "Mainline events, staged conflicts, causal chains, turns, key battles, or key plot advances."),
-    ("关键物品", "Artifacts, resources, tools, divine items, pills, and cultivation-art carriers: attributes, ownership, and plot role."),
-    ("技能体系", "Spells, divine abilities, cultivation arts, secret arts, formations, forging/refining, and usage rules."),
+    ("Worldview", "Cosmos structure, era background, heaven-and-earth rules, historical stages, core conflict, and world-running logic."),
+    ("Power system", "Cultivation ranks, realm structure, power sources, promotion methods, combat-power differences, and limits."),
+    ("Key characters", "Important characters' identities, stances, relations, abilities, plot roles, and main experiences."),
+    ("Factions", "Sects, churches, peoples, dynasties, alliances: positioning, relations, interests, and conflicts."),
+    ("Story spine", "Mainline events, staged conflicts, causal chains, turns, key battles, or key plot advances."),
+    ("Key items", "Artifacts, resources, tools, divine items, pills, and cultivation-art carriers: attributes, ownership, and plot role."),
+    ("Skills and techniques", "Spells, divine abilities, cultivation arts, secret arts, formations, forging/refining, and usage rules."),
 ]
 
 SECTION_LOOKUP = dict(WORLD_SECTIONS)
 WORLD_SECTION_NAMES = tuple(name for name, _ in WORLD_SECTIONS)
 CANON_INDEX_SECTIONS = (
-    "公共人物", "公共势力", "公共地点", "公共事件与历史线",
-    "公共物品与法宝", "公共技能与法术", "力量体系关键词",
-    "世界观规则关键词", "待补充类别",
+    "Shared characters", "Shared factions", "Shared places", "Shared events and history",
+    "Shared items and artifacts", "Shared skills and spells", "Power-system keywords",
+    "Worldview-rule keywords", "To be filled",
 )
 
-# English headings from generation; stored under the Chinese canonical key.
+# Chinese and extra English labels map onto the canonical English keys.
 _HEADING_ALIASES = {
-    "Worldview": "世界观",
-    "Power system": "力量体系",
-    "Key characters": "关键人物",
-    "Factions": "势力描述",
-    "Story spine": "故事主线",
-    "Key items": "关键物品",
-    "Skills and techniques": "技能体系",
-    "Shared characters": "公共人物",
-    "Shared factions": "公共势力",
-    "Shared places": "公共地点",
-    "Shared events and history": "公共事件与历史线",
-    "Shared items and artifacts": "公共物品与法宝",
-    "Shared skills and spells": "公共技能与法术",
-    "Power-system keywords": "力量体系关键词",
-    "Worldview-rule keywords": "世界观规则关键词",
-    "To be filled": "待补充类别",
+    "世界观": "Worldview",
+    "力量体系": "Power system",
+    "关键人物": "Key characters",
+    "势力描述": "Factions",
+    "故事主线": "Story spine",
+    "关键物品": "Key items",
+    "技能体系": "Skills and techniques",
+    "Main plot": "Story spine",
+    "Skill system": "Skills and techniques",
+    "公共人物": "Shared characters",
+    "公共势力": "Shared factions",
+    "公共地点": "Shared places",
+    "公共事件与历史线": "Shared events and history",
+    "公共物品与法宝": "Shared items and artifacts",
+    "公共技能与法术": "Shared skills and spells",
+    "力量体系关键词": "Power-system keywords",
+    "世界观规则关键词": "Worldview-rule keywords",
+    "待补充类别": "To be filled",
+}
+_LEGACY_SECTION_FILES = {
+    "Worldview": "世界观.md",
+    "Power system": "力量体系.md",
+    "Key characters": "关键人物.md",
+    "Factions": "势力描述.md",
+    "Story spine": "故事主线.md",
+    "Key items": "关键物品.md",
+    "Skills and techniques": "技能体系.md",
 }
 _EMPTY_SECTION_BODIES = {"", "无", "none", "none.", "(none)"}
 
@@ -251,7 +262,37 @@ def _source_name(record):
 
 
 def _section_file_name(section_name):
-    return f"{_safe_name(section_name)}.md"
+    return section_name.lower().replace(" ", "_") + ".md"
+
+
+def _legacy_section_file_name(section_name):
+    return _LEGACY_SECTION_FILES.get(section_name, "")
+
+
+def _section_write_path(directory, section_name):
+    return os.path.join(directory, _section_file_name(section_name))
+
+
+def _resolve_section_path(directory, section_name):
+    english = _section_write_path(directory, section_name)
+    if _has_meaningful_file(english):
+        return english
+    legacy_name = _legacy_section_file_name(section_name)
+    if legacy_name:
+        legacy = os.path.join(directory, legacy_name)
+        if _has_meaningful_file(legacy):
+            return legacy
+    return english
+
+
+def _remove_legacy_section_file(directory, section_name):
+    legacy_name = _legacy_section_file_name(section_name)
+    if not legacy_name:
+        return
+    english = os.path.abspath(_section_write_path(directory, section_name))
+    legacy = os.path.abspath(os.path.join(directory, legacy_name))
+    if legacy != english and os.path.isfile(legacy):
+        os.remove(legacy)
 
 
 def _source_world_dir(ws, record):
@@ -259,7 +300,7 @@ def _source_world_dir(ws, record):
 
 
 def _source_section_path(ws, record, section_name):
-    return os.path.join(_source_world_dir(ws, record), _section_file_name(section_name))
+    return _resolve_section_path(_source_world_dir(ws, record), section_name)
 
 
 def _source_partials_dir(ws, record):
@@ -275,7 +316,7 @@ def _final_world_dir(ws):
 
 
 def _final_section_path(ws, section_name):
-    return os.path.join(_final_world_dir(ws), _section_file_name(section_name))
+    return _resolve_section_path(_final_world_dir(ws), section_name)
 
 
 def _canon_index_path(ws):
@@ -798,18 +839,22 @@ def _build_canon_index(ws, primary_record, primary_card_paths, llm, force=False)
 
 def _write_sections_to_source(ws, record, section_documents):
     section_paths = {}
+    directory = _source_world_dir(ws, record)
     for section_name, _ in WORLD_SECTIONS:
-        output_path = _source_section_path(ws, record, section_name)
+        output_path = _section_write_path(directory, section_name)
         _write_file(output_path, section_documents.get(section_name, f"# {section_name}\n\nNone"))
+        _remove_legacy_section_file(directory, section_name)
         section_paths[section_name] = output_path
     return section_paths
 
 
 def _write_sections_to_final(ws, section_documents):
     section_paths = {}
+    directory = _final_world_dir(ws)
     for section_name, _ in WORLD_SECTIONS:
-        output_path = _final_section_path(ws, section_name)
+        output_path = _section_write_path(directory, section_name)
         _write_file(output_path, section_documents.get(section_name, f"# {section_name}\n\nNone"))
+        _remove_legacy_section_file(directory, section_name)
         section_paths[section_name] = output_path
     return section_paths
 

@@ -25,7 +25,7 @@ Add regression coverage for both the current emitted form and any retained legac
 
 ```bash
 python -m unittest tests.test_heading_parsers tests.test_story_arc_context -v
-python -m unittest tests.test_system_panel tests.test_chapter_filenames -v
+python -m unittest tests.test_system_panel tests.test_chapter_filenames tests.test_world_knowledge_filenames -v
 ```
 
 Then run `python -m unittest discover -s tests -v`. Tests must use fake/mocked LLMs and temporary workspaces, never live model calls or user data.

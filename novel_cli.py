@@ -326,14 +326,14 @@ def _run_reference_pipeline(ws, batch_size, max_chapters=None, resume=False, sou
         ]
         if len(vol_dirs) <= 1:
             print("\nOnly one volume was detected; running intelligent volume split...")
-            from training.outline_builder import resegment
+            from training.outline_builder import _is_whole_book_dir, resegment
             from training.reference_analyzer import mark_resegmented
             resegment(outlines_dir)
             resulting_dirs = [
                 name for name in os.listdir(outlines_dir)
                 if re.match(r"^vol_\d+_.+$", name) and os.path.isdir(os.path.join(outlines_dir, name))
             ]
-            if resulting_dirs and not any("全书" in name for name in resulting_dirs):
+            if resulting_dirs and not any(_is_whole_book_dir(name) for name in resulting_dirs):
                 mark_resegmented(ws.reference)
             else:
                 print("  Intelligent volume split did not finish; keeping the current deconstruction state for the next retry.")
