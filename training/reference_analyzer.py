@@ -1065,7 +1065,8 @@ class ReferenceAnalyzer:
     def _is_placeholder(value: Any) -> bool:
         text = str(value or "").strip().lower()
         return bool(re.search(
-            r"\b(?:tbd|todo|placeholder|to be filled|fill (?:this|later)|unknown for now)\b|待补|待填写|占位",
+            r"\b(?:tbd|todo|placeholder|to be filled|fill (?:this|later)|unknown for now)\b|"
+            + "\u5f85\u8865|\u5f85\u586b\u5199|\u5360\u4f4d",
             text,
         ))
 

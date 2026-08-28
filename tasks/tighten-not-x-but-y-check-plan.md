@@ -15,7 +15,7 @@ That matches any `not` … `but` in one sentence. Chapter 2 of esmee aborted on 
 
 ## Goal
 
-Flag the rhetorical contrast formula (English analogue of `不是…而是`), not verb-negation plus coordinating `but`.
+Flag the rhetorical contrast formula (English analogue of "not A, rather B"), not verb-negation plus coordinating `but`.
 
 ## Status
 
@@ -25,5 +25,5 @@ Done. English pattern now matches copula/`not a…`/sentence-initial contrast, a
 
 - New unittest file `tests/test_chapter_style_violations.py` is green.
 - Templates still flag; the two chapter-2 sentences do not.
-- Chinese patterns, `not only X but also Y`, and `——` are unchanged in intent.
+- CJK leak patterns, `not only X but also Y`, and `——` are unchanged in intent.
 - Smallest change: pattern(s) plus tests. No rewrite of the repair loop.

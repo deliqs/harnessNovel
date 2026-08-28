@@ -72,6 +72,8 @@ novel web --workspace-root /path/to/my-novels
 
 ### Interface Preview
 
+Screenshots depict an older workbench UI; they are kept as historical images and have not been reshot.
+
 <table align="center">
   <tr>
     <td><img src="docs/web-ui-1-reference.png" width="450" alt="Reference Deconstruction"></td>
@@ -202,6 +204,9 @@ ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
 
 # Prompt diagnostics: off, metadata (default), or full.
 HARNESS_NOVEL_PROMPT_TRACE_MODE=metadata
+
+# Optional. Directory that contains novel workspaces. Unset uses ./my-novels.
+# HARNESS_NOVEL_HOME=
 ```
 
 You can also override these settings with environment variables of the same names. `DATA_BUILDER` handles reference extraction, `ADAPTIVE_BUILDER` handles book and stage design, and Lite is the exact fallback for each missing optional-role field. `DRAFT` writes chapter prose, `EDITOR` handles refinement and humanization, and `CRITIC` handles story-arc/chapter-outline planning, routing, validation, and lightweight decisions. Each missing `DRAFT`, `EDITOR`, or `CRITIC` model, base URL, or key falls back independently to `ADAPTIVE_BUILDER_LITE`.
@@ -412,7 +417,7 @@ These diagnostics are deterministic workflow signals, not a literary-quality cer
 
 ## About the Author
 
-飞鸟 one the way — Explorer
+Fei Niao one the way — Explorer
 
 <p align="left">
   <img src="docs/qrcode.png" width="400" alt="QR code">

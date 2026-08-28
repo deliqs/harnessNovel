@@ -22,7 +22,7 @@ DEFAULT_BUDGETS = {
 }
 _ARC_RE = re.compile(r"^arc_(\d+)_ch(\d+)_(\d+)\.md$")
 _STAGE_RE = re.compile(
-    r"^#{1,6}\s*(?:Stage|舞台)\s*0*(\d+)\b[^\n]*\n?(.*?)(?=^#{1,6}\s*(?:Stage|舞台)\s*0*\d+\b|\Z)",
+    r"^#{1,6}\s*Stage\s*0*(\d+)\b[^\n]*\n?(.*?)(?=^#{1,6}\s*Stage\s*0*\d+\b|\Z)",
     re.I | re.M | re.S,
 )
 
@@ -60,7 +60,6 @@ def extract_stage_obligations(stage_text):
     active = False
     section_words = (
         "three-act", "three act", "foreshadow", "core payoff", "character roster",
-        "三幕", "伏笔", "核心爽点", "角色",
     )
     for raw in (stage_text or "").splitlines():
         line = raw.strip()
@@ -70,7 +69,7 @@ def extract_stage_obligations(stage_text):
             active = any(word in line.casefold() for word in section_words)
             continue
         if active and (
-            re.match(r"^(?:[-*]|\d+[.)、]|Act\s+[IVX]+|第[一二三123]幕)", line, re.I)
+            re.match(r"^(?:[-*]|\d+[.)、]|Act\s+[IVX123]+)", line, re.I)
             or any(word in line.casefold() for word in ("payoff", "clue", "hook", "cost", "plant", "paid off"))
         ):
             cleaned = re.sub(r"^[-*\s]+", "", line)

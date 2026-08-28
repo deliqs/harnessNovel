@@ -162,8 +162,8 @@ class AdaptiveQualityIntegrationTests(unittest.TestCase):
         self.assertEqual(result.replace("\n\n", " "), first + " " + second)
 
     def test_chinese_character_based_paragraph_behavior_is_retained(self):
-        first = "甲" * 110 + "。"
-        second = "乙" * 110 + "。"
+        first = "\u7532" * 110 + "\u3002"
+        second = "\u4e59" * 110 + "\u3002"
         result = _format_chapter_paragraphs(first + second)
         self.assertEqual(result, first + "\n\n" + second)
 

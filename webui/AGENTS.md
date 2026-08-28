@@ -11,6 +11,7 @@
 ## Web contracts
 
 - Keep backend request/response shapes, route paths, task states, DOM IDs, and JavaScript calls synchronized.
+- English is the only stored form for generated artifacts. User-import parsers may match CJK via unicode escapes. Do not keep Chinese aliases for generated files.
 - Reuse the generation functions in `training/`; do not fork CLI behavior in the Web layer.
 - Preserve workspace-name validation, resolved-path containment, direct-child deletion checks, per-workspace activity guards, locks, and event-driven pause/stop semantics.
 - Never serialize thread locks or event objects into API responses. Return stable JSON data and convert expected domain errors to consistent HTTP details.

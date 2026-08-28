@@ -3,32 +3,32 @@ import re
 
 
 DEFAULT_FORBIDDEN_TERMS = [
-    "西游",
-    "方寸山",
-    "斜月三星洞",
-    "菩提祖师",
-    "孙悟空",
-    "唐三藏",
-    "东汉三藏",
-    "取经人",
-    "金蝉子",
-    "花果山",
-    "如意金箍棒",
-    "金箍棒",
-    "大品天仙诀",
-    "紫霄玄真悟元功",
+    "\u897f\u6e38",
+    "\u65b9\u5bf8\u5c71",
+    "\u659c\u6708\u4e09\u661f\u6d1e",
+    "\u83e9\u63d0\u7956\u5e08",
+    "\u5b59\u609f\u7a7a",
+    "\u5510\u4e09\u85cf",
+    "\u4e1c\u6c49\u4e09\u85cf",
+    "\u53d6\u7ecf\u4eba",
+    "\u91d1\u8749\u5b50",
+    "\u82b1\u679c\u5c71",
+    "\u5982\u610f\u91d1\u7b8d\u68d2",
+    "\u91d1\u7b8d\u68d2",
+    "\u5927\u54c1\u5929\u4ed9\u8bc0",
+    "\u7d2b\u9704\u7384\u771f\u609f\u5143\u529f",
 ]
 
 TERM_EXTRACT_STOPWORDS = {
-    "章纲",
-    "正文",
-    "批次摘要",
-    "卷纲",
-    "后续生成",
-    "参考小说",
-    "映射说明",
-    "输出",
-    "处理方式",
+    "\u7ae0\u7eb2",
+    "\u6b63\u6587",
+    "\u6279\u6b21\u6458\u8981",
+    "\u5377\u7eb2",
+    "\u540e\u7eed\u751f\u6210",
+    "\u53c2\u8003\u5c0f\u8bf4",
+    "\u6620\u5c04\u8bf4\u660e",
+    "\u8f93\u51fa",
+    "\u5904\u7406\u65b9\u5f0f",
     "chapter outline",
     "draft",
     "batch summary",
@@ -119,10 +119,10 @@ def extract_forbidden_terms_from_text(text):
     for line in text.splitlines():
         stripped = line.strip()
         if not (
-            stripped.startswith("禁止残留参考元素")
-            or stripped.startswith("硬禁用元素")
-            or stripped.startswith("不得直接出现")
-            or stripped.startswith("禁用词")
+            stripped.startswith("\u7981\u6b62\u6b8b\u7559\u53c2\u8003\u5143\u7d20")
+            or stripped.startswith("\u786c\u7981\u7528\u5143\u7d20")
+            or stripped.startswith("\u4e0d\u5f97\u76f4\u63a5\u51fa\u73b0")
+            or stripped.startswith("\u7981\u7528\u8bcd")
             or stripped.lower().startswith("forbidden")
         ):
             continue
@@ -143,7 +143,11 @@ def extract_forbidden_terms_from_text(text):
             if (
                 2 <= len(item) <= 20
                 and item not in TERM_EXTRACT_STOPWORDS
-                and not any(x in item for x in ["必须", "改写", "替换", "出现", "参考", "输出", "must", "rewrite", "replace", "appear", "reference", "output"])
+                and not any(x in item for x in [
+                    "\u5fc5\u987b", "\u6539\u5199", "\u66ff\u6362", "\u51fa\u73b0",
+                    "\u53c2\u8003", "\u8f93\u51fa",
+                    "must", "rewrite", "replace", "appear", "reference", "output",
+                ])
             ):
                 terms.append(item)
 

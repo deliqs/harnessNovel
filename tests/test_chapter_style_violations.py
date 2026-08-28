@@ -42,7 +42,10 @@ class ChapterStyleViolationsTests(unittest.TestCase):
                 self.assertEqual(_labels(text), [])
 
     def test_other_hard_patterns_unchanged(self):
-        self.assertIn(_ZH_CONTRAST, _labels("这不是请求，而是命令。"))
+        flagged = (
+            "\u8fd9\u4e0d\u662f\u8bf7\u6c42\uff0c\u800c\u662f\u547d\u4ee4\u3002"
+        )
+        self.assertIn(_ZH_CONTRAST, _labels(flagged))
         self.assertIn(_EN_NOT_ONLY, _labels("She was not only tired, but also angry."))
         self.assertNotIn(_EN_CONTRAST, _labels("She was not only tired, but also angry."))
         self.assertIn(_EM_DASH, _labels("Wait——she froze."))

@@ -23,18 +23,28 @@ SUPPORTED_TEXT_EXTS = {
     ".yml",
 }
 
+_IDEO_SPACE = "\u3000"
+_CH_PREFIX = "\u7b2c"
+_CN_NUM_CLASS = (
+    "\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\u5343\u96f6"
+)
+_CH_UNITS = "\u7ae0\u56de\u8282"
+_VOL_UNIT = "\u5377"
 CHAPTER_HEADER_RE = re.compile(
-    r'^[ \t　]*(?:(?:\d+\.)?第[一二三四五六七八九十百千零\d]+[章回节]'
-    r'(?:\s*[（(]\d+[）)])?\s*.+|(?:Chapter|Ch\.?)\s+\d+\b.*)',
+    r"^[ \t" + _IDEO_SPACE + r"]*(?:(?:\d+\.)?" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"\d]+[" + _CH_UNITS + r"]"
+    r"(?:\s*[（(]\d+[）)])?\s*.+|(?:Chapter|Ch\.?)\s+\d+\b.*)",
     re.MULTILINE | re.IGNORECASE,
 )
 CHAPTER_HEADER_FALLBACK = re.compile(
-    r'(^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+[章回节].{0,60}?'
-    r'|(?:Chapter|Ch\.?)\s+\d+\b.{0,60}?)\n)',
+    r"(^[ \t" + _IDEO_SPACE + r"]*(?:" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"0-9]+[" + _CH_UNITS + r"].{0,60}?"
+    r"|(?:Chapter|Ch\.?)\s+\d+\b.{0,60}?)\n)",
     re.MULTILINE | re.IGNORECASE,
 )
 VOLUME_TITLE_RE = re.compile(
-    r'^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+卷\b|(?:Volume|Book|Vol\.?)\s+\d+\b)',
+    r"^[ \t" + _IDEO_SPACE + r"]*(?:" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"0-9]+" + _VOL_UNIT + r"\b|(?:Volume|Book|Vol\.?)\s+\d+\b)",
     re.IGNORECASE,
 )
 
@@ -56,37 +66,13 @@ CANON_INDEX_SECTIONS = (
     "Worldview-rule keywords", "To be filled",
 )
 
-# Chinese and extra English labels map onto the canonical English keys.
+# Extra English labels map onto the canonical English keys.
 _HEADING_ALIASES = {
-    "世界观": "Worldview",
-    "力量体系": "Power system",
-    "关键人物": "Key characters",
-    "势力描述": "Factions",
-    "故事主线": "Story spine",
-    "关键物品": "Key items",
-    "技能体系": "Skills and techniques",
     "Main plot": "Story spine",
     "Skill system": "Skills and techniques",
-    "公共人物": "Shared characters",
-    "公共势力": "Shared factions",
-    "公共地点": "Shared places",
-    "公共事件与历史线": "Shared events and history",
-    "公共物品与法宝": "Shared items and artifacts",
-    "公共技能与法术": "Shared skills and spells",
-    "力量体系关键词": "Power-system keywords",
-    "世界观规则关键词": "Worldview-rule keywords",
-    "待补充类别": "To be filled",
 }
-_LEGACY_SECTION_FILES = {
-    "Worldview": "世界观.md",
-    "Power system": "力量体系.md",
-    "Key characters": "关键人物.md",
-    "Factions": "势力描述.md",
-    "Story spine": "故事主线.md",
-    "Key items": "关键物品.md",
-    "Skills and techniques": "技能体系.md",
-}
-_EMPTY_SECTION_BODIES = {"", "无", "none", "none.", "(none)"}
+_LEGACY_SECTION_FILES = {}
+_EMPTY_SECTION_BODIES = {"", "none", "none.", "(none)"}
 
 
 def _heading_names(section_name):
@@ -251,7 +237,12 @@ def _source_id(path):
 
 
 def _safe_name(name):
-    name = re.sub(r"[^\w.\-\u4e00-\u9fff]+", "_", name, flags=re.UNICODE).strip("_")
+    name = re.sub(
+        r"[^\w.\-" + "\u4e00-\u9fff" + r"]+",
+        "_",
+        name,
+        flags=re.UNICODE,
+    ).strip("_")
     return name or "source.txt"
 
 

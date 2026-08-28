@@ -3,9 +3,11 @@
 import re
 
 
-_WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*|[\u3400-\u9fff]")
+_WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*|" + "[\u3400-\u9fff]")
 _EN_HEADING_RE = re.compile(r"^\s*Chapter\s+0*(\d+)\s*:\s*(.*?)\s*$", re.I)
-_ZH_HEADING_RE = re.compile(r"^\s*第\s*0*(\d+)\s*章\s*[：:]?\s*(.*?)\s*$")
+_ZH_HEADING_RE = re.compile(
+    r"^\s*" + "\u7b2c" + r"\s*0*(\d+)\s*" + "\u7ae0" + r"\s*[：:]?\s*(.*?)\s*$"
+)
 _FORBIDDEN = (
     ("em dash", re.compile(r"—|——")),
     ("not-X-but-Y template", re.compile(
@@ -21,7 +23,8 @@ _FORBIDDEN = (
         r"\bnot only\b[^.\n]{0,80}\bbut(?:\s+also)?\b", re.I,
     )),
     ("Chinese contrast template", re.compile(
-        r"(?:不是|并非)[^。！？\n]{0,60}(?:而是|却是)",
+        "(?:" + "\u4e0d\u662f|\u5e76\u975e" + ")[^。！？\n]{0,60}(?:"
+        + "\u800c\u662f|\u5374\u662f" + ")",
     )),
 )
 _COMMON_CAPITALS = {
@@ -244,17 +247,19 @@ def diagnose_chapter_outline(text, expected_number, required_anchors=None,
     """Validate the compact outline contract before replacing an existing outline."""
     errors = []
     heading = re.compile(
-        r"^\s*【(?:Chapter\s+0*%d\s+outline|第\s*0*%d\s*章(?:大纲)?)】" %
-        (expected_number, expected_number), re.I,
+        r"^\s*【(?:Chapter\s+0*%d\s+outline|" % expected_number
+        + "\u7b2c" + r"\s*0*%d\s*" % expected_number + "\u7ae0"
+        + "(?:" + "\u5927\u7eb2" + r")?)】",
+        re.I,
     )
     if not heading.search(text or ""):
         errors.append({"code": "outline_heading", "reason": "Outline heading must identify chapter %d" % expected_number})
-    elif re.match(r"^\s*【第", text or "") and not allow_legacy_heading:
+    elif re.match(r"^\s*【" + "\u7b2c", text or "") and not allow_legacy_heading:
         errors.append({"code": "legacy_heading", "reason": "New outlines must emit an English chapter heading"})
     sections = (
-        ("Story line", ("# Story line", "# 故事线")),
-        ("Chapter rhythm", ("# Chapter rhythm", "# 章节节奏")),
-        ("Chapter summary", ("# Chapter summary", "# 章节摘要", "# 本章概述")),
+        ("Story line", ("# Story line", "# \u6545\u4e8b\u7ebf")),
+        ("Chapter rhythm", ("# Chapter rhythm", "# \u7ae0\u8282\u8282\u594f")),
+        ("Chapter summary", ("# Chapter summary", "# \u7ae0\u8282\u6458\u8981", "# \u672c\u7ae0\u6982\u8ff0")),
     )
     for label, aliases in sections:
         if not any(alias.casefold() in (text or "").casefold() for alias in aliases):

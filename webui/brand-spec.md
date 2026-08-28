@@ -6,7 +6,7 @@ Redesign preserve. The existing CLI workflow, workspace layout, task service and
 
 ## Assets
 
-- Primary mark: `webui/static/logo.svg`, the open “汉” glyph used beside the wordmark
+- Primary mark: `webui/static/logo.svg`, the open glyph mark used beside the wordmark
 - Compact mark: `webui/static/favicon.svg`, the same glyph in a rounded container for small square placements
 - README mark: `docs/logo.svg`, identical to the compact mark
 - Web wordmark: live text (`harnessNovel`); `h`, `a`, and `N` use the mint accent and heavier weight

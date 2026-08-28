@@ -78,10 +78,16 @@ class GenerationQualityTests(unittest.TestCase):
         self.assertIn("premature_reveal", codes)
 
     def test_legacy_headings_are_readable_but_rejected_for_new_emission(self):
-        chapter = "第1章：旧标题\n" + "内容 " * 700
+        heading = "\u7b2c1\u7ae0:\u65e7\u6807\u9898"
+        chapter = heading + "\n" + ("content " * 700)
         self.assertFalse(diagnose_chapter(chapter, 1)["valid"])
         self.assertTrue(diagnose_chapter(chapter, 1, allow_legacy_heading=True)["valid"])
-        outline = "【第1章大纲】\n# 故事线\n线\n# 章节节奏\n快\n# 章节摘要\n摘要"
+        outline = (
+            "\u3010\u7b2c1\u7ae0\u5927\u7eb2\u3011\n"
+            "# \u6545\u4e8b\u7ebf\nline\n"
+            "# \u7ae0\u8282\u8282\u594f\nfast\n"
+            "# \u7ae0\u8282\u6458\u8981\nsummary"
+        )
         self.assertFalse(diagnose_chapter_outline(outline, 1)["valid"])
         self.assertTrue(diagnose_chapter_outline(outline, 1, allow_legacy_heading=True)["valid"])
 

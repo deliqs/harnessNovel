@@ -1,4 +1,4 @@
-"""Emit/parse contracts: Stage vs Phase, English glossary, Chinese aliases."""
+"""Emit/parse contracts: Stage vs Phase stay distinct; English our-artifacts."""
 import inspect
 import os
 import tempfile
@@ -25,6 +25,7 @@ from training.outline_builder import (
     _is_whole_book_dir,
     _parse_virtual_volumes,
     _whole_book_dir_name,
+    split_chapters,
 )
 
 _VOLUME_STYLE_BLOCK = """# Stage 1: The Inn
@@ -41,22 +42,27 @@ The reveal.
 Planned chapters: 12
 """
 
+# Imported-novel chapter prefix "chapter N" as unicode escapes (no hanzi in source).
+_ZH_CH_1 = "\u7b2c\u4e00\u7ae0"
+_ZH_CH_2 = "\u7b2c\u4e8c\u7ae0"
+_ZH_VOL = "\u5377"
+
 
 class TestStageAndPhaseHeadings(unittest.TestCase):
-    def test_stage_heading_matches_english_and_chinese(self):
+    def test_stage_heading_matches_english_stage(self):
         self.assertEqual(STAGE_HEADING_RE.findall("# Stage 1: Foo"), ["1"])
-        self.assertEqual(STAGE_HEADING_RE.findall("# 舞台1：Foo"), ["1"])
+        self.assertEqual(STAGE_HEADING_RE.findall("# Stage 12: Later"), ["12"])
 
     def test_phase_regex_does_not_match_stage_heading(self):
         self.assertFalse(STAGE_OUTLINE_HEADING_RE.search("# Stage 1: Foo"))
+        self.assertFalse(STAGE_HEADING_RE.search("## Phase 1: Bar"))
 
-    def test_phase_heading_matches_english_and_chinese(self):
+    def test_phase_heading_matches_english_phase(self):
         self.assertEqual(STAGE_OUTLINE_HEADING_RE.findall("## Phase 2: Bar"), ["2"])
-        self.assertEqual(STAGE_OUTLINE_HEADING_RE.findall("## 阶段2：Bar"), ["2"])
+        self.assertEqual(STAGE_OUTLINE_HEADING_RE.findall("# Phase 8: Close"), ["8"])
 
-    def test_normalize_stage_roadmap_emits_english_for_both_forms(self):
+    def test_normalize_stage_roadmap_emits_english_stage(self):
         self.assertIn("# Stage 1: Inn", _normalize_stage_roadmap("# Stage 1: Inn"))
-        self.assertIn("# Stage 1: 客栈", _normalize_stage_roadmap("# 舞台1：客栈"))
         self.assertNotIn("HARNESS_NOVEL_LANG", inspect.getsource(_normalize_stage_roadmap))
 
     def test_remove_stage_outline_drops_phase_outline_keeps_other(self):
@@ -65,15 +71,12 @@ class TestStageAndPhaseHeadings(unittest.TestCase):
             "# Phase outline\nDrop English.\n"
             "## Nested under phase outline\nDrop too.\n"
             "# Worldview\nKeep worldview.\n"
-            "# 阶段粗纲\nDrop Chinese.\n"
         )
         result = _remove_stage_outline_section(text)
         self.assertIn("Keep this.", result)
         self.assertIn("Keep worldview.", result)
         self.assertNotIn("Drop English.", result)
-        self.assertNotIn("Drop Chinese.", result)
         self.assertNotIn("Phase outline", result)
-        self.assertNotIn("阶段粗纲", result)
 
     def test_design_structure_counts_english_map_layers(self):
         worldview = "# 6. Maps / stage layers\n- Layer 1: Border | pressure\n"
@@ -85,11 +88,11 @@ class TestStageAndPhaseHeadings(unittest.TestCase):
 
 
 class TestVirtualVolumesAndArcs(unittest.TestCase):
-    def test_parse_virtual_volumes_english_and_chinese(self):
+    def test_parse_virtual_volumes_english_and_escaped_chinese(self):
         en = _parse_virtual_volumes("Volume 1: The Lock | Chapters 1-78")
-        zh = _parse_virtual_volumes("卷1：锁 | 第1-78章")
+        zh = _parse_virtual_volumes("%s1: The Lock | %s1-78\u7ae0" % (_ZH_VOL, "\u7b2c"))
         self.assertEqual(en, [(1, "The Lock", 1, 78)])
-        self.assertEqual(zh, [(1, "锁", 1, 78)])
+        self.assertEqual(zh, [(1, "The Lock", 1, 78)])
 
     def test_arc_header_re_matches_english_glossary_form(self):
         match = ARC_HEADER_RE.search("【Arc1: Chapters 1-5 | The Hook】")
@@ -99,13 +102,42 @@ class TestVirtualVolumesAndArcs(unittest.TestCase):
         self.assertEqual(match.group(3), "The Hook")
 
 
+class TestSplitChapters(unittest.TestCase):
+    def _split_text(self, text):
+        handle = tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".txt", delete=False,
+        )
+        try:
+            handle.write(text)
+            handle.close()
+            return split_chapters(handle.name)
+        finally:
+            os.remove(handle.name)
+
+    def test_split_chapters_english_and_escaped_chinese_headings(self):
+        body = "The traveler crossed the locked gate before dawn. " * 3
+        _, english = self._split_text(
+            "Chapter 1: Opening\n%s\nChapter 2: Rising\n%s\n" % (body, body)
+        )
+        self.assertEqual(len(english), 2)
+        self.assertTrue(english[0]["title"].startswith("Chapter 1"))
+        self.assertTrue(english[1]["title"].startswith("Chapter 2"))
+
+        _, chinese = self._split_text(
+            "%s Opening\n%s\n%s Rising\n%s\n" % (_ZH_CH_1, body, _ZH_CH_2, body)
+        )
+        self.assertEqual(len(chinese), 2)
+        self.assertTrue(chinese[0]["title"].startswith(_ZH_CH_1))
+        self.assertTrue(chinese[1]["title"].startswith(_ZH_CH_2))
+
+
 class TestExtendGateAndOperations(unittest.TestCase):
     def test_english_stage_append_passes_extend_gate(self):
         helper = getattr(ab, "_stage_append_starts_at", None)
         self.assertIsNotNone(helper, "factor _stage_append_starts_at for the extend gate")
         normalized = _normalize_stage_roadmap("# Stage 3: New Town")
         self.assertTrue(helper(normalized, 3))
-        self.assertTrue(helper("# 舞台3：新城", 3))
+        self.assertTrue(helper("# Stage 3: New Town", 3))
         self.assertFalse(helper("# Stage 2: Old Town", 3))
         self.assertFalse(helper("# Phase 3: Not a stage", 3))
 
@@ -176,14 +208,10 @@ class TestWholeBookVolumeDir(unittest.TestCase):
     def test_write_name_is_english(self):
         self.assertEqual(_whole_book_dir_name(), "vol_01_whole_book")
         self.assertTrue(_is_whole_book_dir("vol_01_whole_book"))
-        self.assertTrue(_is_whole_book_dir("vol_01_全书"))
         self.assertFalse(_is_whole_book_dir("vol_01_The_Lock"))
 
-    def test_find_prefers_english_and_still_reads_legacy(self):
+    def test_find_uses_whole_book_token_only(self):
         with tempfile.TemporaryDirectory() as directory:
-            legacy = os.path.join(directory, "vol_01_全书")
-            os.makedirs(legacy)
-            self.assertEqual(_find_whole_book_dir(directory), legacy)
             english = os.path.join(directory, "vol_01_whole_book")
             os.makedirs(english)
             self.assertEqual(_find_whole_book_dir(directory), english)

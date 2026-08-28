@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 setup(
     name="harnessNovel",
     version="2.0.2",
-    author="飞鸟 one the way",
+    author="Fei Niao one the way",
     description="AI agent for long-form web novel writing",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",

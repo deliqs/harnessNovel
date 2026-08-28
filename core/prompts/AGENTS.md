@@ -5,7 +5,7 @@
 - Each prompt lives at `<folder>/prompt.txt`. Its folder name is passed to `PromptLoader.load()` and the files are included as package data by `setup.py`.
 - `PromptLoader` renders templates with Python `str.format`. Keep placeholders synchronized with every call site's keyword arguments. Write literal braces, including JSON examples, as `{{` and `}}`.
 - Treat requested headings, JSON keys, field names, ordering rules, language rules, and plain-text/code-fence restrictions as machine-readable output contracts. Downstream code often parses them with regexes or JSON validation.
-- English is the canonical generated format. Do not remove intentional Chinese aliases from downstream readers when changing a prompt.
+- English is the only stored form for generated artifacts. Do not keep Chinese aliases for generated files. User-import parsers may match CJK via unicode escapes.
 - Repeated hard constraints can be deliberate model steering. Remove or consolidate them only when the task includes changing that behavior.
 
 ## Changing a prompt

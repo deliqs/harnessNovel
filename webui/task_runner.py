@@ -19,10 +19,13 @@ from typing import Any
 from core.world_knowledge import world_knowledge_status
 
 
-WORKSPACE_NAME_RE = re.compile(r"^[\w\u4e00-\u9fff][\w .\-\u4e00-\u9fff]{0,79}$", re.UNICODE)
-STAGE_RE = re.compile(r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)", re.IGNORECASE | re.MULTILINE)
+WORKSPACE_NAME_RE = re.compile(r"^[\w][\w .\-]{0,79}$", re.UNICODE)
+STAGE_RE = re.compile(
+    r"^#{1,6}\s*stage\s*0*(\d+)\b[^\n]*",
+    re.IGNORECASE | re.MULTILINE,
+)
 PHASE_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:第\s*)?(?:阶段|phase)\s*0*(\d+)\b",
+    r"^#{1,6}\s*phase\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 REFERENCE_ARC_PATH_RE = re.compile(
@@ -63,7 +66,7 @@ def valid_workspace_name(name: str) -> bool:
 def require_workspace_name(name: str) -> str:
     name = (name or "").strip()
     if not valid_workspace_name(name):
-        raise ValueError("Workspace name may contain Chinese, letters, digits, spaces, underscores, dots, and hyphens (max 80 characters).")
+        raise ValueError("Workspace name may contain letters, digits, spaces, underscores, dots, and hyphens (max 80 characters).")
     return name
 
 
@@ -82,16 +85,15 @@ def _positive_int(value: Any, field_name: str, default: int | None = None) -> in
 def story_arc_title(content: str) -> str:
     """Extract the story-arc name from common heading forms."""
     heading = next((line.strip() for line in (content or "").splitlines() if line.strip()), "")
-    if not heading or not re.search(r"(?:情节|Arc)", heading, re.IGNORECASE):
+    if not heading or not re.search(r"Arc", heading, re.IGNORECASE):
         return ""
     heading = re.sub(r"^#{1,6}\s*", "", heading).strip()
-    for pattern in (
+    matched = re.search(
         r"(?:[｜|]|\s+[—–-]\s+)\s*([^】\]\n]+?)\s*[】\]]?\s*$",
-        r"第\s*\d+\s*[-—–至到]\s*\d+\s*章\s*[）)]?\s*[：:]\s*([^】\]\n]+?)\s*[】\]]?\s*$",
-    ):
-        matched = re.search(pattern, heading)
-        if matched:
-            return matched.group(1).strip()
+        heading,
+    )
+    if matched:
+        return matched.group(1).strip()
     return ""
 
 
@@ -921,11 +923,9 @@ class TaskManager:
             assert process.stdout is not None
             for line in iter(process.stdout.readline, ""):
                 if (
-                    line.lstrip().startswith(("Error:", "错误：", "Traceback"))
+                    line.lstrip().startswith(("Error:", "Traceback"))
                     or "[LLMProvider] Call failed" in line
-                    or "[LLMProvider] 调用失败" in line
                     or "[LLMProvider] api_key is not configured" in line
-                    or "[LLMProvider] 未配置 api_key" in line
                 ):
                     reported_warning = True
                 self._append_log(task, line)

@@ -1838,8 +1838,7 @@ function displayVolume(path) {
 function chapterNumberFromPath(path) {
   const filename = path.split("/").pop() || "";
   const matched = filename.match(/^chapter_0*(\d+)/i)
-    || filename.match(/^0*(\d+)(?:[_\-.]|$)/)
-    || filename.match(/第\s*(\d+)\s*章/);
+    || filename.match(/^0*(\d+)(?:[_\-.]|$)/);
   return matched ? Number(matched[1]) : null;
 }
 
@@ -1870,13 +1869,6 @@ function artifactDescriptor(step, path) {
     "story_spine.md": ["Story spine", "Event causality with the primary source taking priority."],
     "key_items.md": ["Key items", "Artifacts, resources, and plot function."],
     "skills_and_techniques.md": ["Skills and techniques", "Arts, techniques, methods, and usage rules."],
-    "世界观.md": ["Worldview", "Heaven-and-earth rules, era background, and core conflicts."],
-    "力量体系.md": ["Power system", "Realms, power sources, and promotion limits."],
-    "关键人物.md": ["Key characters", "Identity, relationships, abilities, and roles."],
-    "势力描述.md": ["Factions", "Organizations, interests, and conflict structure."],
-    "故事主线.md": ["Story spine", "Event causality with the primary source taking priority."],
-    "关键物品.md": ["Key items", "Artifacts, resources, and plot function."],
-    "技能体系.md": ["Skills and techniques", "Arts, techniques, methods, and usage rules."],
   };
   const designDescriptions = {
     "core_gameplay.md": ["Core gameplay", "The upgrade and feedback loop that keeps readers going."],

@@ -1,6 +1,17 @@
 # Zero CJK in tracked text
 
-Robin asked for zero Chinese in this repo. Explicit compatibility removal: Chinese artifact names, parse aliases, tests, docs, prompts, and author-string CJK all go. Runtime may still see CJK in user files; tracked source must not contain codepoints U+4E00-U+9FFF.
+Robin asked for zero Chinese in this repo. Co-lead plan critique reconciled: **repo source has no hanzi literals; the product still slices Chinese reference novels.**
+
+Tracked `py/js/html/md/txt/svg/css` must not contain U+4E00-U+9FFF. Runtime may still see CJK in user files. Where a parser must match user Chinese, use ASCII unicode escapes (`"\\u7b2c"`), never a literal character.
+
+## Two surfaces (do not mix)
+
+| Surface | Action |
+|---|---|
+| **Our** artifacts (world-knowledge files, chapter-draft names, `# Stage` / `# Phase`, volume-style design headings, wizard labels, chat commands, empty-asset prefixes) | English only. Delete Chinese aliases. No read fallback. |
+| **User** reference novels (chapter/volume split, Chinese numerals, GBK/Big5 ranking, Journey-to-the-West leak terms, style/word-count CJK ranges, `_safe_name` for imported source names) | Keep behavior. Unicode-escape every hanzi in source. Add tests with escaped fixtures. |
+
+CJK punctuation already used by the English glossary (`【Arc1: Chapters 1-5 | title】`) may stay. Han-glyph **paths** in SVG stay. PNG/JPG out of scanner.
 
 ## Done when
 
@@ -10,69 +21,62 @@ python3 -m unittest discover -s tests -v
 python3 novel_cli.py --help
 ```
 
-`tests/test_no_cjk.py` scans git-tracked `py/js/html/md/txt/svg/css` plus `prompt.txt` and fails on any CJK codepoint. Tests that need CJK at runtime use ASCII unicode escapes only (`"\\u4e00"`), never literal characters.
+`tests/test_no_cjk.py` uses `git ls-files` and reports `path:line`. Range U+4E00-U+9FFF. Lands in Unit C.
 
-## Product consequences (accepted)
-
-- English-only heading and filename parsers. Imported novels that only use Chinese chapter/volume headings are no longer auto-sliced by those headings.
-- Chapter-draft `legacy=` Chinese basenames and world-knowledge Chinese filename aliases are removed, not kept as read fallbacks.
-- `DEFAULT_FORBIDDEN_TERMS` become English proper nouns (Sun Wukong, Journey to the West, Flower-Fruit Mountain, Ruyi Jingu Bang, Bodhi Patriarch, Tang Sanzang).
-- `_COMMON_CJK` frequency table is deleted. Encoding still tries UTF-8, charset_normalizer, then `gb18030` / `big5` ranked by CJK *range count* via unicode escapes, not literal characters.
-- Author string becomes ASCII `Fei Niao`. Logo `<title>` becomes `HarnessNovel mark`. Delete `docs/heading-web-zh.svg`.
-- PNG/JPG screenshots are out of this pass (binary false positives; visual reshoot is separate).
+This task **is** the AGENTS.md compatibility-removal exception. Do not keep Chinese read aliases for our artifacts.
 
 ## Units (serial, shared tree)
 
-`adaptive_builder.py` is a collision magnet. One worker at a time on the shared tree.
-
 ### Unit A — engine Python + tests (hard)
 
-Owner: `core/*.py` except `core/prompts/**`, `training/*.py`, `tests/*.py` except `test_no_cjk.py` (that file lands in C).
+Owner: `core/*.py` except `core/prompts/**`; `training/*.py`; engine tests listed below. Not `tests/test_webui_headings.py`. Not wizard JS.
 
-- Strip every CJK codepoint. English-only regexes. Keep Stage != Phase.
-- `chapter_utils.py`: drop Chinese numeral maps and `legacy=`. Resolve/delete English draft names only. `_fix_chapter_numbering` only rewrites `Chapter N` / `Ch. N`.
-- `world_knowledge.py`: English keys and files only; no Chinese heading aliases or Chinese filenames.
-- `outline_builder.py`: drop the whole-book Chinese token; English volume/chapter/arc regexes only.
-- Rewrite tests that used Chinese fixtures to English (or unicode-escape) fixtures. Remove assertions that Chinese aliases still parse.
-- Do not split large modules. Do not rewrite `adaptive_builder.py` from scratch. Do not add `test_no_cjk.py` yet (it would fail on web/docs).
+- Our-artifact aliases: delete (world-knowledge Chinese files/headings, `legacy=` draft names, Stage/Phase/Arc dual parse of Chinese design headings, whole-book directory token, chat-adjacent training command Chinese).
+- User-import matchers: escape, do not delete (`CHAPTER_HEADER_RE`, `VOLUME_HEADER_RE`, `_CN_MAP` / `_CN_DIGITS` / `_cn_to_int`, `_COMMON_CJK`, `DEFAULT_FORBIDDEN_TERMS` Chinese tokens). `_int_to_cn` volume labels become ASCII `(part N)`; `_fix_chapter_numbering` may still rewrite imported Chinese titles via escaped patterns.
+- `_safe_name` CJK ranges stay as `\\u4e00-\\u9fff` (user source names).
+- Tests: English fixtures for our artifacts. Escaped fixtures proving `split_chapters` still splits Chinese `Chapter`-equivalent headings **and** English `Chapter N`. GBK vs Big5 decode test with byte fixtures. Style-violation Chinese patterns stay as escapes.
+- Do not split or rewrite `adaptive_builder.py` from scratch. Do not add `test_no_cjk.py`. Do not edit `webui/` or `novel_cli.py`.
 
 Check:
 
 ```bash
 python3 -m compileall -q core training
-python3 -m unittest tests.test_heading_parsers tests.test_chapter_filenames tests.test_world_knowledge_filenames tests.test_webui_headings tests.test_generation_quality tests.test_chapter_style_violations tests.test_adaptive_quality_integration -v
+python3 -m unittest tests.test_heading_parsers tests.test_chapter_filenames tests.test_world_knowledge_filenames tests.test_generation_quality tests.test_chapter_style_violations tests.test_adaptive_quality_integration tests.test_reference_analyzer -v
 ```
+
+`test_world_knowledge_filenames` must stop asserting wizard JS Chinese keys (B owns that). Drop Chinese-alias behavior assertions for our artifacts.
 
 ### Unit B — web + CLI
 
-Owner: `webui/**` except brand-spec/logo (C), plus `novel_cli.py`.
+Owner: `webui/design_chat.py`, `webui/task_runner.py`, `webui/static/wizard-v0.js`, `webui/static/index.html`, `webui/app.py` only if a user-facing string still has hanzi, `novel_cli.py`, `tests/test_webui_headings.py`.
 
-- Wizard world-knowledge labels: English filenames only (`worldview.md`, `power_system.md`, …).
-- `chapterNumberFromPath`: English patterns only.
-- `design_chat.py` / `task_runner.py`: paste Unit A's exact Stage / Phase / Arc regexes. English-only error markers.
-- `WORKSPACE_NAME_RE`: ASCII word characters only (no CJK range).
-- `index.html`: `Fei Niao on the Way`; bump `?v=`.
-
-Check: `python3 -m compileall -q webui novel_cli.py && python3 novel_cli.py --help`
-
-### Unit C — prompts, docs, brand, tasks, AGENTS
-
-Owner: `core/prompts/**`, `README.md`, `setup.py`, `webui/brand-spec.md`, `webui/static/logo.svg`, `docs/heading-web-zh.svg`, `docs/cli_io_mindmap.html` if needed, all `AGENTS.md`, `tasks/*.md`.
-
-- Replace the Seven-Treasure Tree prompt example with ASCII.
-- Author / brand copy ASCII. Delete `docs/heading-web-zh.svg`.
-- AGENTS.md: English is the only stored form; do not tell workers to keep Chinese aliases.
-- Historical task docs: rewrite so they contain no CJK.
-- Add `tests/test_no_cjk.py` and run the full suite.
+- Paste Unit A's exact Stage/Phase regexes (English). Run `tests.test_webui_headings`.
+- Wizard: English world-knowledge filenames only.
+- Chat commands: English only (drop Chinese command aliases).
+- `index.html`: WeChat caption `Fei Niao on the Way`; bump **both** `?v=` query params.
+- `WORKSPACE_NAME_RE`: remove explicit hanzi range if present as literals; do **not** add `re.ASCII` (Unicode `\w` may still match CJK user names). Update error text if it mentions Chinese.
+- Do not ASCII-only `_safe_filename` for uploads.
 
 Check:
 
 ```bash
-python3 -m compileall -q core training webui novel_cli.py
-python3 -m unittest discover -s tests -v
+python3 -m compileall -q webui novel_cli.py
 python3 novel_cli.py --help
+python3 -m unittest tests.test_webui_headings tests.test_world_knowledge_filenames -v
 ```
+
+### Unit C — prompts, docs, brand, tasks, AGENTS, scanner
+
+Owner: `core/prompts/**`, `README.md`, `setup.py`, `webui/brand-spec.md`, `webui/static/logo.svg` title only, `docs/heading-web-zh.svg` (delete), all `AGENTS.md`, `tasks/*.md`.
+
+- Seven-Treasure Tree ASCII example.
+- Author `Fei Niao` in setup/README. Logo title `HarnessNovel mark`. Brand-spec without hanzi.
+- AGENTS.md: English stored forms; user-import parsers may match CJK via escapes. Do not tell workers to keep our-artifact Chinese aliases.
+- Rewrite historical tasks docs with no hanzi.
+- Add `tests/test_no_cjk.py`. If it fails on engine files, that is Unit A, not a C rewrite of adaptive_builder.
+
+Check: full suite + scanner.
 
 ## Out of scope
 
-Reshooting `docs/web-ui-*.png`. Translating user novel workspaces under `my-novels/`. Splitting `adaptive_builder.py`. Git commits.
+Reshooting `docs/web-ui-*.png` (README may still depict an old Chinese workbench). Han-glyph SVG paths. WeChat image. Translating `my-novels/`. Splitting `adaptive_builder.py`. Git commits. Redesigning the mark.

@@ -4,9 +4,10 @@ import os
 def get_novels_dir():
     """Return the workspace root directory.
 
-    CLI mode keeps the original convention: when unset, use ``my-novels`` under the
-    current directory. The Web workbench can point ``HARNESS_NOVEL_HOME`` at a
-    user-chosen fixed directory so novels are still found after the server cwd changes.
+    Honors ``HARNESS_NOVEL_HOME`` if set; otherwise uses ``my-novels`` under the
+    current directory. The Web workbench can point the same variable at a
+    user-chosen fixed directory so novels are still found after the server cwd
+    changes.
     """
     configured = os.getenv("HARNESS_NOVEL_HOME")
     if configured:

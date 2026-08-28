@@ -54,7 +54,7 @@ The material may come from a classic, novel prose, an encyclopedia, a setting do
   A supplement source's original protagonist does not enter this section by default, but you may supplement shared-character details or necessary shared characters.
 - Factions: positioning, relations, interests, and conflicts of sects, churches, ethnic groups, dynasties, alliances, and similar factions.
 - Story spine: the shared historical mainline, staged conflicts, causal chains, turns, key battles, or key plot advances, using the primary source as the baseline. A supplement source may only provide event details, not a new mainline.
-- Key items: attributes, ownership, and plot function of artifacts, resources, props, divine tools, pills, cultivation-art carriers, and similar items. A supplement source may actively supplement shared artifacts, sage artifacts, formation diagrams, spirit treasures, and resources, for example a public artifact such as 七宝妙树 that does not rewrite the mainline.
+- Key items: attributes, ownership, and plot function of artifacts, resources, props, divine tools, pills, cultivation-art carriers, and similar items. A supplement source may actively supplement shared artifacts, sage artifacts, formation diagrams, spirit treasures, and resources, for example a public artifact such as Seven-Treasure Tree that does not rewrite the mainline.
 - Skills and techniques: ability types and usage rules of spells, divine abilities, cultivation arts, secret arts, formations, artifact-forging, pill-refining, and the like. A supplement source may actively supplement shared divine abilities, formations, spells, and cultivation methods.
 
 【Output format】

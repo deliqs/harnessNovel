@@ -391,6 +391,23 @@ class ReferenceAnalyzerTests(unittest.TestCase):
         self.assertIn(str(backups[0]), str(raised.exception))
         self.assertEqual(json.loads(index_path.read_text(encoding="utf-8")), old_index)
 
+    def test_common_cjk_ranking_prefers_gbk_over_big5_mojibake(self):
+        from core.text_encoding import _cjk_score, decode_text_bytes
+
+        expected = "\u8fd9\u4e2a\u6d4b\u8bd5\u5b66\u4f1a\u5de5\u4f5c"
+        raw = bytes([
+            213, 226, 184, 246, 178, 226, 202, 212,
+            209, 167, 187, 225, 185, 164, 215, 247,
+        ])
+        self.assertEqual(raw.decode("gbk"), expected)
+        gbk_score = _cjk_score(raw.decode("gb18030"))
+        big5_score = _cjk_score(raw.decode("big5"))
+        self.assertGreater(gbk_score[0], big5_score[0])
+        decoded, label = decode_text_bytes(raw)
+        self.assertEqual(decoded, expected)
+        self.assertIn("GB", label.upper())
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -16,12 +16,12 @@ These modules are production code used by both the CLI and Web workbench. Keep c
 - Propagate `progress_callback`, pause/stop events, and cancellation events through long-running loops and model calls. Do not convert cancellation into an ordinary successful result.
 - Use `PromptLoader`, `LLMProvider`, `ConfigLoader`, `NovelWorkspace`, chapter/path helpers, and `reference_finder` instead of creating parallel implementations.
 - Keep model roles distinct: reference analysis, high-level design, and lightweight production use the existing configuration accessors. Do not silently route one role to another.
-- Preserve current English output while accepting supported Chinese/legacy headings and filenames. In particular, keep Stage and Phase parsing distinct.
+- English is the only stored form for generated headings and filenames. User-import parsers may match CJK via unicode escapes. Do not keep Chinese aliases for generated files. Keep Stage and Phase parsing distinct.
 - Treat generated model text as untrusted. Normalize and validate it before persisting structured output, and preserve existing fallback behavior where validation fails.
 
 ## Verification
 
-Add regression coverage for both the current emitted form and any retained legacy input form when changing parsers, filenames, or persisted schemas. Common focused suites are:
+Add regression coverage for the English emit path when changing parsers, filenames, or persisted schemas. When a user-import parser still matches CJK, cover it with unicode-escaped fixtures. Do not keep Chinese aliases for generated files. Common focused suites are:
 
 ```bash
 python -m unittest tests.test_heading_parsers tests.test_story_arc_context -v

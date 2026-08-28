@@ -13,26 +13,37 @@ from core.config import ConfigLoader
 from core.text_utils import normalize_text
 from core.workspace import NovelWorkspace, init_workspace
 
-# Standalone volume titles of reasonable length, e.g. "第一卷 斩落金锁听玄音" / "Volume 2 Title"
+# Standalone volume titles of reasonable length, e.g. "Volume 1 Title" / "Volume 2 Title"
+_IDEO_SPACE = "\u3000"
+_CH_PREFIX = "\u7b2c"
+_CN_NUM_CLASS = (
+    "\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\u5343\u96f6"
+)
+_CH_UNITS = "\u7ae0\u56de\u8282"
+_VOL_UNIT = "\u5377"
 VOLUME_HEADER_RE = re.compile(
-    r'^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+卷\s+\S+'
-    r'|(?:Volume|Book|Vol\.?)\s+\d+\b.*)',
+    r"^[ \t" + _IDEO_SPACE + r"]*(?:" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"0-9]+" + _VOL_UNIT + r"\s+\S+"
+    r"|(?:Volume|Book|Vol\.?)\s+\d+\b.*)",
     re.MULTILINE | re.IGNORECASE,
 )
 
-# Chapter titles, e.g. "1.第一章 标题", "第一章 标题", "Chapter 12: Title", "Ch. 12"
+# Chapter titles, e.g. "Chapter 12: Title", "Ch. 12", plus imported Chinese headings.
 CHAPTER_HEADER_RE = re.compile(
-    r'^[ \t　]*(?:(?:\d+\.)?第[一二三四五六七八九十百千零\d]+[章回节]'
-    r'(?:\s*[（(]\d+[）)])?\s*.+|(?:Chapter|Ch\.?)\s+\d+\b.*)',
+    r"^[ \t" + _IDEO_SPACE + r"]*(?:(?:\d+\.)?" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"\d]+[" + _CH_UNITS + r"]"
+    r"(?:\s*[（(]\d+[）)])?\s*.+|(?:Chapter|Ch\.?)\s+\d+\b.*)",
     re.MULTILINE | re.IGNORECASE,
 )
 CHAPTER_HEADER_FALLBACK = re.compile(
-    r'(^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+[章回节卷].{0,40}?'
-    r'|(?:Chapter|Ch\.?)\s+\d+\b.{0,40}?)\n)',
+    r"(^[ \t" + _IDEO_SPACE + r"]*(?:" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"0-9]+[" + _CH_UNITS + _VOL_UNIT + r"].{0,40}?"
+    r"|(?:Chapter|Ch\.?)\s+\d+\b.{0,40}?)\n)",
     re.MULTILINE | re.IGNORECASE,
 )
 VOLUME_TITLE_RE = re.compile(
-    r'^[ \t　]*(?:第[一二三四五六七八九十百千零0-9]+卷\b|(?:Volume|Book|Vol\.?)\s+\d+\b)',
+    r"^[ \t" + _IDEO_SPACE + r"]*(?:" + _CH_PREFIX + r"[" + _CN_NUM_CLASS
+    + r"0-9]+" + _VOL_UNIT + r"\b|(?:Volume|Book|Vol\.?)\s+\d+\b)",
     re.IGNORECASE,
 )
 
@@ -94,8 +105,8 @@ def _join_prompt_parts(parts, sep="\n\n---\n\n", max_chars=PROMPT_JOIN_MAX_CHARS
 
 ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
 ARC_HEADER_RE = re.compile(
-    r'^【(?:情节(?:\d+)?[：:]\s*第|Arc\s*\d+[：:]\s*Chapters?\s*)'
-    r'(\d+)\s*[-–—]\s*(\d+)\s*章?(?:[｜|：:]\s*(.*?))?】',
+    r'^【Arc\s*\d+[：:]\s*Chapters?\s*'
+    r'(\d+)\s*[-–—]\s*(\d+)\s*(?:[｜|：:]\s*(.*?))?】',
     re.MULTILINE | re.IGNORECASE,
 )
 
@@ -222,7 +233,7 @@ def group_chapters_by_volume(chapters, volumes):
 
 def split_chapters_to_files(ws, output_dir_name="chapters", max_chapters=None, refresh=False):
     """Split the reference novel into per-chapter files under reference/{output_dir_name}/."""
-    from core.chapter_utils import _fix_chapter_numbering, _int_to_cn, MAX_CHAPTERS_PER_VOLUME
+    from core.chapter_utils import _fix_chapter_numbering, MAX_CHAPTERS_PER_VOLUME
 
     base_dir = os.path.join(ws.reference, output_dir_name)
     meta_path = os.path.join(base_dir, "_volumes.json")
@@ -253,7 +264,7 @@ def split_chapters_to_files(ws, output_dir_name="chapters", max_chapters=None, r
             continue
         num_parts = (len(vol_chapters) + MAX_CHAPTERS_PER_VOLUME - 1) // MAX_CHAPTERS_PER_VOLUME
         part_labels = ["(part 1)", "(part 2)", "(part 3)"] if num_parts <= 3 else \
-                      [f"(part {_int_to_cn(i + 1)})" for i in range(num_parts)]
+                      [f"(part {i + 1})" for i in range(num_parts)]
         for pi in range(num_parts):
             start = pi * MAX_CHAPTERS_PER_VOLUME
             end = start + MAX_CHAPTERS_PER_VOLUME
@@ -341,9 +352,7 @@ def _vol_dir_name(vol_idx, title):
 
 
 def _is_whole_book_dir(name):
-    return bool(VOL_DIR_RE.match(name or "")) and (
-        "whole_book" in name or "全书" in name
-    )
+    return bool(VOL_DIR_RE.match(name or "")) and "whole_book" in name
 
 
 def _whole_book_dir_name():
@@ -351,21 +360,15 @@ def _whole_book_dir_name():
 
 
 def _find_whole_book_dir(outlines_dir):
-    english = None
-    legacy = None
     if not os.path.isdir(outlines_dir):
         return None
     for name in os.listdir(outlines_dir):
         if not _is_whole_book_dir(name):
             continue
         path = os.path.join(outlines_dir, name)
-        if not os.path.isdir(path):
-            continue
-        if "全书" in name:
-            legacy = path
-        else:
-            english = path
-    return english or legacy
+        if os.path.isdir(path):
+            return path
+    return None
 
 
 def _batch_file_name(batch_start, batch_end):
@@ -409,7 +412,7 @@ def _parse_story_arc_result(result):
 
     carryover = ""
     carry_match = re.search(
-        r'^#\s*(?:未闭合情节续接区|Open carryover)\s*$',
+        r'^#\s*Open carryover\s*$',
         result,
         re.MULTILINE | re.IGNORECASE,
     )
@@ -417,9 +420,7 @@ def _parse_story_arc_result(result):
     if carry_match:
         arc_part = result[:carry_match.start()]
         carryover = result[carry_match.end():].strip()
-        if carryover in {"无", "无。", "（无）"} or carryover.lower() in {
-            "none", "none.", "(none)",
-        }:
+        if carryover.lower() in {"none", "none.", "(none)"}:
             carryover = ""
 
     matches = list(ARC_HEADER_RE.finditer(arc_part))
@@ -661,7 +662,9 @@ def _parse_virtual_volumes(llm_result):
     for line in llm_result.strip().split('\n'):
         line = line.strip()
         m = re.match(
-            r'(?:Volume|Vol\.?|卷)\s*(\d+)\s*[：:]\s*(.+?)\s*\|\s*(?:Chapters?\s*|第)?(\d+)\s*[-–—]\s*(\d+)\s*章?',
+            r"(?:Volume|Vol\.?|" + "\u5377" + r")\s*(\d+)\s*[：:]\s*(.+?)\s*\|\s*"
+            r"(?:Chapters?\s*|" + "\u7b2c" + r")?(\d+)\s*[-–—]\s*(\d+)\s*"
+            + "\u7ae0" + r"?",
             line,
             re.IGNORECASE,
         )
@@ -685,7 +688,11 @@ def _extract_segment_endpoints(batch_dir):
         content = _read_file(os.path.join(batch_dir, bf))
         if not content:
             continue
-        for m in re.finditer(r'[【]?片段\d+[：:]\s*第(\d+)-(\d+)章', content):
+        for m in re.finditer(
+            r"[【]?Segment\s*\d+[：:]\s*Chapters?\s*(\d+)\s*[-–—]\s*(\d+)",
+            content,
+            re.I,
+        ):
             endpoints.add(int(m.group(2)))
     return sorted(endpoints)
 
@@ -838,7 +845,11 @@ def _extract_segment_ranges(batch_dir):
         content = _read_file(os.path.join(batch_dir, bf))
         if not content:
             continue
-        for m in re.finditer(r'[【]?片段\d+[：:]\s*第(\d+)-(\d+)章', content):
+        for m in re.finditer(
+            r"[【]?Segment\s*\d+[：:]\s*Chapters?\s*(\d+)\s*[-–—]\s*(\d+)",
+            content,
+            re.I,
+        ):
             segments.append((int(m.group(1)), int(m.group(2))))
     return segments
 
@@ -1005,7 +1016,7 @@ def resegment(outlines_dir):
     """Re-run virtual volume split from existing story-arc units or old batch summaries.
 
     Two cases:
-    1. vol_01_whole_book/ (or legacy vol_01_全书/) exists: re-split from that directory.
+    1. vol_01_whole_book/ exists: re-split from that directory.
     2. Virtual volume dirs (with meta.json) already exist: gather all volume story-arc units / batch summaries into vol_01_whole_book/, dedupe, then re-split.
     """
     all_batch_dir = _find_whole_book_dir(outlines_dir)

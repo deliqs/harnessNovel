@@ -61,29 +61,29 @@ STAGE_DESIGN_PIPELINE_VERSION = 2
 OPERATION_ADJUST_LAST_PHASE = "adjust last phase"
 OPERATION_ADD_PHASE = "add phase"
 STAGE_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)\b[^\n]*",
+    r"^#{1,6}\s*stage\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 STAGE_OUTLINE_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:第\s*)?(?:阶段|phase)\s*0*(\d+)\b[^\n]*",
+    r"^#{1,6}\s*phase\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 # Stage-roadmap normalize: match stage header lines in any form (# / ## / bold / plain, leading zeros ok),
-# rewrite to `# Stage N: name`. Body lines like `舞台规则：` do not match because no digit follows 舞台.
+# rewrite to `# Stage N: name`. Body lines like `Stage rules:` do not match because no digit follows Stage.
 _STAGE_HEADER_LINE_RE = re.compile(
-    r"^\s*(?:#{1,6}\s+|\*\*\s*)?(?:舞台|stage)\s*0*(\d+)[\s:：.．]*([^\n]*?)\s*\**\s*$",
+    r"^\s*(?:#{1,6}\s+|\*\*\s*)?stage\s*0*(\d+)[\s:：.．]*([^\n]*?)\s*\**\s*$",
     re.IGNORECASE,
 )
-# Document title lines such as `# 舞台路线图` often push stages to h2; drop them while normalizing.
+# Document title lines such as `# Stage roadmap` often push stages to h2; drop them while normalizing.
 _STAGE_TITLE_LINE_RE = re.compile(
-    r"^\s*#{1,6}\s+(?:舞台路线图|全书舞台路线图|舞台设计|舞台规划|舞台大纲|舞台总览|stage\s*roadmap)\s*$",
+    r"^\s*#{1,6}\s+(?:stage\s*roadmap)\s*$",
     re.IGNORECASE,
 )
 _STAGE_CODE_FENCE_RE = re.compile(r"^\s*```.*$", re.IGNORECASE)
 
 
 def _normalize_stage_roadmap(text):
-    """Normalize stage headers to `# Stage N: name`. Also parses `# 舞台N：名称`."""
+    """Normalize stage headers to `# Stage N: name`."""
     if not text:
         return ""
     output_lines = []
@@ -103,9 +103,9 @@ def _normalize_stage_roadmap(text):
 
 
 def _stage_append_starts_at(text, stage_number):
-    """True when appended roadmap text starts at stage N (English emit or Chinese alias)."""
+    """True when appended roadmap text starts at stage N."""
     return bool(re.search(
-        rf"^#{{1,6}}\s*(?:舞台|stage)\s*{int(stage_number)}\s*[：:]",
+        rf"^#{{1,6}}\s*stage\s*{int(stage_number)}\s*[：:]",
         text or "",
         re.IGNORECASE | re.MULTILINE,
     ))
@@ -113,7 +113,7 @@ def _stage_append_starts_at(text, stage_number):
 
 def _is_empty_design_asset(text):
     value = text or ""
-    return value.startswith("(not generated") or value.startswith("（未生成")
+    return value.startswith("(not generated")
 
 
 def _get_llm():
@@ -255,8 +255,6 @@ def _load_creative_direction(ws, cli_input=None, direction_file=None):
             '# Creative direction', '## Genre and positioning', '## Protagonist concept',
             '## Worldview direction', '## Core conflict', '## Reference traits to keep',
             '## Parts to change', '## Other notes',
-            '# 创作方向', '## 题材与定位', '## 主角构想', '## 世界观方向',
-            '## 核心冲突', '## 希望保留的参考特质', '## 希望改变的部分', '## 其他补充',
         ]:
             body = body.replace(heading, '')
         if body.strip():
@@ -1854,14 +1852,12 @@ def _reference_group_for_stage(ws, reference_volumes, stage_number, total_stages
 
 
 def _design_structure_counts(rough, worldview):
-    chinese_number = r"[一二三四五六七八九十百]+"
-    arabic_or_chinese = rf"(?:\d+|{chinese_number})"
-    phase_token = rf"(?:阶段|phase)"
+    arabic = r"\d+"
+    phase_token = r"phase"
     stage_patterns = (
-        # ## Phase 1 / ## 阶段1 / ### 阶段一 / ## 第八阶段
-        rf"(?m)^\s*#{{2,6}}\s*(?:第\s*)?(?:{phase_token}\s*{arabic_or_chinese}|{arabic_or_chinese}\s*{phase_token})\b",
-        # 1. Phase 1 / - 第八阶段 (models sometimes skip subheadings)
-        rf"(?m)^\s*(?:[-*+]|\d+[.、．])\s*(?:第\s*)?(?:{phase_token}\s*{arabic_or_chinese}|{arabic_or_chinese}\s*{phase_token})\b",
+        # ## Phase 1 / 1. Phase 1
+        rf"(?m)^\s*#{{2,6}}\s*(?:{phase_token}\s*{arabic}|{arabic}\s*{phase_token})\b",
+        rf"(?m)^\s*(?:[-*+]|\d+[.、．])\s*(?:{phase_token}\s*{arabic}|{arabic}\s*{phase_token})\b",
     )
     stage_lines = set()
     for pattern in stage_patterns:
@@ -1878,14 +1874,7 @@ def _design_structure_counts(rough, worldview):
             continue
         heading_title = re.sub(r"^\s*6\s*[.、．:]?\s*", "", heading.group(2)).strip()
         title_l = heading_title.lower()
-        is_map_heading = (
-            (
-                "地图" in heading_title
-                and any(word in heading_title for word in ("舞台", "区域", "版图"))
-                and any(word in heading_title for word in ("层级", "层次", "体系", "结构"))
-            )
-            or ("map" in title_l and "layer" in title_l)
-        )
+        is_map_heading = "map" in title_l and "layer" in title_l
         if not is_map_heading:
             continue
         heading_level = len(heading.group(1))
@@ -1902,15 +1891,13 @@ def _design_structure_counts(rough, worldview):
         map_count = len(re.findall(r"(?m)^##+\s+\S+", map_text))
     if not map_count:
         map_count = len(re.findall(
-            rf"(?mi)^\s*(?:层级|地图|舞台|layer)\s*{arabic_or_chinese}\s*[：:]|"
-            rf"^\s*第\s*{arabic_or_chinese}\s*(?:层|级|区域|舞台)\s*[：:]",
+            rf"(?mi)^\s*layer\s*{arabic}\s*[：:]",
             map_text,
         ))
     if not map_count and map_text:
         # Models sometimes put several layers in one paragraph, split by semicolons.
         labels = re.findall(
-            rf"(?i)(?:层级|地图|舞台|layer)\s*{arabic_or_chinese}\s*[：:]|"
-            rf"第\s*{arabic_or_chinese}\s*(?:层|级|区域|舞台)\s*[：:]",
+            rf"(?i)layer\s*{arabic}\s*[：:]",
             map_text,
         )
         map_count = len(labels)
@@ -1925,10 +1912,7 @@ def _remove_stage_outline_section(rough):
     skipped_level = 0
     for line in lines:
         heading = re.match(r"^\s*(#{1,6})\s+(.+?)\s*$", line)
-        if heading and (
-            "阶段粗纲" in heading.group(2)
-            or re.search(r"phase\s+outline", heading.group(2), re.I)
-        ):
+        if heading and re.search(r"phase\s+outline", heading.group(2), re.I):
             skipping = True
             skipped_level = len(heading.group(1))
             continue
@@ -1963,17 +1947,16 @@ def _completed_stage_prefix(stage_roadmap, target_count):
     return parts
 
 
-_VOLUME_STYLE_SECTIONS_ZH = ("卷纲概览", "三幕结构", "人物谱系", "伏笔追踪", "核心爽点")
 _VOLUME_STYLE_SECTIONS_EN = (
     "Volume overview", "Three-act structure", "Character roster",
     "Foreshadowing tracker", "Core payoff",
 )
 _VOLUME_STYLE_SECTION_ALIASES = {
-    "Volume overview": ("Volume overview", "Volume-outline overview", "卷纲概览"),
-    "Three-act structure": ("Three-act structure", "三幕结构"),
-    "Character roster": ("Character roster", "人物谱系"),
-    "Foreshadowing tracker": ("Foreshadowing tracker", "Foreshadowing tracking", "伏笔追踪"),
-    "Core payoff": ("Core payoff", "Core payoffs", "核心爽点"),
+    "Volume overview": ("Volume overview", "Volume-outline overview"),
+    "Three-act structure": ("Three-act structure",),
+    "Character roster": ("Character roster",),
+    "Foreshadowing tracker": ("Foreshadowing tracker", "Foreshadowing tracking"),
+    "Core payoff": ("Core payoff", "Core payoffs"),
 }
 
 
@@ -1984,7 +1967,7 @@ def _parse_markdown_h1_sections(content):
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         title = re.sub(
-            r"^\s*(?:[一二三四五六七八九十百]+|\d+|[IVXivx]+)\s*[、.．：:]\s*",
+            r"^\s*(?:\d+|[IVXivx]+)\s*[、.．：:]\s*",
             "",
             match.group(1).strip(),
         )
@@ -2012,7 +1995,7 @@ def _is_volume_style_stage(content):
         for aliases in _VOLUME_STYLE_SECTION_ALIASES.values()
     )
     has_count = bool(re.search(
-        r"(?:预计章节数|Planned chapters?)\s*[：:]\s*\d+",
+        r"Planned chapters?\s*[：:]\s*\d+",
         text,
         re.I,
     ))
@@ -2032,8 +2015,9 @@ def _reference_volume_chapter_count(volume, volume_outline):
 
     # Older workspaces without meta.json: infer from Three-act chapter ranges in the volume outline.
     ranges = re.findall(
-        r"第\s*(\d+)\s*章?\s*(?:至|到|[-—~])\s*第?\s*(\d+)\s*章",
+        r"(?:Chapters?\s*)?(\d+)\s*[-–—]\s*(\d+)",
         volume_outline or "",
+        re.I,
     )
     if ranges:
         starts = [min(int(left), int(right)) for left, right in ranges]
@@ -2358,11 +2342,7 @@ def gen_stage_design(
                     f"Stage {number} generation has an invalid number (detected {numbers or 'none'}); "
                     "previous stages were kept. Please retry to continue."
                 )
-            required_sections = (
-                _VOLUME_STYLE_SECTIONS_EN
-                if any(name in stage for name in _VOLUME_STYLE_SECTIONS_EN)
-                else _VOLUME_STYLE_SECTIONS_ZH
-            )
+            required_sections = _VOLUME_STYLE_SECTIONS_EN
             missing_sections = [name for name in required_sections if name not in stage]
             if not _is_volume_style_stage(stage):
                 raise RuntimeError(
@@ -2508,7 +2488,7 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
         reference_structure = "\n\n---\n\n".join(
             _reference_volume_stage_structure(ws, volume) for volume in mapped_volumes
         ) or "(no mapped reference structural sample)"
-        if operation in (OPERATION_ADJUST_LAST_PHASE, "调整最后阶段"):
+        if operation == OPERATION_ADJUST_LAST_PHASE:
             stage_context = (
                 "[Second-to-last phase]\n"
                 + (sections.get(number - 1) or "(this is the first phase; no second-to-last phase)")
@@ -2535,7 +2515,7 @@ def sync_stage_outline_from_new_reference(ws, instruction=""):
             raise RuntimeError(
                 f"Phase-outline increment has an invalid number: expected phase {number}, detected {numbers or 'none'}."
             )
-        if operation in (OPERATION_ADJUST_LAST_PHASE, "调整最后阶段"):
+        if operation == OPERATION_ADJUST_LAST_PHASE:
             heading = list(STAGE_OUTLINE_HEADING_RE.finditer(stage_outline))[-1]
             stage_outline = stage_outline[:heading.start()].rstrip() + "\n\n" + candidate.strip()
         else:
@@ -2655,7 +2635,7 @@ def refine_stage_design(
         start_stage = 1
     explicit_stages = [
         int(value) for value in re.findall(
-            r"(?:舞台|stage)\s*0*(\d+)", instruction or "", re.I,
+            r"stage\s*0*(\d+)", instruction or "", re.I,
         )
         if 1 <= int(value) <= total_stages
     ]
@@ -2667,7 +2647,7 @@ def refine_stage_design(
         mode = (
             "regenerate"
             if re.search(
-                r"重新生成|完全重写|推倒重来|全部重写|regenerate|rewrite|start over|full rewrite",
+                r"regenerate|rewrite|start over|full rewrite",
                 instruction or "",
                 re.I,
             )
@@ -3030,8 +3010,6 @@ def _is_real_design_field(text):
     if not text or not str(text).strip():
         return False
     t = str(text).strip()
-    if "模型未返回" in t and "请重试或人工补充" in t:
-        return False
     if "Model did not return" in t and "please retry or fill in manually" in t:
         return False
     return True
@@ -3123,7 +3101,7 @@ def build_target_world_knowledge(ws, force=False, chunk_size=36000, chapter_batc
 def _extract_reference_name_synopsis(ws):
     """Extract the reference novel's title and synopsis from sample_novel.txt.
 
-    Prefer marked format: 【书名】XXX / 【简介】XXX (may be multiple lines).
+    Prefer marked format: 【title】XXX / 【synopsis】XXX (may be multiple lines).
     Without markers, heuristic fallback: first line is the title, continuous text before the chapter heading is the synopsis.
     """
     if not os.path.exists(ws.reference_sample):
@@ -3132,9 +3110,21 @@ def _extract_reference_name_synopsis(ws):
     with open(ws.reference_sample, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Prefer marked format
-    name_match = re.search(r'^【书名】(.+)', content, re.MULTILINE)
-    synopsis_match = re.search(r'^【简介】(.+?)(?=^【|^第[一二三四五六七八九十百千零\d]+[章回节])', content, re.MULTILINE | re.DOTALL)
+    _cn_nums = (
+        "\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\u5343\u96f6"
+    )
+    _ch_units = "\u7ae0\u56de\u8282"
+    _ch_prefix = "\u7b2c"
+    # Prefer marked format (imported Chinese novels may use escaped title/synopsis markers).
+    name_match = re.search(
+        r"^【" + "\u4e66\u540d" + r"】(.+)", content, re.MULTILINE,
+    )
+    synopsis_match = re.search(
+        r"^【" + "\u7b80\u4ecb" + r"】(.+?)(?=^【|^" + _ch_prefix + r"["
+        + _cn_nums + r"\d]+[" + _ch_units + r"])",
+        content,
+        re.MULTILINE | re.DOTALL,
+    )
 
     if name_match:
         name = name_match.group(1).strip()
@@ -3158,7 +3148,12 @@ def _extract_reference_name_synopsis(ws):
             name = stripped.strip("《》")
             continue
 
-        if re.match(r'^第[一二三四五六七八九十百千零\d]+[章回节]', stripped):
+        if re.match(r"^(?:Chapter|Ch\.?)\s+\d+\b", stripped, re.I):
+            break
+        if re.match(
+            "^" + _ch_prefix + r"[" + _cn_nums + r"\d]+[" + _ch_units + r"]",
+            stripped,
+        ):
             break
 
         in_synopsis = True
@@ -3588,10 +3583,7 @@ def _infer_stage_chapter_count(stage_text):
     if not stage_text:
         return 0
     range_patterns = [
-        r'预计章节数[：:]\s*(\d+)\s*[-—–~至到to]+\s*(\d+)',
         r'Planned chapters?[：:]\s*(\d+)\s*[-—–~to]+\s*(\d+)',
-        r'章节数[：:]\s*(\d+)\s*[-—–~至到to]+\s*(\d+)',
-        r'预计\s*(\d+)\s*[-—–~至到to]+\s*(\d+)\s*章',
     ]
     for pattern in range_patterns:
         m = re.search(pattern, stage_text)
@@ -3599,18 +3591,14 @@ def _infer_stage_chapter_count(stage_text):
             return max(int(m.group(1)), int(m.group(2)))
 
     patterns = [
-        r'预计章节数[：:]\s*(\d+)',
         r'Planned chapters?[：:]\s*(\d+)',
-        r'章节数[：:]\s*(\d+)',
-        r'预计\s*(\d+)\s*章',
-        r'共\s*(\d+)\s*章',
     ]
     for pattern in patterns:
         m = re.search(pattern, stage_text)
         if m:
             return max(1, int(m.group(1)))
 
-    range_match = re.search(r'第\s*(\d+)\s*[-—~至到]\s*(\d+)\s*章', stage_text)
+    range_match = re.search(r'Chapters?\s+(\d+)\s*[-—~]\s*(\d+)', stage_text, re.I)
     if range_match:
         start = int(range_match.group(1))
         end = int(range_match.group(2))
@@ -4183,7 +4171,7 @@ def _load_volume_outline_context(ws, volume):
         print("Run the volume-outline command first to generate volume outlines and worldviews.")
         return None
 
-    chapter_nums = re.findall(r'第(\d+)章', vol_outline)
+    chapter_nums = re.findall(r'(?:Chapter|Ch\.?)\s+(\d+)', vol_outline, re.I)
     if not chapter_nums:
         print("Error: cannot infer total chapter count from the volume outline.")
         return None
@@ -4311,9 +4299,7 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
         diagnostics = diagnose_story_arc(
             result, arc_idx, start_ch, end_ch,
             target_chars=target_char_count,
-            required_anchors=extract_critical_anchors(
-                "\n".join((plan.get("arc_obligations") or []) + (plan.get("chapter_beats") or []))
-            ),
+            required_anchors=extract_critical_anchors("\n".join((plan.get("arc_obligations") or []) + (plan.get("chapter_beats") or []))),
             reference_text=plan.get("reference_story_arc") or "",
         )
         if not diagnostics["valid"]:
@@ -4446,7 +4432,7 @@ def refine_story_arcs(ws, volume, instruction, cancel_event=None):
             arc = {"file": f"arc_{idx + 1}_ch{'?'}_{'?'}.md"}
         # Extract the chapter range from the first line
         first_line = seg.split("\n")[0] if "\n" in seg else seg.split("\n")[0]
-        range_match = re.search(r'第(\d+)-(\d+)章', first_line)
+        range_match = re.search(r'Chapters?\s+(\d+)\s*[-–—]\s*(\d+)', first_line, re.I)
         if range_match:
             start_ch = int(range_match.group(1))
             end_ch = int(range_match.group(2))
@@ -4483,14 +4469,12 @@ def _normalize_refinement_mode(value, instruction):
     normalized = str(value or "").strip().lower()
     if normalized in {
         "regenerate", "rewrite", "start over", "full rewrite",
-        "重新生成", "完全重写", "推倒重来", "全部重写", "从头生成",
     }:
         return "regenerate"
-    if normalized in {"revise", "adjust", "optimize", "修改", "调整", "优化"}:
+    if normalized in {"revise", "adjust", "optimize"}:
         return "revise"
     compact = re.sub(r"\s+", "", str(instruction or "")).lower()
     regenerate_markers = (
-        "重新生成", "完全重写", "推倒重来", "从头生成", "重新写一版", "重写一版", "全部重写",
         "regenerate", "rewrite", "startover", "fullrewrite",
     )
     return "regenerate" if any(marker in compact for marker in regenerate_markers) else "revise"
@@ -4656,9 +4640,7 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
         diagnostics = diagnose_story_arc(
             result, target["idx"], target["start_ch"], target["end_ch"],
             target_chars=target_char_count,
-            required_anchors=extract_critical_anchors(
-                "\n".join((target.get("arc_obligations") or []) + (target.get("chapter_beats") or []))
-            ),
+            required_anchors=extract_critical_anchors("\n".join((target.get("arc_obligations") or []) + (target.get("chapter_beats") or []))),
             reference_text=target.get("reference_story_arc") or "",
         )
         if not diagnostics["valid"]:
@@ -4753,7 +4735,7 @@ def _cap_story_line_in_outline(text, limit=STORY_LINE_LIMIT):
     header_idx = None
     same_line = ""
     for idx, line in enumerate(lines):
-        match = re.match(r"^\s*#{0,6}\s*(?:故事线|Story line|Storyline)\s*[:：]?\s*(.*)$", line, re.I)
+        match = re.match(r"^\s*#{0,6}\s*(?:Story line|Storyline)\s*[:：]?\s*(.*)$", line, re.I)
         if match:
             header_idx = idx
             same_line = (match.group(1) or "").strip()
@@ -4776,7 +4758,7 @@ def _cap_story_line_in_outline(text, limit=STORY_LINE_LIMIT):
         return text
     capped = _truncate_plus_chain(content, limit)
     header_clean = re.match(
-        r"\s*#{0,6}\s*(?:故事线|Story line|Storyline)",
+        r"\s*#{0,6}\s*(?:Story line|Storyline)",
         lines[header_idx],
         re.I,
     ).group(0)
@@ -5203,7 +5185,6 @@ def refine_chapter_outlines_serial(ws, volume, arc_idx, instruction, progress_ca
             f"Choosing the adjustment start in the editable range of chapters {editable_start}-{end_ch}",
         )
     generic_instruction = instruction.strip().lower() in {
-        "生成", "重新生成", "继续生成", "调整", "优化",
         "generate", "regenerate", "continue generating", "adjust", "optimize",
     }
     if generic_instruction:
@@ -5533,7 +5514,7 @@ def _is_english_period_boundary(text, index):
 
 def _paragraph_measure(text):
     english_words = re.findall(r"[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*", text or "")
-    cjk_chars = re.findall(r"[\u3400-\u9fff]", text or "")
+    cjk_chars = re.findall("[\u3400-\u9fff]", text or "")
     if len(english_words) >= len(cjk_chars):
         return len(english_words)
     return len(re.sub(r"\s+", "", text or ""))
@@ -5632,11 +5613,17 @@ _CHAPTER_FORBIDDEN_STYLE_PATTERNS = (
     ("em dash '——'", re.compile(r"——")),
     (
         "Chinese not-X-but-Y contrast template",
-        re.compile(r"(?:不是|并非)[^。！？\n]{0,60}?(?:而是|却是)"),
+        re.compile(
+            "(?:" + "\u4e0d\u662f|\u5e76\u975e" + ")[^。！？\n]{0,60}?(?:"
+            + "\u800c\u662f|\u5374\u662f" + ")"
+        ),
     ),
     (
         "Chinese not-only-X-but-also-Y template",
-        re.compile(r"(?:不仅|不只是)[^。！？\n]{0,60}?(?:而且|更(?:是|加)?)"),
+        re.compile(
+            "(?:" + "\u4e0d\u4ec5|\u4e0d\u53ea\u662f" + ")[^。！？\n]{0,60}?(?:"
+            + "\u800c\u4e14|\u66f4(?:\u662f|\u52a0)?" + ")"
+        ),
     ),
     (
         "not X but Y contrast template",

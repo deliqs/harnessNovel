@@ -22,7 +22,7 @@ def normalize_text(text: str) -> str:
         return text
 
     # Drop ideographic space (U+3000), used only as paragraph indent in Chinese web novels.
-    text = text.replace('　', '')
+    text = text.replace("\u3000", "")
 
     # Collapse 3+ newlines to 2 (keep paragraph breaks).
     text = re.sub(r'\n{3,}', '\n\n', text)

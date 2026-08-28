@@ -5,21 +5,24 @@ import re
 
 MAX_CHAPTERS_PER_VOLUME = 90
 
-_CN_MAP = {'零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-           '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '百': 100, '千': 1000}
-_CN_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
-
-_CH_NUM_RE = re.compile(r'第([一二三四五六七八九十百千零\d]+)章')
+_CN_MAP = {
+    "\u96f6": 0, "\u4e00": 1, "\u4e8c": 2, "\u4e09": 3, "\u56db": 4, "\u4e94": 5,
+    "\u516d": 6, "\u4e03": 7, "\u516b": 8, "\u4e5d": 9, "\u5341": 10, "\u767e": 100,
+    "\u5343": 1000,
+}
+_CN_DIGITS = [
+    "\u96f6", "\u4e00", "\u4e8c", "\u4e09", "\u56db",
+    "\u4e94", "\u516d", "\u4e03", "\u516b", "\u4e5d",
+]
+_CN_NUM_CLASS = "".join(_CN_MAP)
+_CH_NUM_RE = re.compile("\u7b2c([%s\\d]+)\u7ae0" % _CN_NUM_CLASS)
 _EN_CH_NUM_RE = re.compile(r'(?:Chapter|Ch\.?)\s+(\d+)', re.I)
 
 
 def chapter_draft_basename(chapter_num, *, raw=False, legacy=False):
     chapter_num = int(chapter_num)
-    stem = (
-        f"{chapter_num:03d}_第{chapter_num}章"
-        if legacy
-        else f"{chapter_num:03d}_chapter_{chapter_num}"
-    )
+    _ = legacy
+    stem = f"{chapter_num:03d}_chapter_{chapter_num}"
     return f"{stem}.raw.md" if raw else f"{stem}.md"
 
 
@@ -28,41 +31,24 @@ def chapter_draft_write_path(directory, chapter_num, *, raw=False):
 
 
 def resolve_chapter_draft_path(directory, chapter_num, *, raw=False):
-    directory = str(directory)
-    english = chapter_draft_write_path(directory, chapter_num, raw=raw)
-    if os.path.isfile(english):
-        return english
-    legacy = os.path.join(directory, chapter_draft_basename(chapter_num, raw=raw, legacy=True))
-    if os.path.isfile(legacy):
-        return legacy
-    return english
+    return chapter_draft_write_path(directory, chapter_num, raw=raw)
 
 
 def remove_legacy_chapter_draft(directory, chapter_num, *, raw=False):
-    directory = str(directory)
-    english = os.path.abspath(chapter_draft_write_path(directory, chapter_num, raw=raw))
-    legacy = os.path.abspath(os.path.join(
-        directory, chapter_draft_basename(chapter_num, raw=raw, legacy=True),
-    ))
-    if legacy != english and os.path.isfile(legacy):
-        os.remove(legacy)
+    return
 
 
 def chapter_draft_delete_paths(refined_dir, raw_dir, chapter_num):
     chapter_num = int(chapter_num)
     refined_dir = str(refined_dir)
     raw_dir = str(raw_dir)
+    n = chapter_num
     paths = [
         os.path.join(refined_dir, chapter_draft_basename(chapter_num)),
-        os.path.join(refined_dir, chapter_draft_basename(chapter_num, legacy=True)),
         os.path.join(raw_dir, chapter_draft_basename(chapter_num, raw=True)),
-        os.path.join(raw_dir, chapter_draft_basename(chapter_num, raw=True, legacy=True)),
     ]
-    n = chapter_num
     paths.extend(glob.glob(os.path.join(refined_dir, "versions", f"{n:03d}_chapter_{n}.md_*")))
-    paths.extend(glob.glob(os.path.join(refined_dir, "versions", f"{n:03d}_第{n}章.md_*")))
     paths.extend(glob.glob(os.path.join(raw_dir, "versions", f"{n:03d}_chapter_{n}_*.raw.md")))
-    paths.extend(glob.glob(os.path.join(raw_dir, "versions", f"{n:03d}_第{n}章_*.raw.md")))
     return paths
 
 
@@ -97,12 +83,12 @@ def _int_to_cn(n):
 
     thousands = n // 1000
     if thousands:
-        result += _CN_DIGITS[thousands] + '千'
+        result += _CN_DIGITS[thousands] + "\u5343"
         n %= 1000
 
     hundreds = n // 100
     if hundreds:
-        result += _CN_DIGITS[hundreds] + '百'
+        result += _CN_DIGITS[hundreds] + "\u767e"
         n %= 100
     elif result:
         need_zero = True
@@ -110,19 +96,19 @@ def _int_to_cn(n):
     tens = n // 10
     if tens:
         if need_zero:
-            result += '零'
+            result += "\u96f6"
             need_zero = False
         if tens == 1 and not result:
-            result += '十'
+            result += "\u5341"
         else:
-            result += _CN_DIGITS[tens] + '十'
+            result += _CN_DIGITS[tens] + "\u5341"
         n %= 10
     elif result and n > 0:
         need_zero = True
 
     if n > 0:
         if need_zero:
-            result += '零'
+            result += "\u96f6"
         result += _CN_DIGITS[n]
 
     return result
@@ -164,7 +150,7 @@ def _fix_chapter_numbering(groups):
                 corrected = _int_to_cn(expected)
                 old_title = ch["title"]
                 new_title = _CH_NUM_RE.sub(
-                    lambda m: f'第{corrected}章',
+                    lambda m: "\u7b2c%s\u7ae0" % corrected,
                     old_title, count=1,
                 )
                 ch["title"] = new_title

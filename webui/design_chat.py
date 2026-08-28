@@ -23,14 +23,13 @@ from core.prompt_trace import capture_prompts
 # Route 3 keywords: any match takes the extend/append path (scope=stage only).
 _EXTEND_KEYWORDS = (
     "extend", "continue", "add stage", "append stage", "next stage", "new stage",
-    "续写", "新增", "继续添加", "往后加", "加舞台", "追加舞台", "下一个舞台", "新舞台",
 )
 PHASE_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:第\s*)?(?:阶段|phase)\s*0*(\d+)\b",
+    r"^#{1,6}\s*phase\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 STAGE_HEADING_RE = re.compile(
-    r"^#{1,6}\s*(?:舞台|stage)\s*0*(\d+)\b",
+    r"^#{1,6}\s*stage\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -52,9 +51,7 @@ def _is_real_content(text: str) -> bool:
     if not text or not text.strip():
         return False
     t = text.strip()
-    if ("模型未返回" in t and "请重试或人工补充" in t) or (
-        "Model did not return" in t and "please retry or fill in manually" in t
-    ):
+    if "Model did not return" in t and "please retry or fill in manually" in t:
         return False
     return True
 
