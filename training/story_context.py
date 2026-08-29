@@ -205,6 +205,30 @@ def _recent_continuity(ws, stage_number, chapter_number):
     return "\n\n".join(parts)
 
 
+def _claims_ledger(ws, stage_number, chapter_number):
+    content = _read(os.path.join(ws.file_system, "claims_ledger.md"))
+    if not content:
+        return ""
+    return compact_text(content, 800)
+
+
+def _scene_types_used(ws, stage_number):
+    directory = os.path.join(ws.file_system, "story_arcs", "vol_%02d" % int(stage_number))
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return ""
+    lines = []
+    for name in names:
+        if not _ARC_RE.match(name):
+            continue
+        for line in _read(os.path.join(directory, name)).splitlines():
+            stripped = line.strip()
+            if stripped.startswith("Scenes used:") or "scene type" in stripped.lower():
+                lines.append(stripped)
+    return compact_text("\n".join(lines), 400) if lines else ""
+
+
 def _reference_craft_guidance(ws, limit):
     """Render principles/profile only; source evidence and prose never enter production prompts."""
     bible = load_reference_craft_bible(ws.reference_outlines)
@@ -257,6 +281,8 @@ def build_story_context(ws, stage_number, chapter_number=None, arc_index=None,
         world_knowledge = ""
     prior_arcs = _generated_arcs(ws, stage_number, before_arc=arc_index)
     recent = _recent_continuity(ws, stage_number, chapter_number)
+    claims = _claims_ledger(ws, stage_number, chapter_number)
+    scenes = _scene_types_used(ws, stage_number)
     craft_guidance = _reference_craft_guidance(ws, limits["craft"])
     progress = "Stage %s" % stage_number
     if arc_index is not None:
@@ -276,6 +302,8 @@ def build_story_context(ws, stage_number, chapter_number=None, arc_index=None,
         ("Whole-stage arc plan with progress and remaining obligations", obligations, limits["plan"]),
         ("Prior generated arcs", prior_arcs, limits["prior_arcs"]),
         ("Compact recent continuity", recent, limits["recent"]),
+        ("Claims already spent (do not repeat)", claims, 800),
+        ("Scene types already used in this stage", scenes, 400),
         ("Transferable reference craft; never copy source prose", craft_guidance, limits["craft"]),
         ("Current arc", current_arc, 2200),
         ("Current chapter outline", current_outline, 1800),

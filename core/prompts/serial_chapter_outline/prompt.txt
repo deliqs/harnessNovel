@@ -21,6 +21,11 @@ The chapter outline must pick up the previous chapter and keep plot, character s
 {previous_chapter_outline}
 [END UNTRUSTED WORKSPACE DATA: PREVIOUS CHAPTER OUTLINE]
 
+【Do not repeat】(claims and scene types already spent in prior chapters — do not reuse them)
+[BEGIN UNTRUSTED WORKSPACE DATA: DO NOT REPEAT]
+{do_not_repeat}
+[END UNTRUSTED WORKSPACE DATA: DO NOT REPEAT]
+
 【Current chapter】Chapter {chapter_num}
 
 【Generation requirements】

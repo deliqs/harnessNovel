@@ -343,11 +343,18 @@ class AdaptiveQualityIntegrationTests(unittest.TestCase):
         serial_outline = PromptLoader.load(
             "serial_chapter_outline", previous_system_panel=hostile,
             story_arc=hostile, previous_chapter_outline=hostile, chapter_num=1,
+            do_not_repeat=hostile,
         )
         self.assertIn(
             "[BEGIN UNTRUSTED WORKSPACE DATA: CURRENT STORY ARC]\n"
             + hostile
             + "\n[END UNTRUSTED WORKSPACE DATA: CURRENT STORY ARC]",
+            serial_outline,
+        )
+        self.assertIn(
+            "[BEGIN UNTRUSTED WORKSPACE DATA: DO NOT REPEAT]\n"
+            + hostile
+            + "\n[END UNTRUSTED WORKSPACE DATA: DO NOT REPEAT]",
             serial_outline,
         )
 

@@ -51,6 +51,8 @@ from training.generation_quality import (
 from training.story_context import (
     build_story_context,
     enrich_arc_plans,
+    _claims_ledger,
+    _scene_types_used,
 )
 
 BATCH_SIZE = 20
@@ -4823,6 +4825,9 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
                 ws, volume, chapter_number=ch_num, arc_index=arc["idx"],
                 story_plan=plan.get("stage_story_plan", ""), current_arc=arc_content,
             )
+            claims = _claims_ledger(ws, volume, ch_num)
+            scenes = _scene_types_used(ws, volume)
+            do_not_repeat = claims + "\n" + scenes if claims and scenes else (claims or scenes)
             prompt = PromptLoader.load(
                 "serial_chapter_outline",
                 previous_system_panel=json.dumps(
@@ -4831,6 +4836,7 @@ def gen_serial_chapter_outlines(ws, volume=1, force=False):
                 story_arc=canonical_context + "\n\n[Current arc artifact]\n" + arc_content,
                 previous_chapter_outline=previous_text,
                 chapter_num=ch_num,
+                do_not_repeat=do_not_repeat,
             )
             result = normalize_text(llm.generate(prompt))
             if not str(result).strip():
@@ -5001,6 +5007,9 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
             ws, volume, chapter_number=ch_num, arc_index=arc_idx,
             story_plan=target_plan.get("stage_story_plan", ""), current_arc=arc_content,
         )
+        claims = _claims_ledger(ws, volume, ch_num)
+        scenes = _scene_types_used(ws, volume)
+        do_not_repeat = claims + "\n" + scenes if claims and scenes else (claims or scenes)
         prompt = PromptLoader.load(
             "serial_chapter_outline",
             previous_system_panel=json.dumps(
@@ -5009,6 +5018,7 @@ def gen_chapter_outlines_for_arc(ws, volume, arc_idx, progress_callback=None,
             story_arc=canonical_context + "\n\n[Current arc artifact]\n" + arc_content,
             previous_chapter_outline=previous_text,
             chapter_num=ch_num,
+            do_not_repeat=do_not_repeat,
         )
         if progress_callback:
             progress_callback(
