@@ -30,16 +30,22 @@ Your task is to design a stage-appropriate story arc from the core gameplay, the
 Story-arc unit {arc_index}, covering Chapter {start_chapter} - Chapter {end_chapter}
 
 【Generation requirements】
-Generate a complete story-arc unit for the current new novel. You must:
+Generate a complete, deep story-arc unit for the current new novel. You must:
 1. The plot must fit the current new novel's worldview stage, core gameplay, and long mainline.
 2. It must pick up the previous stage's ending state and strictly obey the current stage's three-act structure, character roster, and foreshadowing plan.
-3. The current unit must cover Chapter {start_chapter} - Chapter {end_chapter}. Internally you may split small beats by natural rhythm, but do not list chapter by chapter mechanically.
-4. Using the average length of deconstructed story-arc summaries as the baseline, keep the full text around {target_char_count} characters-or-equivalent; each field averages about {target_field_chars} characters-or-equivalent, with modest redistribution by information load.
+3. The current unit must cover Chapter {start_chapter} - Chapter {end_chapter}. Internally split the arc into 3-6 natural beats by rhythm; anchor each beat to a specific chapter range (e.g. "Ch 6-7: …", "Ch 8: …"). Do not list every chapter mechanically, but the reader must be able to see which chapter carries which beat.
+4. Keep the full text around {target_char_count} characters-or-equivalent; each field contains 2-4 concrete beats or sentences, with redistribution by information load.
 5. Each story arc should contain the cycle: establish a goal → plant a crisis → attempt a solution → core conflict erupts (payoff) → tally gains → open the next bind. If a stage is naturally missing or delayed in this arc, say so in Narrative stages.
 6. Make sure the reader feels emotional change: tension, anticipation, satisfaction, surprise, curiosity.
-7. Output format, fields, and density must align with the reference story arcs in the input; the output is a "story-arc summary", not a chapter outline or prose. Each field is one compact paragraph, usually 1-2 sentences; do not use bullets, subheadings, chapter-by-chapter breakdowns, per-character inventories, or repeated explanations.
-8. Keep only the information needed to drive causality, state change, and later pickup; delete specific dialogue, scene blocking, per-chapter scheduling, and synonymous restatement.
-9. Use the reference story arcs only to learn format, information density, natural boundaries, and narrative function. Do not copy characters, places, factions, abilities, event chains, or unique causality.
+7. Depth and specificity rules (apply to every field):
+   - Name every secondary character present in a key beat and give them a motive or lane (e.g. "Tasha's jealousy surfaces as seating control", not "a classmate is hostile").
+   - Go to body-level and sensory specificity where the story demands it: physical detail (weight, heat, fabric strain, breath), concrete objects in the room, and the characters' mixed feelings (awe, shame, desire) told from inside their heads.
+   - Where a beat turns on what is actually said, write the line in double quotes (one or two lines max per arc).
+   - Every named character present in a key scene gets at least one interior beat or consequence, not just the protagonist.
+   - Do NOT stop at plot causality; include enough concrete sensation and interiority that a writer can draft directly from this arc without inventing the scene's texture.
+8. The output is a "story-arc summary", not a chapter outline or prose. Do not use bullets, subheadings, or per-chapter mechanical lists. Each field is a dense paragraph of 2-4 sentences carrying concrete beats, not one abstract clause.
+9. Keep the information needed to drive causality, state change, and later pickup; delete synonymous restatement and generic labels ("control lane", "minimize lane") in favor of the specific action that enacts them.
+10. Use the reference story arcs only to learn format, information density, natural boundaries, and narrative function. Do not copy characters, places, factions, abilities, event chains, or unique causality.
 
 【Output format】
 Output plain text. Do not use Markdown tables. Except for the first-line title, output only the following 10 fields, with no additions, deletions, or renamed labels.
@@ -47,22 +53,22 @@ Output plain text. Do not use Markdown tables. Except for the first-line title, 
 The first line must be:
 【Arc{arc_index}: Chapters {start_chapter}-{end_chapter} | title】
 
-Plot function: State this arc's structural role in the current stage and the long mainline.
+Plot function: State this arc's structural role in the current stage and the long mainline. Name the specific shift it enacts (e.g. "shifts from private management to public exposure") and which prior state it breaks.
 
-Boundary reason: State why it starts at Chapter {start_chapter} and ends at Chapter {end_chapter}, and the staged result formed at the close.
+Boundary reason: State why it starts at Chapter {start_chapter} and ends at Chapter {end_chapter}, naming the concrete event that opens it and the staged result formed at the close.
 
-Rise and turn: Write the trigger, advance, turn, and close, including specific characters, factions, places, items, or abilities.
+Rise and turn: Write the trigger, advance, turn, and close as 3-6 chapter-anchored beats. Include specific characters, places, items, and physical/sensory detail. Where a beat turns on dialogue, write the line in double quotes.
 
-Narrative stages: List the stages this arc actually contains; for missing stages, say whether they are naturally absent, delayed, or folded into another arc.
+Narrative stages: List the stages this arc actually contains with their chapter anchors; for missing stages, say whether they are naturally absent, delayed, or folded into another arc.
 
-Protagonist action chain: Write the full chain as "goal → judgment → action → resistance → adjustment → result → next goal".
+Protagonist action chain: Write the full chain as "goal → judgment → action → resistance → adjustment → result → next goal", with each link naming the specific character, object, or place that enacts it.
 
-Conflict and emotion curve: Write the surface and deep conflicts, pressure points, tug points, burst points, aftertaste, and the ending emotional tone.
+Conflict and emotion curve: Write the surface and deep conflicts with named pressure points (who applies pressure, in which chapter), tug points, burst points, aftertaste, and the ending emotional tone. Include at least one body-level sensory detail that carries the emotional shift.
 
-Core payoff or tension: Write how the payoff/tension is stored, triggered, and cashed; if there is no strong payoff, state the main tension function this arc carries.
+Core payoff or tension: Write how the payoff/tension is stored, triggered, and cashed across specific chapters; name who feels it and what physical or social fact makes it land. If there is no strong payoff, state the main tension function this arc carries and where it will cash.
 
-Character and relationship change: Write major characters' actions, motives, and consequences, and how relationships and attitudes change from before to after.
+Character and relationship change: For each major character present, write their specific action, motive (not a label), and consequence. Show how the relationship changes from before to after with a concrete behavioral shift, not an abstract state word.
 
-Gains and costs: Write material, power, status, knowledge, and relationship gains, plus the costs paid and leftover risk.
+Gains and costs: Write material, power, status, knowledge, and relationship gains as concrete facts (what object, what number, what access), plus the costs paid and leftover risk named to a specific future chapter or event.
 
-Foreshadowing and next bind: Write newly planted and paid-off foreshadowing, information gaps (who knows, who does not, how much the reader knows), and the hook into the next arc.
+Foreshadowing and next bind: Write newly planted and paid-off foreshadowing with chapter anchors, information gaps (who knows what, who does not), and the hook into the next arc as a concrete pending event, not an abstract "tension".

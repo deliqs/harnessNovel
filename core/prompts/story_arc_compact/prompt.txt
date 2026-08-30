@@ -24,4 +24,4 @@ Character and relationship change:
 Gains and costs:
 Foreshadowing and next bind:
 
-Each field may be only one compact paragraph, usually 1 sentence. Do not use bullets, subheadings, chapter-by-chapter breakdowns, per-character inventories, dialogue, or repeated explanations. Output the compressed complete arc directly; do not describe the compression process.
+Each field is a dense paragraph of 2-4 sentences carrying concrete beats. Preserve named characters with motives, body-level sensory detail, chapter anchors, and any quoted dialogue lines. Do not use bullets or subheadings. Output the compressed complete arc directly; do not describe the compression process.

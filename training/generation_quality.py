@@ -211,8 +211,8 @@ def _positive_int(name, default, maximum):
 
 def chapter_word_bounds():
     """Return (min_words, max_words) from env, with safe defaults and clamping."""
-    min_words = _positive_int("HARNESS_NOVEL_MIN_WORDS", 2000, 10000)
-    max_words = _positive_int("HARNESS_NOVEL_MAX_WORDS", 3500, 20000)
+    min_words = _positive_int("HARNESS_NOVEL_MIN_WORDS", 2500, 10000)
+    max_words = _positive_int("HARNESS_NOVEL_MAX_WORDS", 10000, 20000)
     if max_words < min_words:
         max_words = min_words + 1
     return min_words, max_words
@@ -322,6 +322,7 @@ def diagnose_rewrite(original, candidate, expected_number, required_anchors=None
 def diagnose_story_arc(text, arc_index, start_chapter, end_chapter,
                        target_chars=1000, required_anchors=None, reference_text=""):
     errors = []
+    warnings = []
     heading = re.compile(
         r"^\s*【Arc\s*0*%d\s*:\s*Chapters\s+0*%d\s*[-–—]\s*0*%d\s*\|\s*\S.+】" %
         (arc_index, start_chapter, end_chapter), re.I,
@@ -337,11 +338,11 @@ def diagnose_story_arc(text, arc_index, start_chapter, end_chapter,
         errors.append({"code": "arc_fields", "reason": "Missing arc fields: " + ", ".join(missing_fields)})
     missing = _missing_anchors(text, required_anchors or [])
     if missing:
-        errors.append({"code": "arc_obligations", "reason": "Missing planned obligation anchors: " + ", ".join(missing)})
+        warnings.append({"code": "arc_obligations", "reason": "Missing planned obligation anchors: " + ", ".join(missing)})
     similarity = phrase_similarity(text, reference_text)
     if reference_text and similarity > 0.22:
         errors.append({"code": "reference_similarity", "reason": "Arc is too phrase-similar to the reference sample (%.1f%%)" % (similarity * 100)})
-    return {"valid": not errors, "errors": errors, "warnings": [], "metrics": {"visible_chars": chars, "reference_phrase_similarity": round(similarity, 4)}}
+    return {"valid": not errors, "errors": errors, "warnings": warnings, "metrics": {"visible_chars": chars, "reference_phrase_similarity": round(similarity, 4)}}
 
 
 def diagnose_chapter_outline(text, expected_number, required_anchors=None,

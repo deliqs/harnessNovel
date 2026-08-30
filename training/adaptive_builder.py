@@ -60,7 +60,7 @@ from training.story_context import (
 BATCH_SIZE = 20
 STORY_ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
 STORY_ARC_TARGET_CHAPTERS = 5
-STORY_ARC_TARGET_CHARS_MAX = 2000
+STORY_ARC_TARGET_CHARS_MAX = 5000
 STAGE_DESIGN_PIPELINE_VERSION = 2
 OPERATION_ADJUST_LAST_PHASE = "adjust last phase"
 OPERATION_ADD_PHASE = "add phase"
@@ -3731,8 +3731,10 @@ def _reference_story_arc_average_chars(ws, stage_number=None):
             if char_count:
                 lengths.append(char_count)
     if not lengths:
-        return 1000
-    return max(300, min(STORY_ARC_TARGET_CHARS_MAX, round(sum(lengths) / len(lengths))))
+        return 4000
+    avg = round(sum(lengths) / len(lengths))
+    # Floor at 4000 visible chars (~800 words) so arcs stay deep even when reference digests are compact.
+    return max(4000, min(STORY_ARC_TARGET_CHARS_MAX, avg))
 
 
 def _reference_volume_for_stage(ws, stage_number):
@@ -3826,7 +3828,7 @@ def _generate_with_cancel(llm, prompt, cancel_event=None, temperature=0.7):
 def _compact_story_arc_result(llm, result, arc_idx, start_ch, end_ch, target_char_count,
                               cancel_event=None):
     """Compress obviously overlong story-arc results without changing structure, so verbosity does not keep growing."""
-    max_chars = round(target_char_count * 1.25)
+    max_chars = round(target_char_count * 1.5)
     if _visible_char_count(result) <= max_chars:
         return result
     prompt = PromptLoader.load(
@@ -4306,6 +4308,9 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
             required_anchors=extract_critical_anchors("\n".join((plan.get("arc_obligations") or []) + (plan.get("chapter_beats") or []))),
             reference_text=plan.get("reference_story_arc") or "",
         )
+        if diagnostics["warnings"]:
+            warn_reasons = "; ".join(item["reason"] for item in diagnostics["warnings"])
+            print(f"  Note: story-arc unit {arc_idx} has soft warnings: {warn_reasons}")
         if not diagnostics["valid"]:
             reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
             print(f"  Warning: story-arc unit {arc_idx} failed deterministic validation; not written: {reasons}")
