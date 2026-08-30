@@ -332,6 +332,7 @@ class AdaptiveQualityIntegrationTests(unittest.TestCase):
         drafting = PromptLoader.load(
             "adaptive_drafting", context=hostile,
             start_chapter=1, end_chapter=1, chapter_count=1,
+            min_words=2000, max_words=3500,
         )
         self.assertIn(
             "[BEGIN UNTRUSTED WORKSPACE DATA: DRAFTING CONTEXT]\n"

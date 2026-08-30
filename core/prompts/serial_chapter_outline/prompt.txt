@@ -29,13 +29,19 @@ The chapter outline must pick up the previous chapter and keep plot, character s
 【Current chapter】Chapter {chapter_num}
 
 【Generation requirements】
-Write a compact outline for this chapter. Output only these 3 parts: Story line, Chapter rhythm, Chapter summary. Do not output extra sections such as highlights, core content, plot points, this chapter's goal, foreshadowing and information gaps, chapter-end hooks, or mechanics-event drafts.
+Write a deep, scene-level outline for this chapter. Output only these 3 parts: Story line, Chapter rhythm, Chapter summary. Do not output extra sections such as highlights, core content, plot points, this chapter's goal, foreshadowing and information gaps, chapter-end hooks, or mechanics-event drafts.
 
 When generating, you must unfold strictly inside the current story-arc unit. Do not add new mainlines, characters, places, abilities, or settings that the arc unit does not support.
 
 Each chapter must have at least one plot beat that clearly stimulates emotion (satisfaction, frustration, anger, shock, anticipation, humor, embarrassment, heartache, ambiguity, fear, contrast, humiliation, a falling-out, a face-slap, a misunderstanding escalating, a profit backstab, status oppression, and so on). Do not only write "emotional change"; in the chapter summary, use descriptive language to summarize the concrete event and character action that triggers the emotion.
 
-The chapter summary is an objective, descriptive digest of this chapter's events, not a prose fragment. Do not write character dialogue, direct quotes, quoted lines, back-and-forth speech, or scene performance in prose style. What a character said may only be summarized by its information and function, for example "Zhao Heng refuses to cooperate and warns the protagonist"; do not write the line for the character.
+The chapter summary is a beat-by-beat scene digest of this chapter's events. Write it as short paragraphs, one paragraph per beat (typically 10 to 25 beats), so the prose writer can follow it step by step.
+
+Where a beat turns on what is actually said, write the line in double quotes (for example: "Would it help... to take off your top?"). Keep quoted lines short and sparse — only for the beats where the exact wording carries the scene; summarize all other speech by its information and function.
+
+Mark POV explicitly whenever the chapter moves into a character's head: use parentheticals such as (POV: Priya — her awe and jealousy as she watches) or (stay in Esmee's head here: the fabric moving over her skin, her fear of being seen). Every character present in a key scene must get at least one interior beat, not just the protagonist.
+
+Go to body-level and sensory specificity: physical detail (sweat, heat, weight, breath, skin, fabric against the body), concrete objects in the room, and the characters' mixed feelings (awe, jealousy, shame, desire) told from inside their heads. Do not stop at plot causality; the outline must contain enough concrete sensation and interiority that a writer can draft directly from it without inventing the scene's texture.
 
 If the previous chapter system panel shows the system panel is enabled, naturally fold related state or number changes into the chapter summary; if it shows the panel is not enabled, do not mention a system panel at all.
 
@@ -56,4 +62,4 @@ Emotional tone: for example: tension+anticipation+panic
 Rhythm breakdown: for example: crisis planted+attempt to respond+pressure rises+brief burst+hook close
 
 # Chapter summary
-A chapter story digest of about 220-280 English words. Write clearly what happens in this chapter: cause, character actions, conflict advance, key information, and ending hook. High information density, with causality and necessary detail, but only a descriptive digest. Do not include any character dialogue, direct quotes, or prose-style performance.
+A deep scene-level digest of about 900-1400 English words, written as short beat-by-beat paragraphs (one paragraph per beat). Write clearly what happens in this chapter: cause, character actions, conflict advance, key information, and ending hook. High information density with causality, plus body-level sensory detail and each present character's interiority (marked with explicit POV parentheticals). Include short quoted lines only where the exact wording carries a beat.

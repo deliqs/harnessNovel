@@ -208,6 +208,7 @@ class TestWholeBookVolumeDir(unittest.TestCase):
     def test_write_name_is_english(self):
         self.assertEqual(_whole_book_dir_name(), "vol_01_whole_book")
         self.assertTrue(_is_whole_book_dir("vol_01_whole_book"))
+        self.assertTrue(_is_whole_book_dir("vol_01_Whole_book"))
         self.assertFalse(_is_whole_book_dir("vol_01_The_Lock"))
 
     def test_find_uses_whole_book_token_only(self):

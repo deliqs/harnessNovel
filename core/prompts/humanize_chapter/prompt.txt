@@ -11,7 +11,7 @@ Write the entire response in English. Do not use Chinese except in proper nouns 
 3. Do not change core events, event order, character relationships, win/loss results, foreshadowing, chapter-end hooks, system rules, or any numbers.
 4. Do not add important characters, settings, items, abilities, clues, side lines, or psychological motives that cannot be inferred from the source.
 5. Keep the original genre, point of view, person, narrative distance, payoff positions, authorial voice, and characters’ speech habits.
-6. Keep total word count within 95% to 110% of the source. Do not compress it into a synopsis, and do not pad by repeating information.
+6. Keep total word count within 90% to 115% of the source. Do not compress it into a synopsis, and do not pad by repeating information.
 7. Do not use em-dash characters; do not use Markdown marks as headings or lists.
 
 【Current work’s generation guide】
@@ -202,7 +202,7 @@ Check item by item, then output. Do not show the check process:
 4. Whether important information, verbal tics, stuttering, or character motives not in the source were added.
 5. Whether there are broken inversions, deliberate typos, grammar errors, or consecutive ultra-long comma sentences.
 6. Whether there are still consecutive template sentences, repeated emotion explanations, dense metaphors, and aphoristic endings.
-7. Whether word count is within 95% to 110% of the source.
+7. Whether word count is within 90% to 115% of the source.
 8. Whether modal particles, speculative words, core nouns, concrete objects, and distinctive images already in the source were wrongly deleted or swapped.
 9. Whether there is register downgrade, a character knowing beyond their knowledge, exact timing without basis, or repeated perception.
 10. Randomly sample three changes: if the new sentence is only prettier than the original, and not more accurate or more natural, restore the original sentence.

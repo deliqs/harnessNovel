@@ -17,13 +17,14 @@ Especially: do not use binary contrast formulas (such as "not A, but B", "not X,
 [END UNTRUSTED WORKSPACE DATA: DRAFTING CONTEXT]
 
 【This writing range】
-Write the prose for Chapter {start_chapter}. Target about 900-1200 English words; do not exceed about 1400 words.
+Write the prose for Chapter {start_chapter}. Target about {min_words}-{max_words} English words; do not exceed about {max_words} words.
 
 【Length and density constraints (hard)】
-1. Target around 900-1200 words. Prefer a tight cut over padding. Visible text after whitespace is removed that exceeds about 1400 words is a fail.
+1. Target around {min_words}-{max_words} words; the chapter may run up to about {max_words} words when the scene needs it. Prefer depth, detail and intensity over padding. Visible text after whitespace is removed that exceeds about {max_words} words is a fail.
 2. Meaningless padding is forbidden: do not re-render the same emotion or scene, do not write empty lyricism, do not stack parallelisms, do not over-lay environment and psychology.
-3. Information density must be high: every paragraph must advance events, character action, conflict, or key information; cut all redundant description that does not advance the plot.
-4. Write strictly by the outline's event flow. Do not expand, water, or add extra business for content the outline does not have.
+3. Depth is encouraged: render the outline's beats fully with sustained sensory and physical detail, slow real-time rendering of key beats (especially intimate, growth, or tension scenes), interiority, and concrete scene-specific description.
+4. Information density must still be high: every paragraph must advance events, character action, conflict, key information, or emotion; cut redundant description that advances nothing.
+5. Write strictly by the outline's event flow. Do not expand, water, or add extra business for content the outline does not have; depth means rendering its beats fully, not adding new plot.
 
 【Output format requirements】
 1. The first line outputs the chapter name, in the form: Chapter {start_chapter}: <title>.

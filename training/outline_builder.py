@@ -352,7 +352,7 @@ def _vol_dir_name(vol_idx, title):
 
 
 def _is_whole_book_dir(name):
-    return bool(VOL_DIR_RE.match(name or "")) and "whole_book" in name
+    return bool(VOL_DIR_RE.match(name or "")) and "whole_book" in (name or "").lower()
 
 
 def _whole_book_dir_name():

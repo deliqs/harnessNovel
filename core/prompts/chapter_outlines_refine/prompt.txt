@@ -34,7 +34,7 @@ Emotional tone:
 Rhythm breakdown:
 
 # Chapter summary
-About 220-280 English words. Use descriptive language to summarize cause, character actions, conflict advance, key information, and ending hook. Do not write character dialogue, direct quotes, quoted lines, back-and-forth speech, or scene performance in prose style.
+A deep scene-level digest of about 900-1400 English words, written as short beat-by-beat paragraphs (one paragraph per beat). Use descriptive language to cover cause, character actions, conflict advance, key information, and ending hook, with body-level sensory detail and each present character's interiority (marked with explicit POV parentheticals). Include short quoted lines only where the exact wording carries a beat.
 
 Do not output extra sections such as highlights, core content, plot points, foreshadowing and information gaps, chapter-end hooks, or mechanics-event drafts. Even if the original outline used the old four-part structure, you must convert it to the three-part structure above.
 

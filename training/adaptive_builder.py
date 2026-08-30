@@ -42,11 +42,13 @@ from training.artifact_provenance import (
     write_artifact,
 )
 from training.generation_quality import (
+    chapter_word_bounds,
     diagnose_chapter,
     diagnose_chapter_outline,
     diagnose_rewrite,
     diagnose_story_arc,
     extract_critical_anchors,
+    split_outline_anchors,
 )
 from training.story_context import (
     build_story_context,
@@ -5811,6 +5813,10 @@ def _humanize_chapter_text(
     return candidate
 
 
+def _is_numeric_anchor(s):
+    return bool(re.fullmatch(r"\d+(?:\.\d+)?(?:%|st|nd|rd|th)?", s, re.I))
+
+
 def gen_serial_chapters(
     ws,
     volume=1,
@@ -6079,12 +6085,15 @@ def gen_serial_chapters(
               "do not copy prior prose; silently check every hard forbidden rule before output."
         )
 
+        draft_min_words, draft_max_words = chapter_word_bounds()
         prompt = PromptLoader.load(
             "adaptive_drafting",
             context=context,
             start_chapter=ch_num,
             end_chapter=ch_num,
             chapter_count=1,
+            min_words=draft_min_words,
+            max_words=draft_max_words,
         )
         while True:
             try:
@@ -6114,12 +6123,25 @@ def gen_serial_chapters(
                 print(f"  Warning: chapter {ch_num} humanize got no model output; not written. You can retry.")
                 continue
         reference_text = _reference_text_for_chapter(ws, volume, ch_num)
+        outline_anchors = extract_critical_anchors(chapter_outline)
+        core_name_anchors, numeric_anchors, other_anchors = split_outline_anchors(outline_anchors)
         draft_diagnostics = diagnose_chapter(
             result, ch_num,
-            required_anchors=extract_critical_anchors(chapter_outline),
+            # Empty required_anchors would re-extract numbers from outline/canon.
+            required_anchors=core_name_anchors if core_name_anchors else [""],
             outline_text=chapter_outline, canon_text=canonical_context,
             reference_text=reference_text,
         )
+        folded_draft = str(result).casefold()
+        missing_non_core = [
+            anchor for anchor in numeric_anchors + other_anchors
+            if str(anchor).casefold() not in folded_draft
+        ]
+        if missing_non_core:
+            draft_diagnostics["warnings"].append({
+                "code": "anchor_retention",
+                "reason": f"Missing non-core outline anchors (not fatal): {', '.join(missing_non_core)}",
+            })
         draft_diagnostics["operation"] = "draft_generation"
         _write_json_file(
             _chapter_quality_diagnostics_path(ws, volume, ch_num, "draft"),
