@@ -601,6 +601,8 @@ class WorkspaceStore:
             path.relative_to(base)
         except ValueError as exc:
             raise ValueError("File path is outside the current workspace.") from exc
+        if any(part.startswith(".") for part in path.relative_to(base).parts):
+            raise ValueError("Invalid file path.")
         return path
 
     @staticmethod

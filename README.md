@@ -16,7 +16,7 @@
 
 <div align="center">
 
-[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-green.svg)](LICENSE)
 
 </div>
@@ -148,7 +148,7 @@ Supports Claude, GPT-4o, DeepSeek, Qwen, and other mainstream models.
 
 ## Requirements
 
-- Python 3.9+
+- Python 3.10+
 - LLM API: must support an OpenAI-compatible interface, such as DeepSeek, Zhipu GLM, Kimi, etc.
 
 ## Installation

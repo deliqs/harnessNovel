@@ -1,0 +1,28 @@
+data: {"type":"RUN_STARTED","timestamp":1790441807154,"threadId":"t4-b9f81f","runId":"run-897d5410"}
+
+data: {"type":"TOOL_CALL_RESULT","timestamp":1790441807156,"messageId":"738f35c2-1a20-42fb-9e1c-4d30d6135380","toolCallId":"call_ba38f681cdc19bf4bf8c703a","content":"Deleted drafts/old-ch03.md.","role":"tool"}
+
+data: {"type":"TEXT_MESSAGE_START","timestamp":1790441807330,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807330,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"Deleted"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807362,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":" drafts"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807392,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"/"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807421,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"old"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807452,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"-ch"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807482,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"0"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807511,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"3"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807540,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":".md"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","timestamp":1790441807569,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808","delta":"."}
+
+data: {"type":"TEXT_MESSAGE_END","timestamp":1790441807596,"messageId":"8acaa720-f07b-4760-a6eb-b171ea58f808"}
+
+data: {"type":"RUN_FINISHED","timestamp":1790441807598,"threadId":"t4-b9f81f","runId":"run-897d5410","outcome":{"type":"success"}}
+

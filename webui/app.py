@@ -26,6 +26,8 @@ from webui.arc_chat import ArcsChatManager
 from webui.chapter_chat import ChapterOutlineChatManager
 from webui.draft_chat import DraftChatManager
 from webui.world_chat import WorldChatManager
+from webui.orchestrator.routes import router as orchestrator_router
+from webui.orchestrator.runs import OrchestratorRuns
 from core.config import write_private_text
 from core.workspace import init_workspace
 
@@ -198,11 +200,14 @@ class WebRuntime:
         self.chapters_chat = ChapterOutlineChatManager(root)
         self.draft_chat = DraftChatManager(root)
         self.world_chat = WorldChatManager(root)
+        self.orchestrator = OrchestratorRuns(self.store)
         self._persist_root()
 
     def set_workspace_root(self, root: str) -> None:
         if any(task["status"] in {"queued", "running"} for task in self.tasks.list()):
             raise ValueError("A task is running. Finish it before changing the workspace root.")
+        if self.orchestrator.any_running():
+            raise ValueError("A chat is still answering. Wait for it before changing the workspace root.")
         self.store.set_root(root)
         os.environ["HARNESS_NOVEL_HOME"] = str(self.store.root)
         self.design_chat.root = Path(root)
@@ -210,6 +215,7 @@ class WebRuntime:
         self.chapters_chat.root = Path(root)
         self.draft_chat.root = Path(root)
         self.world_chat.root = Path(root)
+        self.orchestrator.forget_all()
         self._persist_root()
 
     def _persist_root(self) -> None:
@@ -263,12 +269,15 @@ class WebRuntime:
         managers = (self.design_chat, self.arcs_chat, self.chapters_chat, self.draft_chat, self.world_chat)
         if any(self._chat_manager_busy(manager, name) for manager in managers):
             raise ValueError("This workspace still has a content-generation task. Stop it before deleting.")
+        if self.orchestrator.workspace_running(name):
+            raise ValueError("This workspace still has a chat answering. Wait for it before deleting.")
         self.tasks.begin_workspace_delete(name)
         try:
             result = self.store.delete_workspace(name)
             task_result = self.tasks.delete_workspace_records(name)
             for manager in managers:
                 self._forget_chat_workspace(manager, name)
+            self.orchestrator.forget_workspace(name)
             return {**result, **task_result}
         finally:
             self.tasks.end_workspace_delete(name)
@@ -282,6 +291,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     runtime = WebRuntime(workspace_root)
     app = FastAPI(title="HarnessNovel Web", version="1.0.0", docs_url=None, redoc_url=None)
     app.state.runtime = runtime
+    app.include_router(orchestrator_router)
     static_dir = Path(__file__).resolve().parent / "static"
 
     @app.middleware("http")

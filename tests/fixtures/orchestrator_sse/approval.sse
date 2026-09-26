@@ -1,0 +1,14 @@
+data: {"type":"RUN_STARTED","timestamp":1790441804603,"threadId":"t4-b9f81f","runId":"run-26f84ca1"}
+
+data: {"type":"TEXT_MESSAGE_START","timestamp":1790441807141,"messageId":"54a217d4-dc7c-49e9-8115-09f8d1308c0a","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_END","timestamp":1790441807141,"messageId":"54a217d4-dc7c-49e9-8115-09f8d1308c0a"}
+
+data: {"type":"TOOL_CALL_START","timestamp":1790441807141,"toolCallId":"call_ba38f681cdc19bf4bf8c703a","toolCallName":"delete_draft","parentMessageId":"54a217d4-dc7c-49e9-8115-09f8d1308c0a"}
+
+data: {"type":"TOOL_CALL_ARGS","timestamp":1790441807141,"toolCallId":"call_ba38f681cdc19bf4bf8c703a","delta":"{\"path\": \"drafts/old-ch03.md\"}"}
+
+data: {"type":"TOOL_CALL_END","timestamp":1790441807142,"toolCallId":"call_ba38f681cdc19bf4bf8c703a"}
+
+data: {"type":"RUN_FINISHED","timestamp":1790441807143,"threadId":"t4-b9f81f","runId":"run-26f84ca1","outcome":{"type":"interrupt","interrupts":[{"id":"int-call_ba38f681cdc19bf4bf8c703a","reason":"tool_call","message":"Approve delete_draft({\"path\": \"drafts/old-ch03.md\"})?","toolCallId":"call_ba38f681cdc19bf4bf8c703a","responseSchema":{"properties":{"approved":{"type":"boolean"},"editedArgs":{"type":"object"},"reason":{"type":"string"}},"required":["approved"],"type":"object"}}]}}
+

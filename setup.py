@@ -28,6 +28,9 @@ setup(
         "fastapi>=0.110",
         "uvicorn>=0.27",
         "python-multipart>=0.0.9",
+        "pydantic-ai-slim[openai,ag-ui]>=2.51,<2.52",
+        "pydantic-ai-harness>=0.36,<0.37",
+        "ag-ui-protocol>=0.1.22,<1",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.10",
 )

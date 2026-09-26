@@ -1,0 +1,14 @@
+data: {"type":"RUN_STARTED","timestamp":1790441807608,"threadId":"t4d-d1b966","runId":"run-7e0d2e3b"}
+
+data: {"type":"TEXT_MESSAGE_START","timestamp":1790441810189,"messageId":"d9f48a48-62e1-4134-9890-561f0d4afbf2","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_END","timestamp":1790441810189,"messageId":"d9f48a48-62e1-4134-9890-561f0d4afbf2"}
+
+data: {"type":"TOOL_CALL_START","timestamp":1790441810189,"toolCallId":"call_216e7bb97001e75a22dcda66","toolCallName":"delete_draft","parentMessageId":"d9f48a48-62e1-4134-9890-561f0d4afbf2"}
+
+data: {"type":"TOOL_CALL_ARGS","timestamp":1790441810189,"toolCallId":"call_216e7bb97001e75a22dcda66","delta":"{\"path\": \"notes/outline.md\"}"}
+
+data: {"type":"TOOL_CALL_END","timestamp":1790441810189,"toolCallId":"call_216e7bb97001e75a22dcda66"}
+
+data: {"type":"RUN_FINISHED","timestamp":1790441810191,"threadId":"t4d-d1b966","runId":"run-7e0d2e3b","outcome":{"type":"interrupt","interrupts":[{"id":"int-call_216e7bb97001e75a22dcda66","reason":"tool_call","message":"Approve delete_draft({\"path\": \"notes/outline.md\"})?","toolCallId":"call_216e7bb97001e75a22dcda66","responseSchema":{"properties":{"approved":{"type":"boolean"},"editedArgs":{"type":"object"},"reason":{"type":"string"}},"required":["approved"],"type":"object"}}]}}
+

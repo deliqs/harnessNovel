@@ -87,6 +87,7 @@ function renderWorldChat(conversation, job) {
   $("#upload-world-guide")?.addEventListener("click", () => $("#world-guide-file")?.click());
   $("#world-guide-file")?.addEventListener("change", saveWorldGuide);
   $("#reset-world-guide")?.addEventListener("click", resetWorldGuide);
+  mountPhaseChat(host, "world");
 }
 
 async function loadWorldChat() {

@@ -210,7 +210,7 @@ function renderInlineMarkdown(value) {
   rendered = rendered.replace(/(\*\*|__)(.+?)\1/g, "<strong>$2</strong>");
   rendered = rendered.replace(/~~(.+?)~~/g, "<del>$1</del>");
   rendered = rendered.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
-  rendered = rendered.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1<em>$2</em>");
+  rendered = rendered.replace(/(^|\W)_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>");
   return rendered.replace(/@@CODE_(\d+)@@/g, (_, index) => codeTokens[Number(index)] || "");
 }
 
@@ -524,6 +524,7 @@ function renderArcsChat(volume, conversation, job = null) {
       showToast("Reset. The next message will generate again.");
     } catch (error) { showToast(error.message || "Could not reset.", true); }
   });
+  mountPhaseChat(node, "arcs");
 }
 
 async function loadArcsChat(volume) {
@@ -786,6 +787,7 @@ function renderChaptersChat(volume, arcIdx, conversation, job = null) {
       showToast("Reset. The next message will generate again.");
     } catch (error) { showToast(error.message || "Could not reset.", true); }
   });
+  mountPhaseChat(node, "chapters");
 }
 
 async function loadChaptersChat(volume, arcIdx) {
@@ -968,6 +970,7 @@ function renderDraftChat(volume, arcIdx, conversation, job = null) {
     }
   });
   $$("[data-artifact-path]").forEach((button) => button.addEventListener("click", () => openReviewFile(button.dataset.artifactPath)));
+  mountPhaseChat(host, "draft");
 }
 
 let draftJobPollTimer = null;
@@ -1200,6 +1203,7 @@ function renderDesignChat(scope, conversation, job = null, lenses = null) {
       showToast("Reset. The next message will generate a first draft again.");
     } catch (error) { showToast(error.message || "Could not reset.", true); }
   });
+  mountPhaseChat(node, scope === "concept" ? "design" : "stage");
 }
 
 async function loadDesignChat(scope) {
@@ -2844,6 +2848,7 @@ async function deleteCurrentWorkspace() {
 
 async function selectWorkspace(name) {
   wizardState.workspace = name || null;
+  closeOtherPhaseChats(wizardState.workspace);
   wizardState.confirmed = new Set();
   wizardState.activeTaskId = null;
   wizardState.logOffset = 0;

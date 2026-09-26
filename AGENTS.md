@@ -13,7 +13,7 @@ Read `README.md` when changing user-visible workflow or CLI behavior. More speci
 
 ## Compatibility and data contracts
 
-- Support Python 3.9 and later. Match the style and typing level of the module being changed; do not introduce a repository-wide typing or `pathlib` conversion as a side effect.
+- Support Python 3.10 and later. Match the style and typing level of the module being changed; do not introduce a repository-wide typing or `pathlib` conversion as a side effect.
 - Treat CLI commands and flags, Web API payloads, workspace layout, artifact filenames, Markdown headings, JSON fields, and checkpoint files as compatibility surfaces.
 - English is the only stored form for our generated story, chapter, and world-knowledge headings and filenames. User-import parsers may match CJK in imported reference novels via unicode escapes, never hanzi literals. Do not keep Chinese aliases for generated files.
 - `Stage` identifies the current volume-sized story unit. `Phase` identifies a structural subdivision inside a design. Do not make their parsers or headings interchangeable.
@@ -31,7 +31,7 @@ Read `README.md` when changing user-visible workflow or CLI behavior. More speci
 - Treat every checkout as shared. Keep diffs focused, preserve unrelated changes, and ask before reverting, deleting, or cleaning unexpected work. Avoid broad reformatting, especially in the large pipeline modules.
 - Preserve comments unless they are demonstrably false. Keep comments and names evergreen; avoid labels such as `New`, `Improved`, `Enhanced`, or `V2`.
 - Verify drift-prone facts against current primary sources when the answer depends on them, and state remaining uncertainty plainly.
-- There is no configured formatter, linter, type checker, or JavaScript package manager. Offline CI is `.github/workflows/ci.yml` (unittest, compileall, and CLI help on Python 3.9 and 3.12). Do not invent extra mandatory checks; follow surrounding formatting.
+- There is no configured formatter, linter, type checker, or JavaScript package manager. Offline CI is `.github/workflows/ci.yml` (unittest, compileall, and CLI help on Python 3.10 and 3.12). Do not invent extra mandatory checks; follow surrounding formatting.
 - Never commit API keys or tokens. Keep configuration-key changes synchronized across `core/config.py`, `.env.example`, the Web configuration UI, and `README.md` where applicable.
 - Do not add generated-agent footers or co-author trailers to commits or pull requests.
 - Unit tests must remain offline. Mock or fake LLM calls; do not invoke paid/live generation to validate a code change unless explicitly requested.

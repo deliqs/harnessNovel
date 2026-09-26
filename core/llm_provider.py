@@ -3,6 +3,7 @@ import threading
 from urllib.parse import urlsplit, urlunsplit
 
 from openai import OpenAI, Timeout
+from core.model_gate import model_gate
 from core.text_utils import normalize_text
 from core.prompt_trace import record_prompt, redact_sensitive_text
 
@@ -171,6 +172,8 @@ class LLMProvider:
             print("[LLMProvider] api_key is not configured; cannot call the model, returning empty content.")
             return ""
 
+        # An active orchestrator chat run goes first on the shared model.
+        model_gate.wait_until_free()
         print(f"[LLMProvider] Calling model {self.model} ...")
         kwargs = self._completion_kwargs(prompt, temperature, is_json, max_tokens)
 
@@ -211,7 +214,8 @@ class LLMProvider:
         if not self.api_key:
             return ""
         for attempt in range(max_retries + 1):
-            if cancel_event is not None and cancel_event.is_set():
+            # Waits while an orchestrator chat run goes first; a set cancel_event ends the wait.
+            if not model_gate.wait_until_free(cancel_event):
                 raise LLMCallCancelled("Model request cancelled")
             done = threading.Event()
             outcome = {}

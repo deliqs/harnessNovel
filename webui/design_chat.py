@@ -24,6 +24,8 @@ from core.prompt_trace import capture_prompts
 _EXTEND_KEYWORDS = (
     "extend", "continue", "add stage", "append stage", "next stage", "new stage",
 )
+# Explicit chat modes a caller may pass instead of relying on routing and keywords.
+_CHAT_MODES = ("chat", "extend", "question", "critique")
 PHASE_HEADING_RE = re.compile(
     r"^#{1,6}\s*phase\s*0*(\d+)\b[^\n]*",
     re.IGNORECASE | re.MULTILINE,
@@ -202,6 +204,25 @@ def _is_extend_intent(message: str) -> bool:
     return any(kw in message for kw in _EXTEND_KEYWORDS)
 
 
+def _wants_extend(mode, message: str) -> bool:
+    """An explicit chat mode decides extend vs refine; without one, fall back to the keyword heuristic."""
+    if mode is not None:
+        return mode == "extend"
+    return _is_extend_intent(message)
+
+
+def _check_chat_mode(scope: str, mode, is_initial: bool) -> None:
+    """Reject explicit chat modes that have no path for this scope or design state."""
+    if mode is None:
+        return
+    if mode not in _CHAT_MODES:
+        raise ValueError("Design chat mode must be chat, extend, question or critique.")
+    if mode == "extend" and scope != "stage":
+        raise ValueError("Only the stage design can be extended.")
+    if mode != "chat" and is_initial:
+        raise ValueError("There is no design yet. Generate it first with a chat message.")
+
+
 def _job_completion_message(scope: str, mode: str, stopped: bool) -> str:
     if mode == "answer":
         return "Question answered"
@@ -245,7 +266,7 @@ class DesignChatManager:
         self, workspace: str, scope: str, message: str, attachments=None,
         use_new_reference=False, sync_updated_design=False,
         progress_callback=None, pause_event=None, stop_event=None,
-        cancel_event=None,
+        cancel_event=None, chat_mode=None,
     ) -> dict[str, Any]:
         """Unified chat entry: the first message generates the first draft; later messages refine it.
 
@@ -287,6 +308,7 @@ class DesignChatManager:
             sync_updated_design=sync_updated_design,
             progress_callback=progress_callback,
             stop_event=stop_event,
+            chat_mode=chat_mode,
         )
         if extra_instruction:
             combined_for_llm = combined_for_llm + "\n\n" + extra_instruction
@@ -358,7 +380,7 @@ class DesignChatManager:
         is_initial = not _design_files_exist(ws, scope)
         is_concept_stage_sync = scope == "concept" and not is_initial and bool(use_new_reference)
         is_sync_extend = scope == "stage" and not is_initial and bool(sync_updated_design)
-        is_extend = scope == "stage" and not is_initial and _is_extend_intent(combined_for_llm)
+        is_extend = scope == "stage" and not is_initial and _wants_extend(chat_mode, combined_for_llm)
         if is_initial:
             if scope == "concept":
                 result = gen_design_concept(
@@ -433,16 +455,22 @@ class DesignChatManager:
     def _answer_if_question(
         self, ws, conv, scope, combined_for_llm,
         use_new_reference=False, sync_updated_design=False,
-        progress_callback=None, stop_event=None,
+        progress_callback=None, stop_event=None, chat_mode=None,
     ):
-        """Route an existing-design message: answer, critique, or inject saved points."""
+        """Route an existing-design message: answer, critique, or inject saved points.
+
+        An explicit `chat_mode` of question or critique takes that path directly. Chat or extend
+        still asks the router for saved critique points, but never diverts to answer or critique.
+        """
         if use_new_reference or sync_updated_design:
             return None, ""
+        if chat_mode in {"question", "critique"}:
+            return self._answer_for_mode(ws, conv, scope, combined_for_llm, chat_mode, progress_callback, stop_event), ""
         from training.design_question import design_context, route_design_request
         if not design_context(ws, scope):
             return None, ""
         request = route_design_request(ws, scope, combined_for_llm)
-        mode = request.get("mode")
+        mode = request.get("mode") if chat_mode is None else "change"
         if mode == "question":
             return self._complete_design_answer(
                 ws, conv, scope, combined_for_llm, progress_callback,
@@ -452,6 +480,13 @@ class DesignChatManager:
                 ws, conv, scope, combined_for_llm, progress_callback, stop_event,
             ), ""
         return None, _points_instruction_text(ws, scope, request.get("points") or [])
+
+    def _answer_for_mode(self, ws, conv, scope, combined_for_llm, mode, progress_callback, stop_event):
+        if mode == "question":
+            return self._complete_design_answer(ws, conv, scope, combined_for_llm, progress_callback)
+        return self._complete_design_critique(
+            ws, conv, scope, combined_for_llm, progress_callback, stop_event,
+        )
 
     def _complete_design_answer(self, ws, conv, scope, combined_for_llm, progress_callback):
         from training.design_question import answer_design_question
@@ -502,7 +537,7 @@ class DesignChatManager:
 
     def start_message(
         self, workspace: str, scope: str, message: str, attachments=None,
-        use_new_reference=False, sync_updated_design=False,
+        use_new_reference=False, sync_updated_design=False, chat_mode=None,
     ) -> dict[str, Any]:
         """Run design chat in the background so the UI can poll three-step book-design progress."""
         if scope not in _SCOPE_FILES:
@@ -510,6 +545,7 @@ class DesignChatManager:
         key = (workspace, scope)
         ws = init_workspace(workspace)
         is_initial = not _design_files_exist(ws, scope)
+        _check_chat_mode(scope, chat_mode, is_initial)
         total = 3 if scope == "concept" and is_initial else 1
         with self._jobs_lock:
             current = self._jobs.get(key)
@@ -574,6 +610,7 @@ class DesignChatManager:
                     pause_event=pause_event,
                     stop_event=stop_event,
                     cancel_event=cancel_event,
+                    chat_mode=chat_mode,
                 )
                 with self._jobs_lock:
                     active = self._jobs.get(key)
