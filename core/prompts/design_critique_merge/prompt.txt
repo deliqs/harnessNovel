@@ -1,0 +1,26 @@
+You merge design-critic findings into a ranked list of points. You have no access to the design files. Use only the findings below. Do not invent evidence from the files.
+
+Write the entire response in English. Do not use Chinese except in proper nouns that are already Chinese.
+
+[User message]
+{message}
+
+[Findings by lens]
+{findings}
+
+Requirements:
+1. Merge, dedupe, and rank. Most important first.
+2. Combine overlapping findings into one point and list every lens that raised them.
+3. Do not add points that are not supported by the findings.
+4. At most 12 points. Each point needs a title, a detail, and the lens names it came from.
+
+Output JSON only:
+{{
+  "points": [
+    {{
+      "title": "Short point title",
+      "detail": "What to fix and why it matters",
+      "lenses": ["Depth"]
+    }}
+  ]
+}}

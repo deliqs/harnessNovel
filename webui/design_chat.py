@@ -202,6 +202,32 @@ def _is_extend_intent(message: str) -> bool:
     return any(kw in message for kw in _EXTEND_KEYWORDS)
 
 
+def _job_completion_message(scope: str, mode: str, stopped: bool) -> str:
+    if mode == "answer":
+        return "Question answered"
+    if mode == "critique":
+        return "Critique ready"
+    if stopped:
+        return "This stage-design round has ended"
+    if scope == "concept":
+        return "Book design generated"
+    return "Stage design generated"
+
+
+def _points_instruction_text(ws, scope, points) -> str:
+    if not points:
+        return ""
+    from training.design_critique import points_instruction
+    info = points_instruction(ws, scope, points)
+    missing = info.get("missing") or []
+    if missing:
+        raise ValueError(
+            "Critique points %s are not available. Run a critique first."
+            % ", ".join(str(number) for number in missing)
+        )
+    return info.get("text") or ""
+
+
 class DesignChatManager:
     def __init__(self, workspace_root: Path):
         self.root = Path(workspace_root)
@@ -255,6 +281,17 @@ class DesignChatManager:
             raise ValueError("Enter inspiration or upload a file before sending.")
 
         conv.append_user(display_text)
+        answered, extra_instruction = self._answer_if_question(
+            ws, conv, scope, combined_for_llm,
+            use_new_reference=use_new_reference,
+            sync_updated_design=sync_updated_design,
+            progress_callback=progress_callback,
+            stop_event=stop_event,
+        )
+        if extra_instruction:
+            combined_for_llm = combined_for_llm + "\n\n" + extra_instruction
+        if answered is not None:
+            return answered
         from training.adaptive_builder import (
             gen_design_concept, gen_stage_design, refine_design_concept, refine_stage_design,
             extend_stage_design, sync_stage_outline_from_new_reference,
@@ -393,6 +430,76 @@ class DesignChatManager:
 
         return {"mode": mode, "result": result, "conversation": conv.history()}
 
+    def _answer_if_question(
+        self, ws, conv, scope, combined_for_llm,
+        use_new_reference=False, sync_updated_design=False,
+        progress_callback=None, stop_event=None,
+    ):
+        """Route an existing-design message: answer, critique, or inject saved points."""
+        if use_new_reference or sync_updated_design:
+            return None, ""
+        from training.design_question import design_context, route_design_request
+        if not design_context(ws, scope):
+            return None, ""
+        request = route_design_request(ws, scope, combined_for_llm)
+        mode = request.get("mode")
+        if mode == "question":
+            return self._complete_design_answer(
+                ws, conv, scope, combined_for_llm, progress_callback,
+            ), ""
+        if mode == "critique":
+            return self._complete_design_critique(
+                ws, conv, scope, combined_for_llm, progress_callback, stop_event,
+            ), ""
+        return None, _points_instruction_text(ws, scope, request.get("points") or [])
+
+    def _complete_design_answer(self, ws, conv, scope, combined_for_llm, progress_callback):
+        from training.design_question import answer_design_question
+        if progress_callback:
+            progress_callback("answering", 0, 1, "Answering")
+        recent = [
+            {"role": turn.get("role"), "content": turn.get("content")}
+            for turn in conv.turns[:-1][-6:]
+            if isinstance(turn, dict)
+        ]
+        answer = answer_design_question(ws, scope, combined_for_llm, recent)
+        conv.append_assistant(answer)
+        conv.save()
+        if progress_callback:
+            progress_callback("completed", 1, 1, "Question answered")
+        return {"mode": "answer", "result": {"answer": answer}, "conversation": conv.history()}
+
+    def _complete_design_critique(
+        self, ws, conv, scope, combined_for_llm, progress_callback, stop_event,
+    ):
+        from training.design_critique import run_critique
+        result = run_critique(
+            ws, scope, combined_for_llm,
+            progress_callback=progress_callback, stop_event=stop_event,
+        )
+        if result.get("stopped"):
+            conv.append_assistant("Critique stopped.")
+            conv.save()
+            return {
+                "mode": "critique",
+                "result": {
+                    "points": result.get("points") or [],
+                    "failed_lenses": result.get("failed_lenses") or [],
+                    "stopped": True,
+                },
+                "conversation": conv.history(),
+            }
+        conv.append_assistant(result.get("answer_md") or "")
+        conv.save()
+        return {
+            "mode": "critique",
+            "result": {
+                "points": result.get("points") or [],
+                "failed_lenses": result.get("failed_lenses") or [],
+            },
+            "conversation": conv.history(),
+        }
+
     def start_message(
         self, workspace: str, scope: str, message: str, attachments=None,
         use_new_reference=False, sync_updated_design=False,
@@ -472,6 +579,7 @@ class DesignChatManager:
                     active = self._jobs.get(key)
                     if active and active.get("id") == job["id"]:
                         stopped = bool((response.get("result") or {}).get("stopped"))
+                        mode = response.get("mode")
                         active.update(
                             status="stopped" if stopped else "completed",
                             phase="stopped" if stopped else "completed",
@@ -479,11 +587,8 @@ class DesignChatManager:
                                 active.get("completed", 0) if stopped
                                 else active.get("total", total)
                             ),
-                            message=(
-                                "This stage-design round has ended" if stopped else
-                                "Book design generated" if scope == "concept" else "Stage design generated"
-                            ),
-                            result={"mode": response.get("mode")},
+                            message=_job_completion_message(scope, mode, stopped),
+                            result={"mode": mode},
                         )
             except Exception as exc:
                 with self._jobs_lock:
@@ -493,6 +598,10 @@ class DesignChatManager:
                             status="failed", phase="failed",
                             message="Generation failed", error=str(exc),
                         )
+                # Keep the failure in the chat so the message is not left unanswered.
+                conv = self.get(workspace, scope)
+                conv.append_assistant(f"Generation failed: {exc}")
+                conv.save()
             finally:
                 trace_context.__exit__(None, None, None)
 
@@ -591,6 +700,8 @@ class DesignChatManager:
                 for field in ("current_prompt_id", "prompt_model", "prompt_created_at"):
                     job.pop(field, None)
         ws = init_workspace(workspace)
+        from training.design_critique import clear_points
+        clear_points(ws, scope)
         for name in _SCOPE_FILES.get(scope, ()):
             try:
                 os.remove(os.path.join(_design_dir(ws), name))
@@ -623,3 +734,17 @@ class DesignChatManager:
         conv = self.get(workspace, scope)
         conv.clear()
         return {"cleared": True, "conversation": conv.history()}
+
+    def lens_status(self, workspace: str) -> dict[str, Any]:
+        from training.design_lenses import lens_file_status
+        return lens_file_status(init_workspace(workspace))
+
+    def save_lenses(self, workspace: str, content: str) -> dict[str, Any]:
+        from training.design_lenses import save_lens_file
+        save_lens_file(init_workspace(workspace), content)
+        return self.lens_status(workspace)
+
+    def reset_lenses(self, workspace: str) -> dict[str, Any]:
+        from training.design_lenses import reset_lens_file
+        reset_lens_file(init_workspace(workspace))
+        return self.lens_status(workspace)

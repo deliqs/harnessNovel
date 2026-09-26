@@ -970,6 +970,32 @@ def _load_existing_source_sections(ws, records):
 
 # ── final merge and audit ──
 
+def _chat_edited_backup_dir(ws):
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    worlds = _worlds_dir(ws)
+    backup_dir = os.path.join(worlds, f"_final_backup_{stamp}")
+    suffix = 2
+    while os.path.exists(backup_dir):
+        backup_dir = os.path.join(worlds, f"_final_backup_{stamp}_{suffix}")
+        suffix += 1
+    return backup_dir
+
+
+def _backup_chat_edited_final(ws):
+    if not get_chat_edited(ws):
+        return
+    final_dir = _final_world_dir(ws)
+    if os.path.isdir(final_dir):
+        backup_dir = _chat_edited_backup_dir(ws)
+        shutil.copytree(final_dir, backup_dir)
+        print(f"  -> Chat-edited knowledge base backed up to: {backup_dir}")
+
+
+def _clear_chat_edited(ws):
+    if get_chat_edited(ws):
+        set_chat_edited(ws, False)
+
+
 def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=None):
     if not source_items:
         return None
@@ -1015,6 +1041,8 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
         print(f"Target-world sectioned knowledge base already exists: {_final_world_dir(ws)}")
         print("Use --force to rebuild the summary.")
         return _final_world_dir(ws)
+
+    _backup_chat_edited_final(ws)
 
     primary_paths = [
         (section_name, primary_item["sections"][section_name])
@@ -1077,6 +1105,8 @@ def _integrate_final_sections(ws, source_items, llm, force=False, max_workers=No
                 )
             previous_checkpoint = checkpoint_path
         _write_sections_to_final(ws, _split_sections_from_document(current_summary))
+
+    _clear_chat_edited(ws)
 
     legacy_path = os.path.join(_world_root(ws), "world_knowledge.md")
     if os.path.exists(legacy_path):
@@ -1282,6 +1312,7 @@ def world_knowledge_status(ws):
         "source_count": source_count,
         "final_section_count": final_section_count,
         "ready": final_section_count == len(WORLD_SECTIONS),
+        "chat_edited": bool(manifest.get("chat_edited", False)),
     }
 
 
@@ -1296,3 +1327,41 @@ def set_world_knowledge_enabled(ws, enabled: bool) -> bool:
 def is_world_knowledge_enabled(ws) -> bool:
     """Read the knowledge-base enabled state."""
     return bool(_load_manifest(ws).get("enabled", True))
+
+
+def read_final_section(ws, section_name):
+    """Return the current final section document, or a None placeholder if missing."""
+    path = _final_section_path(ws, section_name)
+    if not os.path.exists(path):
+        return f"# {section_name}\n\nNone"
+    return _read_file(path)
+
+
+def write_selected_final_sections(ws, section_documents):
+    """Write named final sections only; create any missing other sections as None."""
+    directory = _final_world_dir(ws)
+    os.makedirs(directory, exist_ok=True)
+    written = {}
+    for section_name, content in (section_documents or {}).items():
+        if section_name not in SECTION_LOOKUP:
+            continue
+        output_path = _section_write_path(directory, section_name)
+        _write_file(output_path, content)
+        _remove_legacy_section_file(directory, section_name)
+        written[section_name] = output_path
+    for section_name, _ in WORLD_SECTIONS:
+        output_path = _section_write_path(directory, section_name)
+        if not os.path.exists(output_path):
+            _write_file(output_path, f"# {section_name}\n\nNone")
+    return written
+
+
+def get_chat_edited(ws):
+    return bool(_load_manifest(ws).get("chat_edited", False))
+
+
+def set_chat_edited(ws, edited):
+    manifest = _load_manifest(ws)
+    manifest["chat_edited"] = bool(edited)
+    _save_manifest(ws, manifest)
+    return bool(edited)

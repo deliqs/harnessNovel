@@ -25,6 +25,7 @@ from webui.design_chat import DesignChatManager
 from webui.arc_chat import ArcsChatManager
 from webui.chapter_chat import ChapterOutlineChatManager
 from webui.draft_chat import DraftChatManager
+from webui.world_chat import WorldChatManager
 from core.config import write_private_text
 from core.workspace import init_workspace
 
@@ -196,6 +197,7 @@ class WebRuntime:
         self.arcs_chat = ArcsChatManager(root)
         self.chapters_chat = ChapterOutlineChatManager(root)
         self.draft_chat = DraftChatManager(root)
+        self.world_chat = WorldChatManager(root)
         self._persist_root()
 
     def set_workspace_root(self, root: str) -> None:
@@ -207,6 +209,7 @@ class WebRuntime:
         self.arcs_chat.root = Path(root)
         self.chapters_chat.root = Path(root)
         self.draft_chat.root = Path(root)
+        self.world_chat.root = Path(root)
         self._persist_root()
 
     def _persist_root(self) -> None:
@@ -242,9 +245,22 @@ class WebRuntime:
                 for key in keys:
                     values.pop(key, None)
 
+    def ensure_world_task_can_start(self, workspace: str) -> None:
+        workspace = require_workspace_name(workspace)
+        if self._chat_manager_busy(self.world_chat, workspace):
+            raise ValueError("This workspace still has a world-chat task. Stop the chat first.")
+
+    def ensure_world_chat_can_start(self, workspace: str) -> None:
+        workspace = require_workspace_name(workspace)
+        for task in self.tasks.list(workspace):
+            if task.get("type") in {"world_import", "world_build"} and task.get("status") in {"queued", "running"}:
+                raise ValueError(
+                    "This workspace is building the target-world knowledge base. Stop the build first."
+                )
+
     def delete_workspace(self, name: str) -> dict[str, Any]:
         name = require_workspace_name(name)
-        managers = (self.design_chat, self.arcs_chat, self.chapters_chat, self.draft_chat)
+        managers = (self.design_chat, self.arcs_chat, self.chapters_chat, self.draft_chat, self.world_chat)
         if any(self._chat_manager_busy(manager, name) for manager in managers):
             raise ValueError("This workspace still has a content-generation task. Stop it before deleting.")
         self.tasks.begin_workspace_delete(name)
@@ -413,6 +429,64 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             return {"ok": True, "enabled": final}
         except Exception as exc:
             raise _http_error(exc) from exc
+
+    @app.post("/api/workspaces/{name}/world-knowledge/chat")
+    def world_knowledge_chat(name: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
+        message = str(payload.get("message") or "").strip()
+        if not message:
+            raise _http_error(ValueError("Enter content before sending."))
+        try:
+            runtime.ensure_world_chat_can_start(name)
+            return runtime.world_chat.start_message(name, message)
+        except Exception as exc:
+            raise _http_error(exc) from exc
+
+    @app.get("/api/workspaces/{name}/world-knowledge/job")
+    def world_knowledge_job(name: str) -> dict[str, Any]:
+        return runtime.world_chat.job_status(name)
+
+    @app.get("/api/workspaces/{name}/world-knowledge/prompts")
+    def world_knowledge_prompts(name: str) -> dict[str, Any]:
+        return runtime.world_chat.prompts(name)
+
+    @app.post("/api/workspaces/{name}/world-knowledge/stop")
+    def world_knowledge_stop(name: str) -> dict[str, Any]:
+        try:
+            return runtime.world_chat.stop(name)
+        except Exception as exc:
+            raise _http_error(exc) from exc
+
+    @app.get("/api/workspaces/{name}/world-knowledge/conversation")
+    def world_knowledge_conversation(name: str) -> dict[str, Any]:
+        try:
+            return runtime.world_chat.history(name)
+        except Exception as exc:
+            raise _http_error(exc) from exc
+
+    @app.delete("/api/workspaces/{name}/world-knowledge/conversation")
+    def world_knowledge_conversation_clear(name: str) -> dict[str, Any]:
+        try:
+            return runtime.world_chat.clear(name)
+        except Exception as exc:
+            raise _http_error(exc) from exc
+
+    @app.get("/api/workspaces/{name}/world-knowledge/guide")
+    def world_knowledge_guide_status(name: str) -> dict[str, Any]:
+        return runtime.world_chat.guide_status(name)
+
+    @app.post("/api/workspaces/{name}/world-knowledge/guide")
+    def world_knowledge_guide_save(name: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
+        try:
+            upload_id = str(payload.get("upload_id") or "")
+            source = runtime.uploads.resolve(upload_id)
+            content = Path(source).read_text(encoding="utf-8")
+            return runtime.world_chat.save_guide(name, content)
+        except Exception as exc:
+            raise _http_error(exc) from exc
+
+    @app.delete("/api/workspaces/{name}/world-knowledge/guide")
+    def world_knowledge_guide_reset(name: str) -> dict[str, Any]:
+        return runtime.world_chat.reset_guide(name)
 
     @app.post("/api/workspaces/{name}/arcs/{volume}/chat")
     def arcs_chat(name: str, volume: int, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
@@ -651,6 +725,24 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
     def drafts_writing_guide_reset(name: str) -> dict[str, Any]:
         return runtime.draft_chat.reset_writing_guide(name)
 
+    @app.get("/api/workspaces/{name}/design/lenses")
+    def design_lenses_status(name: str) -> dict[str, Any]:
+        return runtime.design_chat.lens_status(name)
+
+    @app.post("/api/workspaces/{name}/design/lenses")
+    def design_lenses_save(name: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
+        try:
+            upload_id = str(payload.get("upload_id") or "")
+            source = runtime.uploads.resolve(upload_id)
+            content = Path(source).read_text(encoding="utf-8")
+            return runtime.design_chat.save_lenses(name, content)
+        except Exception as exc:
+            raise _http_error(exc) from exc
+
+    @app.delete("/api/workspaces/{name}/design/lenses")
+    def design_lenses_reset(name: str) -> dict[str, Any]:
+        return runtime.design_chat.reset_lenses(name)
+
     @app.post("/api/workspaces/{name}/design/{scope}/generate")
     def design_generate(name: str, scope: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         if scope not in {"concept", "stage"}:
@@ -795,6 +887,8 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
             args = payload.get("args") or {}
             if not isinstance(args, dict):
                 raise ValueError("Invalid task arguments.")
+            if task_type in {"world_import", "world_build"}:
+                runtime.ensure_world_task_can_start(workspace)
             task = runtime.tasks.create(task_type, workspace, args)
             return task.public()
         except ValueError as exc:

@@ -529,7 +529,7 @@ fieldset[hidden] { display: none; }
 
 .chat-panel { display: flex; flex-direction: column; height: 560px; max-height: 62vh; border: 1px solid #dde6e1; border-radius: 12px; background: #f7f9f8; overflow: hidden; }
 
-.chat-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
+.chat-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 20px; }
 .chat-scroll::-webkit-scrollbar { width: 6px; }
 .chat-scroll::-webkit-scrollbar-thumb { background: #cdd8d1; border-radius: 3px; }
 .chat-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -544,6 +544,7 @@ fieldset[hidden] { display: none; }
 .chat-message-content { min-width: 0; max-width: min(72%, 640px); display: flex; flex-direction: column; gap: 10px; }
 .chat-message.user .chat-message-body { display: inline-block; padding: 11px 15px; border-radius: 16px 16px 4px 16px; background: var(--primary); color: #fff; font-size: 13.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
 .chat-message.assistant .chat-message-body { padding: 0; color: #2f3d36; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+.chat-message.assistant .chat-message-body.chat-markdown { min-height: 0; max-height: none; padding: 0; overflow: visible; white-space: normal; }
 
 .chat-artifacts { display: flex; flex-wrap: wrap; gap: 8px; }
 .chat-artifact-card { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1px solid #cfe0d6; border-radius: 9px; background: #fff; color: #345649; font-size: 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .08s; }
@@ -638,6 +639,7 @@ fieldset[hidden] { display: none; }
 .system-panel-config-bar select { min-width: 112px; height: 30px; padding: 0 9px; border: 1px solid #d7e2dc; border-radius: 6px; color: #355247; background: #fff; font-size: 11px; }
 .chat-icon-btn { border: none; background: transparent; color: #8a9990; font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
 .chat-icon-btn:hover { color: var(--coral); background: #fdf0ec; }
+.chat-copy-btn { align-self: flex-start; }
 
 @media (max-width: 760px) {
   .chat-panel { height: 480px; }

@@ -2,6 +2,7 @@
 import inspect
 import re
 import unittest
+from pathlib import Path
 
 from webui.design_chat import PHASE_HEADING_RE, _design_files_exist, _stage_resume_status
 from webui.task_runner import PHASE_HEADING_RE as TASK_PHASE_HEADING_RE
@@ -45,6 +46,16 @@ class TestTaskRunnerStageOutlineCount(unittest.TestCase):
         self.assertIn("PHASE_HEADING_RE", inspect.getsource(WorkspaceStore.summary))
         self.assertEqual(TASK_PHASE_HEADING_RE.findall("## Phase 1: Name"), ["1"])
         self.assertIsNone(TASK_PHASE_HEADING_RE.search("# Stage 1: Name"))
+
+
+class TestWizardOptionalReference(unittest.TestCase):
+    def test_reference_step_is_optional_and_book_design_is_recommended_first(self):
+        source = (Path(__file__).resolve().parents[1] / "webui" / "static" / "wizard-v0.js").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('id: "reference", title: "Reference novel", short: "Optional craft source", optional: true', source)
+        self.assertIn('WIZARD_STEPS.find((step) => !step.optional && !inferredDone(step))', source)
 
 
 if __name__ == "__main__":

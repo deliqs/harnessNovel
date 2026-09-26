@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f5f7f5" />
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <title>HarnessNovel Workbench</title>
-  <link rel="stylesheet" href="/assets/wizard-v0.css?v=50" />
+  <link rel="stylesheet" href="/assets/wizard-v0.css?v=53" />
   </head>
   <body>
     <div class="wizard-shell">
@@ -86,11 +86,13 @@
       <header class="settings-header"><div><p>New work</p><h2>Create workspace</h2></div><button id="close-workspace-panel" class="drawer-close" type="button" title="Close">&times;</button></header>
       <form id="new-workspace-form" class="workspace-form">
         <label>Work title<input id="new-workspace-name" name="workspace" maxlength="80" autocomplete="off" placeholder="e.g. The Lock at the Gate" required /></label>
-        <p class="workspace-note">After creating it you enter the Reference novel step, where you choose a file and decide whether to deconstruct the whole book or the first N chapters.</p>
+        <p class="workspace-note">After creating it, start Book design with your creative direction. You can optionally import a reference novel now or later to extract structural patterns.</p>
         <div class="workspace-actions"><button id="cancel-workspace" class="secondary-button" type="button">Cancel</button><button class="primary-button" type="submit">Create workspace</button></div>
       </form>
     </section>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/wizard-v0.js?v=50"></script>
+  <script src="/assets/wizard-v0.js?v=57"></script>
+  <script src="/assets/world-chat.js?v=2"></script>
+  <script src="/assets/design-lenses.js?v=1"></script>
   </body>
 </html>

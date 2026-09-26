@@ -360,6 +360,7 @@ class WorkspaceStore:
                 "source_count": world_sources,
                 "final_section_count": world_sections,
                 "ready": world_status["ready"],
+                "chat_edited": world_status["chat_edited"],
                 "sources": [
                     {
                         "id": str(source.get("id") or ""),
@@ -961,7 +962,8 @@ class TaskManager:
             handle.write(content)
 
     def _build_command(self, task_type: str, workspace: str, args: dict[str, Any]) -> list[str]:
-        command = [sys.executable, "-m", "novel_cli"]
+        cli_path = Path(__file__).resolve().parents[1] / "novel_cli.py"
+        command = [sys.executable, str(cli_path)]
         force = bool(args.get("force"))
 
         if task_type == "workspace_init":

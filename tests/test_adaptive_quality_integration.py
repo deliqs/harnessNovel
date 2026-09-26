@@ -419,12 +419,32 @@ class AdaptiveQualityIntegrationTests(unittest.TestCase):
                     json.dumps({"worldview_md": "# Worldview\nnew world"}),
                     json.dumps({"rough_outline_md": "# Rough outline\nnew rough"}),
                     "",
+                    "",
                 ]):
-            with self.assertRaises(json.JSONDecodeError):
+            with self.assertRaisesRegex(RuntimeError, "valid JSON"):
                 gen_design_concept(self.ws, force=True)
         for key, path in paths.items():
             with open(path, encoding="utf-8") as handle:
                 self.assertEqual(handle.read(), old[key])
+
+    def test_phase_outline_retries_after_an_invalid_json_reply(self):
+        guidance = {
+            "reference_volume_count": 0, "stage_min": 1, "stage_max": 2,
+            "stage_range": "1-2", "map_min": 1, "map_max": 2, "map_range": "1-2",
+        }
+        phases = "# Phase outline\n\n## Phase 1: Tides\n\n" + "The harbour floods. " * 20
+        with patch("training.adaptive_builder._design_structure_guidance", return_value=guidance), \
+                patch("training.adaptive_builder._get_llm", return_value=object()), \
+                patch("training.adaptive_builder._load_reference_context", return_value="reference"), \
+                patch("training.adaptive_builder._load_world_knowledge_optional", return_value=""), \
+                patch("training.adaptive_builder._call_design_llm", side_effect=[
+                    json.dumps({"worldview_md": "# Worldview\n" + "A drowned coast. " * 20}),
+                    json.dumps({"rough_outline_md": "# Rough outline\n" + "A pilot returns. " * 20}),
+                    '{"stage_outline_md": "broken "quote" here"}',
+                    json.dumps({"stage_outline_md": phases}),
+                ]):
+            result = gen_design_concept(self.ws)
+        self.assertIn("## Phase 1: Tides", result["stage_outline"])
 
 
 if __name__ == "__main__":

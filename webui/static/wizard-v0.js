@@ -1,6 +1,6 @@
 const WIZARD_STEPS = [
-  { id: "reference", title: "Reference novel", short: "Deconstruct structure", optional: false, heading: "Reference novel deconstruction", lead: "The book outline, volume outlines, and story arcs are stored as structured assets.", decision: "Review book structure, volume boundaries, and story arcs before designing the new novel.", reviewPrefixes: ["reference/outlines"], reviewHint: "Inspect the book outline, volume outlines, and story arcs." },
-  { id: "world", title: "Target world", short: "Optional knowledge base", optional: true, heading: "Build the target-world knowledge base", lead: "Use a primary source to define the world, then refine details with supplement sources.", decision: "Import sources and pick a primary source, or skip this step.", reviewPrefixes: ["file_system/world_knowledge/worlds/_final"], reviewHint: "Inspect world rules, power systems, and key characters." },
+  { id: "reference", title: "Reference novel", short: "Optional craft source", optional: true, heading: "Reference novel deconstruction", lead: "Import a novel to extract reusable structural patterns, or skip this step and create an original story from your direction.", decision: "A reference provides optional pacing and structure guidance. You can add one later without replacing your story design.", reviewPrefixes: ["reference/outlines"], reviewHint: "Inspect the book outline, volume outlines, and story arcs." },
+  { id: "world", title: "Target world", short: "Sources, chat, or both", optional: true, heading: "Build the target-world knowledge base", lead: "The world can be built from imported sources, through chat, or both.", decision: "Import sources, describe the world in chat, or skip this step.", reviewPrefixes: ["file_system/world_knowledge/worlds/_final"], reviewHint: "Inspect world rules, power systems, and key characters." },
   { id: "design", title: "Book design", short: "Worldview and outline", optional: false, heading: "Design worldview, rough outline, and phase outline", lead: "After you enter inspiration, the system generates worldview, rough outline, and a standalone phase outline in sequence. You can keep chatting to adjust them.", decision: "The first draft is generated in three serial steps to keep context small; later adjustments keep all three files in sync.", reviewPrefixes: ["file_system/story_design/worldview.md", "file_system/story_design/rough_outline.md", "file_system/story_design/stage_outline.md", "file_system/story_design/core_gameplay.md"], reviewHint: "Review world rules, core gameplay, and phase progression, and keep adjusting anytime." },
   { id: "stage", title: "Stage design", short: "Mainline and stages", optional: false, heading: "Design the long mainline and stage roadmap", lead: "The system first generates the book-length long mainline, then generates each stage from the matching phases and reference volume outlines. After an interruption you can resume from completed stages.", decision: "Each run generates one stage and uses the previous stage for continuity. After generation you can still refine or extend through chat.", reviewPrefixes: ["file_system/story_design/long_mainline.md", "file_system/story_design/stage_roadmap.md", "file_system/novel_name_synopsis.md"], reviewHint: "Stages use a volume-outline structure: three-act progression, characters, foreshadowing, and core payoff." },
   { id: "arcs", title: "Story arcs", short: "Current stage", optional: false, heading: "Generate story arcs", lead: "Produce a continuous plot blueprint for the current stage.", decision: "Choose a stage, abstract reference narrative patterns, then generate new arcs.", reviewPrefixes: ["file_system/story_arcs"], reviewHint: "Review goals, conflicts, emotion, and hooks for generated volumes, and keep adjusting anytime." },
@@ -332,7 +332,7 @@ function inferredDone(step) {
 function stepIndex(stepId) { return WIZARD_STEPS.findIndex((step) => step.id === stepId); }
 
 function currentRecommendedStep() {
-  const firstIncomplete = WIZARD_STEPS.find((step) => !inferredDone(step));
+  const firstIncomplete = WIZARD_STEPS.find((step) => !step.optional && !inferredDone(step));
   return firstIncomplete?.id || "draft";
 }
 
@@ -1010,7 +1010,15 @@ function chatMessageMarkup(turn) {
     return `<li class="chat-message user"><div class="chat-message-body">${escapeHtml(turn.content || "")}</div></li>`;
   }
   const artCards = chatArtifactCards(turn.artifacts);
-  return `<li class="chat-message assistant"><div class="chat-message-avatar">AI</div><div class="chat-message-content"><div class="chat-message-body">${escapeHtml(turn.content || "")}</div>${artCards}</div></li>`;
+  const copyBtn = turn.content ? `<button class="chat-icon-btn chat-copy-btn" type="button" title="Copy the raw markdown" data-copy-markdown="${escapeHtml(turn.content)}">Copy</button>` : "";
+  return `<li class="chat-message assistant"><div class="chat-message-avatar">AI</div><div class="chat-message-content"><div class="chat-message-body review-document chat-markdown">${markdownPreview(turn.content || "")}</div>${artCards}${copyBtn}</div></li>`;
+}
+
+async function copyChatMarkdown(button) {
+  try {
+    await copyPreviewText(button.dataset.copyMarkdown || "");
+    showToast("Copied markdown.");
+  } catch (error) { showToast(error.message || "Could not copy.", true); }
 }
 
 function designJobMarkup(job) {
@@ -1064,7 +1072,7 @@ function designJobMarkup(job) {
   </div>`;
 }
 
-function designChatPanelMarkup(scope, conversation, job = null) {
+function designChatPanelMarkup(scope, conversation, job = null, lenses = null) {
   const turns = (conversation && Array.isArray(conversation.turns)) ? conversation.turns : [];
   const busy = Boolean(job && ["queued", "running", "pausing", "paused", "stopping"].includes(job.status));
   const sd = wizardState.summary?.story_design || {};
@@ -1101,7 +1109,9 @@ function designChatPanelMarkup(scope, conversation, job = null) {
   const nameSynopsisAction = scope === "stage" && filesExist && !busy
     ? '<button id="refresh-name-synopsis" class="chat-icon-btn" type="button">Regenerate title and synopsis</button>'
     : "";
+  const lensBar = typeof designLensBarMarkup === "function" ? designLensBarMarkup(lenses) : "";
   return `<section class="chat-panel" id="design-chat" data-scope="${scope}">
+    ${lensBar}
     <div class="chat-scroll" id="chat-message-list">${messages || `<div class="chat-empty"><div class="chat-empty-icon">💬</div><p>${emptyHint}</p></div>`}</div>
     ${designJobMarkup(job)}
     <div class="chat-composer">
@@ -1156,16 +1166,18 @@ function bindChatAttach(scope) {
   });
 }
 
-function renderDesignChat(scope, conversation, job = null) {
+function renderDesignChat(scope, conversation, job = null, lenses = null) {
   const node = $("#design-chat-host");
   if (!node) return;
-  node.innerHTML = designChatPanelMarkup(scope, conversation, job);
+  if (lenses) wizardState.designLenses = lenses;
+  node.innerHTML = designChatPanelMarkup(scope, conversation, job, lenses || wizardState.designLenses);
   const list = $("#chat-message-list");
   if (list) list.scrollTop = list.scrollHeight;
   renderChatAttachments(scope);
   bindChatAttach(scope);
   $$("[data-artifact-path]").forEach((btn) => btn.addEventListener("click", () => openReviewFile(btn.dataset.artifactPath)));
   $("#send-design-chat")?.addEventListener("click", () => sendDesignMessage(scope));
+  if (typeof bindDesignLenses === "function") bindDesignLenses(scope);
   bindDesignJobControls(scope);
   $("#refresh-name-synopsis")?.addEventListener("click", async () => {
     try { await refreshNameSynopsis(); } catch (error) { showToast(error.message || "Could not generate title and synopsis.", true); }
@@ -1192,9 +1204,15 @@ function renderDesignChat(scope, conversation, job = null) {
 
 async function loadDesignChat(scope) {
   try {
-    const base = `/api/workspaces/${encodeURIComponent(wizardState.workspace)}/design/${scope}`;
-    const [data, job] = await Promise.all([api(`${base}/conversation`), api(`${base}/job`)]);
-    renderDesignChat(scope, data, job);
+    const workspace = wizardState.workspace;
+    const base = `/api/workspaces/${encodeURIComponent(workspace)}/design/${scope}`;
+    const lensesPromise = typeof fetchDesignLenses === "function"
+      ? fetchDesignLenses(workspace)
+      : Promise.resolve(null);
+    const [data, job, lenses] = await Promise.all([
+      api(`${base}/conversation`), api(`${base}/job`), lensesPromise,
+    ]);
+    renderDesignChat(scope, data, job, lenses);
     if (["queued", "running", "pausing", "paused", "stopping"].includes(job.status)) pollDesignJob(scope);
   } catch (_) { /* ignore */ }
 }
@@ -1263,7 +1281,7 @@ function pollDesignJob(scope) {
       renderDesignChat(scope, conversation, job);
       if (job.status === "failed") showToast(job.error || "Book design failed. Please retry.", true);
       else if (job.status === "stopped") showToast("This stage-design round has ended. Completed content was kept.");
-      else if (job.status === "completed") showToast(scope === "concept" ? "Book design generated." : "Stage design generated.");
+      else if (job.status === "completed") showToast(job.result?.mode === "answer" ? "Answered." : job.result?.mode === "critique" ? "Critique ready." : (scope === "concept" ? "Book design generated." : "Stage design generated."));
     } catch (_) {
       designJobPollTimer = setTimeout(poll, 1500);
     }
@@ -1360,6 +1378,10 @@ function worldSources() {
 function worldForm() {
   const sources = worldSources();
   const worldReady = Boolean(wizardState.summary?.world_knowledge?.ready);
+  const sectionCount = Number(wizardState.summary?.world_knowledge?.final_section_count || 0);
+  const toggleHint = sources.length
+    ? (worldReady ? "All 7 knowledge-base sections are built. Turn it off to stop injecting sources into later design; turn it on again to resume." : "Build starts automatically after import. If a task is interrupted, retry with the button below without uploading a new file.")
+    : (worldReady ? "All 7 knowledge-base sections are ready. Turn it off to stop injecting them into later design; turn it on again to resume." : "Turn it off to stop injecting these sections into later design; turn it on again to resume.");
   const sourceList = sources.length
     ? `<div class="world-uploaded">
         <div class="world-uploaded-heading"><span>Uploaded</span><strong>${sources.length}  files</strong></div>
@@ -1373,9 +1395,9 @@ function worldForm() {
       <p id="world-file-status" class="reference-file-status">No new file selected yet</p>
       <ul id="world-new-file-list" class="source-list world-new-file-list" hidden></ul>
     </div>
-    ${sources.length ? `<div class="world-enable-row">
+    ${sources.length || sectionCount ? `<div class="world-enable-row">
       <label class="world-toggle"><input id="world-enabled" type="checkbox" ${wizardState.summary?.world_knowledge?.enabled === false ? "" : "checked"} /><span class="world-toggle-text">Enable target-world knowledge base</span></label>
-      <small>${worldReady ? "All 7 knowledge-base sections are built. Turn it off to stop injecting sources into later design; turn it on again to resume." : "Build starts automatically after import. If a task is interrupted, retry with the button below without uploading a new file."}</small>
+      <small>${toggleHint}</small>
     </div>` : ""}`;
 }
 
@@ -1715,8 +1737,15 @@ async function startTask(type, args, message) {
 
 async function submitWorldStep() {
   const files = [...($("#world-file-input")?.files || [])];
+  const workspace = wizardState.workspace;
+  const summary = await api(`/api/workspaces/${encodeURIComponent(workspace)}`);
+  if (wizardState.workspace !== workspace) return;
+  if (summary?.world_knowledge?.chat_edited && (files.length || worldSources().length)) {
+    if (!confirm("Rebuilding the target-world knowledge base replaces chat edits. A backup is saved under file_system/world_knowledge/worlds/_final_backup_<timestamp>. Continue?")) return;
+  }
   if (files.length) {
     const uploads = await Promise.all(files.map(uploadFile));
+    if (wizardState.workspace !== workspace) return;
     await startTask("world_import", { upload_ids: uploads.map((upload) => upload.id) }, "Started importing and building the target-world knowledge base (largest file as primary source).");
     return;
   }
@@ -2198,6 +2227,7 @@ function renderActiveStep() {
           </form>
           <aside class="context-note"><strong>Design notes</strong>${decision}</aside>
         </div>
+        ${step.id === "world" ? '<div class="chat-band" id="world-chat-host"></div>' : ""}
       </section>
       <section class="review-band">
         <div class="band-heading"><h2>Generated content</h2><p>${step.reviewHint}</p></div>
@@ -2231,7 +2261,10 @@ function renderActiveStep() {
     }
   });
   if (step.id === "reference") bindReferenceSource();
-  if (step.id === "world") bindWorldSource();
+  if (step.id === "world") {
+    bindWorldSource();
+    if (typeof loadWorldChat === "function") loadWorldChat();
+  }
   if (step.id === "design") {
     loadDesignChat("concept");
   }
@@ -2896,6 +2929,8 @@ async function boot() {
       } catch (error) { showToast(error.message || "Could not delete the task record.", true); }
     });
     document.addEventListener("click", (event) => {
+      const copyButton = event.target.closest("[data-copy-markdown]");
+      if (copyButton) { copyChatMarkdown(copyButton); return; }
       const id = event.target.closest("button")?.id;
       const workspace = encodeURIComponent(wizardState.workspace || "");
       if (id === "show-arcs-prompt") {

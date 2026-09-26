@@ -2159,7 +2159,7 @@ def gen_design_concept(
                     "\n\n[Previous output failed the count check]\n"
                     f"Last time generated {actual_count} phases; generate within {structure_guidance['stage_range']} phases."
                 )
-            payload = parse_json_response(
+            payload = _parse_design_reply(
                 _call_design_llm(llm, prompt, f"new-novel phase outline (attempt {attempt})")
             )
             candidate = _normalize_design_field(payload, "stage_outline_md", "# Phase outline")
@@ -2172,6 +2172,10 @@ def gen_design_concept(
             print(
                 f"  -> Phase-count check failed: generated {actual_count},"
                 f"expected range {structure_guidance['stage_range']}; retrying automatically."
+            )
+        if not payload:
+            raise RuntimeError(
+                "Phase-outline generation failed: the model did not return valid JSON; nothing was written. Please retry."
             )
         if not _is_real_design_field(stage_outline) or (
             not structure_guidance["stage_min"] <= actual_count <= structure_guidance["stage_max"]
@@ -2995,6 +2999,15 @@ def _call_design_llm(llm, prompt, label, cancel_event=None):
     if not raw:
         raise RuntimeError(f"{label} did not receive model output.")
     return raw
+
+
+def _parse_design_reply(raw):
+    """Parse a design-step JSON reply; an invalid reply counts as empty so the retry loop can try again."""
+    try:
+        return parse_json_response(raw)
+    except ValueError as exc:
+        print(f"  -> The model reply was not valid JSON ({exc}); retrying automatically.")
+        return {}
 
 
 def _normalize_design_field(payload, key, fallback_title):

@@ -57,7 +57,7 @@ pip install --upgrade harnessNovel
 
 <h2 align="left"><img src="docs/heading-web-en.svg" alt="Local Web Workbench" height="32"></h2>
 
-The project provides a local visual workbench. Book design, stage design, story arcs, chapter outlines, and draft generation all support multi-round dialogue — you can iteratively adjust the results through conversation and confirm only when satisfied.
+The project provides a local visual workbench. Book design, stage design, story arcs, chapter outlines, and draft generation all support multi-round dialogue — you can iteratively adjust the results through conversation and confirm only when satisfied. In the book-design and stage-design chats, a question is answered from the current design files and does not generate, rewrite, back up, or mark those files as revised. A review request fans out to parallel critics per lens; the merged numbered points are saved and the design files are not rewritten. Saying "apply 2 and 4" applies those saved points in one rewrite. A change request keeps the existing behaviour and rewrites the files. Add or replace lenses in `file_system/story_design/critic_lenses.md` (`## Name` plus focus text). `HARNESS_NOVEL_CRITIC_WORKERS` (default 2) caps parallel critic calls.
 
 ```bash
 novel web
@@ -123,8 +123,8 @@ Supports Claude, GPT-4o, DeepSeek, Qwen, and other mainstream models.
 
 ## Workflow
 
-1. **Deconstruction stage**: Choose a high-quality novel and deconstruct it into structured knowledge with one command.
-2. **Imitation stage**: Input your core inspiration + deconstruction results, then let AI create while "standing on the shoulders of giants."
+1. **Optional deconstruction stage**: Choose a high-quality novel and deconstruct it into structured knowledge when you want a structural reference.
+2. **Story-design stage**: Input your core inspiration and any deconstruction results, then let AI create an original plan.
 3. **Iterative refinement**: Adjust core gameplay, stages, character lines, mechanics, and chapter content at any time to gradually improve the work.
 
 <p align="center">
@@ -135,7 +135,7 @@ Supports Claude, GPT-4o, DeepSeek, Qwen, and other mainstream models.
 
 - **End-to-end automation**: From novel analysis and gameplay design to full text generation, complete a long-form web novel with chained commands.
 - **Reference-based imitation**: Generate new content based on the pacing, structure, and tension curve of the reference novel instead of creating from nothing.
-- **Target-world knowledge base (optional enhancement)**: Import target-genre materials/settings/sample web novels, structure them into a knowledge base, and use it to validate the core gameplay, long mainline, stage roadmap, and character arcs. Without a knowledge base, the workflow automatically falls back to reference novel + user direction.
+- **Target-world knowledge base (optional enhancement)**: Import target-genre materials/settings/sample web novels, structure them into a knowledge base, and use it to validate the core gameplay, long mainline, stage roadmap, and character arcs. Without a knowledge base, the workflow uses the available reference material and user direction.
 - **Narrative abstraction against hard reskins**: Reference arcs are abstracted into narrative patterns, then regenerated against the current stage context rather than renamed and copied.
 - **Story arcs**: During reference deconstruction, story units are extracted by natural plot boundaries and can continue across reading windows.
 - **Gameplay/stage/character lines**: The new novel first gets core gameplay, a long-running mainline, a stage roadmap, and character arcs. Each stage naturally becomes the scope for later story-arc generation.
@@ -330,7 +330,7 @@ Modes:
 
 ## Optional: Target-world Knowledge Base
 
-If the new novel needs to move into a target world that requires supporting materials, import and build the knowledge base before `design-concept` (the Web/stepwise path) or `novel-outline` (the bundled CLI path). Without a knowledge base, the workflow automatically uses only the reference novel + inspiration input.
+If the new novel needs to move into a target world that requires supporting materials, import and build the knowledge base before `design-concept` (the Web/stepwise path) or `novel-outline` (the bundled CLI path). Without a knowledge base, the workflow uses the available reference material and inspiration input; a reference novel is optional.
 
 ```bash
 # Import one file, multiple files, or a material directory.
@@ -346,6 +346,14 @@ novel stage-design my-new-novel
 ```
 
 `world-build` writes seven English section files under `file_system/world_knowledge/worlds/_final/` (`worldview.md`, `power_system.md`, `key_characters.md`, `factions.md`, `story_spine.md`, `key_items.md`, `skills_and_techniques.md`). Existing Chinese filenames in that folder are still read.
+
+### Chat-based world building
+
+On the Web workbench Target world step, chat can create and refine those same seven section files without a source import. An empty world starts as an interview: the model asks follow-up questions, writes sections once there is enough to record, and lists what is still missing. You can also chat against a world that was built from sources.
+
+Optional extra rules live in `file_system/world_knowledge/chat_guide.md`. The file is appended after the built-in prompts and wins on conflict. Upload a `.md` or `.txt` guide from the chat panel, or reset the control to delete the file.
+
+Source import and chat can be used together. If chat has edited the world, a later import or rebuild replaces those edits after copying `_final` to `file_system/world_knowledge/worlds/_final_backup_<timestamp>`. The Web UI asks for confirmation before that rebuild; cancel sends nothing.
 
 ## Notes
 
