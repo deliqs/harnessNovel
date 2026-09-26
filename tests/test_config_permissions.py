@@ -32,6 +32,17 @@ class ConfigPermissionTests(unittest.TestCase):
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
 
+    def test_cli_config_defaults_to_local_orca_bonsai(self):
+        with tempfile.TemporaryDirectory() as home:
+            with patch.dict(os.environ, {"HOME": home}, clear=False):
+                cmd_config(SimpleNamespace(force=False))
+            with open(os.path.join(home, ".harnessNovel", ".env"), encoding="utf-8") as handle:
+                content = handle.read()
+        for prefix in ("DATA_BUILDER", "ADAPTIVE_BUILDER", "ADAPTIVE_BUILDER_LITE"):
+            self.assertIn(f"\n{prefix}_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored\n", content)
+            self.assertIn(f"\n{prefix}_BASE_URL=http://127.0.0.1:8091/v1\n", content)
+            self.assertIn(f"\n{prefix}_API_KEY=local-only\n", content)
+
 
 if __name__ == "__main__":
     unittest.main()

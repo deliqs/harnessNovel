@@ -171,23 +171,26 @@ After installation, the `novel` command is globally available.
 novel config
 ```
 
-This command automatically creates the global config file `~/.harnessNovel/.env`. Edit it and fill in your API keys:
+This command automatically creates the global config file `~/.harnessNovel/.env`. The defaults point every slot at a local OrcaBonsai OpenAI-compatible server on `http://127.0.0.1:8091/v1` (start it with `./start.sh` in `orca-bonsai-api`; it ignores the API key, but the value must be non-empty). Any other OpenAI-compatible provider, such as DeepSeek, still works: change the `*_MODEL`, `*_BASE_URL` and `*_API_KEY` values for each slot.
 
 ```ini
-# Reference novel extraction (flash model recommended for speed and low cost)
-DATA_BUILDER_MODEL=deepseek-v4-flash
-DATA_BUILDER_BASE_URL=https://api.deepseek.com
-DATA_BUILDER_API_KEY=your-api-key
+# Defaults use the local OrcaBonsai server (orca-bonsai-api; start it with ./start.sh).
+# Any OpenAI-compatible provider works: change MODEL, BASE_URL and API_KEY per slot.
 
-# Book-level and stage design (pro model recommended for quality)
-ADAPTIVE_BUILDER_MODEL=deepseek-v4-pro
-ADAPTIVE_BUILDER_BASE_URL=https://api.deepseek.com
-ADAPTIVE_BUILDER_API_KEY=your-api-key
+# Reference novel extraction
+DATA_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
+DATA_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
+DATA_BUILDER_API_KEY=local-only
+
+# Book-level and stage design
+ADAPTIVE_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
+ADAPTIVE_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
+ADAPTIVE_BUILDER_API_KEY=local-only
 
 # Story arcs and chapter outlines. This is the fallback for optional roles below.
-ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
-ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
-ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
+ADAPTIVE_BUILDER_LITE_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
+ADAPTIVE_BUILDER_LITE_BASE_URL=http://127.0.0.1:8091/v1
+ADAPTIVE_BUILDER_LITE_API_KEY=local-only
 
 # Optional production roles. An omitted field inherits the matching Lite value.
 # DRAFT writes chapter prose; EDITOR refines and humanizes it; CRITIC handles

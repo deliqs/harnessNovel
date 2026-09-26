@@ -19,20 +19,23 @@ def cmd_config(args):
         print(f"Config file already exists: {env_path}")
         print("Use --force to overwrite")
         return
-    template = """# Reference novel extraction (init flow; flash model recommended)
-DATA_BUILDER_MODEL=deepseek-v4-flash
-DATA_BUILDER_BASE_URL=https://api.deepseek.com
-DATA_BUILDER_API_KEY=your-api-key
+    template = """# Defaults use the local OrcaBonsai server (orca-bonsai-api; start it with ./start.sh).
+# Any OpenAI-compatible provider works: change MODEL, BASE_URL and API_KEY per slot.
 
-# Book and stage design (pro model recommended)
-ADAPTIVE_BUILDER_MODEL=deepseek-v4-pro
-ADAPTIVE_BUILDER_BASE_URL=https://api.deepseek.com
-ADAPTIVE_BUILDER_API_KEY=your-api-key
+# Reference novel extraction (init flow)
+DATA_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
+DATA_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
+DATA_BUILDER_API_KEY=local-only
+
+# Book and stage design
+ADAPTIVE_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
+ADAPTIVE_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
+ADAPTIVE_BUILDER_API_KEY=local-only
 
 # Story arcs and chapter outlines. This is also the fallback for optional roles below.
-ADAPTIVE_BUILDER_LITE_MODEL=deepseek-v4-flash
-ADAPTIVE_BUILDER_LITE_BASE_URL=https://api.deepseek.com
-ADAPTIVE_BUILDER_LITE_API_KEY=your-api-key
+ADAPTIVE_BUILDER_LITE_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
+ADAPTIVE_BUILDER_LITE_BASE_URL=http://127.0.0.1:8091/v1
+ADAPTIVE_BUILDER_LITE_API_KEY=local-only
 
 # Optional production roles. Leave a role unset to inherit each missing value from Lite.
 # DRAFT writes chapter prose; EDITOR refines and humanizes it; CRITIC handles
