@@ -25,7 +25,13 @@ ORCA_PROFILE = OpenAIModelProfile(
     openai_supports_tool_choice_required=False,
 )
 
-THINK_ON = {"extra_body": {"chat_template_kwargs": {"enable_thinking": True}}}
+# Reasoning and the answer share this budget.
+THINKING_MAX_TOKENS = 32768
+
+THINK_ON = {
+    "extra_body": {"chat_template_kwargs": {"enable_thinking": True}},
+    "max_tokens": THINKING_MAX_TOKENS,
+}
 THINK_OFF = {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
 
 # A cold turn on a long context takes about a minute; summarising can take longer.

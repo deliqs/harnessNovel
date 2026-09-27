@@ -43,8 +43,14 @@ class ModelFactoryTests(unittest.TestCase):
                 orchestrator_model.build_model()
 
     def test_thinking_settings(self):
-        self.assertTrue(_thinking(orchestrator_model.model_settings(True)))
-        self.assertFalse(_thinking(orchestrator_model.model_settings(False)))
+        on = orchestrator_model.model_settings(True)
+        off = orchestrator_model.model_settings(False)
+        self.assertEqual(orchestrator_model.THINKING_MAX_TOKENS, 32768)
+        self.assertTrue(_thinking(on))
+        self.assertEqual(on["max_tokens"], orchestrator_model.THINKING_MAX_TOKENS)
+        self.assertFalse(_thinking(off))
+        self.assertNotIn("max_tokens", off)
+        self.assertIs(off, orchestrator_model.THINK_OFF)
 
 
 class ThinkingSwitchTests(OrchestratorAppCase):
@@ -56,6 +62,10 @@ class ThinkingSwitchTests(OrchestratorAppCase):
         self.post_turn(run_body([user("Three")], thinking=False))
 
         self.assertEqual([_thinking(settings) for settings in scripted.settings], [False, True, False])
+        self.assertEqual(
+            [settings.get("max_tokens") for settings in scripted.settings],
+            [None, orchestrator_model.THINKING_MAX_TOKENS, None],
+        )
 
 
 if __name__ == "__main__":

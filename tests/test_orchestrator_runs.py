@@ -2,11 +2,12 @@
 import json
 import threading
 import unittest
+from contextlib import asynccontextmanager
 from unittest.mock import patch
 
 from pydantic_ai import Tool
 from pydantic_ai.messages import ModelResponse, TextPart, UserPromptPart
-from pydantic_ai.models.function import DeltaToolCall, FunctionModel
+from pydantic_ai.models.function import DeltaThinkingPart, DeltaToolCall, FunctionModel
 
 from tests.orchestrator_fakes import (
     OrchestratorAppCase,
@@ -27,6 +28,18 @@ from webui.orchestrator.transcript import STOP_CODE
 
 def _parts(message):
     return [(type(part).__name__, part.content) for part in message.parts]
+
+
+class _LengthStop(FunctionModel):
+    """A streamed reply that stops for length, so pydantic-ai raises its token-limit error."""
+
+    @asynccontextmanager
+    async def request_stream(self, messages, model_settings, model_request_parameters, run_context=None):
+        async with super().request_stream(
+            messages, model_settings, model_request_parameters, run_context
+        ) as response:
+            response.finish_reason = "length"
+            yield response
 
 
 class OrchestratorRunTests(OrchestratorAppCase):
@@ -247,6 +260,24 @@ class OrchestratorRunTests(OrchestratorAppCase):
         self.assertGreater(calls["n"], 1)
         self.assertEqual((events[-1]["type"], events[-1]["message"]), ("RUN_ERROR", message))
         self.assertNotIn("request_limit", json.dumps(events))
+        recorded = [m["content"]["message"] for m in self.history()["messages"] if m.get("activityType") == "run_error"]
+        self.assertEqual(recorded, [message])
+        replay = sse_events(self.client.get(self.url("/stream")).text)
+        self.assertEqual(replay[-1]["message"], message)
+
+    def test_a_token_limit_ends_with_a_plain_message(self):
+        async def thinking_only(messages, info):
+            yield {0: DeltaThinkingPart(content="still reasoning")}
+
+        def summarize(messages, info):
+            return ModelResponse(parts=[TextPart("SUMMARY")])
+
+        self.runtime.orchestrator.model_factory = lambda: _LengthStop(summarize, stream_function=thinking_only)
+        events = self.post_turn(run_body([user("Think hard")]))
+
+        message = "The model ran out of room before it finished answering. Turn off Think, or ask for a shorter answer, and send again."
+        self.assertEqual((events[-1]["type"], events[-1]["message"]), ("RUN_ERROR", message))
+        self.assertNotIn("Model token limit", json.dumps(events))
         recorded = [m["content"]["message"] for m in self.history()["messages"] if m.get("activityType") == "run_error"]
         self.assertEqual(recorded, [message])
         replay = sse_events(self.client.get(self.url("/stream")).text)

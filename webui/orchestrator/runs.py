@@ -35,6 +35,13 @@ MAX_STEPS = "This reply used its maximum number of steps and stopped. Send a mes
 # The stable sentence of pydantic-ai's UsageLimitExceeded for `request_limit`. The number varies:
 # compaction's nested summary runs with the limit reduced by one.
 _REQUEST_LIMIT_TEXT = "The next request would exceed the request_limit of"
+TOKEN_LIMIT = "The model ran out of room before it finished answering. Turn off Think, or ask for a shorter answer, and send again."
+# Stable words in pydantic-ai's token-limit errors. The limit number and the rest of the sentence vary.
+_TOKEN_LIMIT_MARKERS = ("Model token limit", "exceeded")
+_AUTHOR_MESSAGES = (
+    ((_REQUEST_LIMIT_TEXT,), MAX_STEPS),
+    (_TOKEN_LIMIT_MARKERS, TOKEN_LIMIT),
+)
 BUSY = "This chat is still answering. Wait for it to finish first."
 STOPPED = "Stopped by the author"
 AWAITING_APPROVAL = "The chat is waiting for an approval. Answer it before continuing."
@@ -274,7 +281,8 @@ class OrchestratorRuns:
 
 
 def _author_message(message: str) -> str:
-    """Plain wording when the run stops at its request limit; other errors stay redacted."""
-    if _REQUEST_LIMIT_TEXT in message:
-        return MAX_STEPS
+    """Plain wording for a request limit or a token limit; other errors stay redacted."""
+    for markers, plain in _AUTHOR_MESSAGES:
+        if all(marker in message for marker in markers):
+            return plain
     return redact_sensitive_text(message)
