@@ -140,6 +140,28 @@
     return appendText(Object.assign({}, state, { openReasoningId: id }), "reasoning", id, event.delta);
   }
 
+  // Live until the block ends or the answer starts, which is before the run finishes.
+  function endReasoning(state) {
+    return Object.assign({}, state, { openReasoningId: null });
+  }
+
+  function groupedCount(count) {
+    return String(count).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function reasoningTail(text) {
+    const line = String(text || "").replace(/\s+/g, " ").trim();
+    if (line.length <= 80) return line;
+    return `…${line.slice(-79)}`;
+  }
+
+  function reasoningHeader(text, streaming) {
+    if (!streaming) return { label: "Reasoning", tail: "" };
+    const body = String(text || "");
+    const noun = body.length === 1 ? "character" : "characters";
+    return { label: `Reasoning… ${groupedCount(body.length)} ${noun}`, tail: reasoningTail(body) };
+  }
+
   function textContent(state, event) {
     const id = event.messageId || state.openTextId;
     return appendText(Object.assign({}, state, { openTextId: id }), "assistant", id, event.delta);
@@ -149,18 +171,21 @@
     RUN_STARTED: (state) => Object.assign({}, state, { running: true }),
     RUN_FINISHED: runFinished,
     RUN_ERROR: runError,
-    TEXT_MESSAGE_START: (state, event) => Object.assign({}, state, { openTextId: event.messageId }),
+    TEXT_MESSAGE_START: (state, event) => Object.assign({}, endReasoning(state), { openTextId: event.messageId }),
     TEXT_MESSAGE_CONTENT: textContent,
     TEXT_MESSAGE_CHUNK: textContent,
     TEXT_MESSAGE_END: (state) => Object.assign({}, state, { openTextId: null }),
-    TOOL_CALL_START: (state, event) => toolStart(state, event.toolCallId, event.toolCallName, ""),
+    TOOL_CALL_START: (state, event) => toolStart(endReasoning(state), event.toolCallId, event.toolCallName, ""),
     TOOL_CALL_ARGS: (state, event) => toolArgs(state, event.toolCallId, event.delta),
     TOOL_CALL_RESULT: (state, event) => toolResult(state, event.toolCallId, event.content),
     REASONING_MESSAGE_START: reasoningStart,
     REASONING_MESSAGE_CONTENT: reasoningContent,
     REASONING_MESSAGE_CHUNK: reasoningContent,
+    REASONING_MESSAGE_END: endReasoning,
+    REASONING_END: endReasoning,
     THINKING_TEXT_MESSAGE_START: reasoningStart,
     THINKING_TEXT_MESSAGE_CONTENT: reasoningContent,
+    THINKING_TEXT_MESSAGE_END: endReasoning,
     ACTIVITY_SNAPSHOT: (state, event) => notice(state, event.messageId, event.activityType, activityText(event.content)),
     "local.user": (state, action) => (action.auto ? autoTurn(state, action.id, action.auto) : upsert(state, { kind: "user", id: action.id, text: action.text })),
     "local.remove": (state, action) => withItems(state, state.items.filter((item) => item.id !== action.id)),
@@ -263,7 +288,7 @@
   const jobs = typeof module !== "undefined" && module.exports
     ? require("./orchestrator-jobs.js")
     : (root && root.OrchestratorChat && root.OrchestratorChat.jobs) || {};
-  const api = Object.assign({ initialState, reduce, fromHistory, parseJson, pendingResume, trackableJobs, refreshesHost, AUTO_TEXT }, jobs);
+  const api = Object.assign({ initialState, reduce, fromHistory, parseJson, pendingResume, trackableJobs, refreshesHost, reasoningHeader, AUTO_TEXT }, jobs);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) {
     root.OrchestratorChat = root.OrchestratorChat || {};

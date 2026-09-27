@@ -28,7 +28,10 @@
 .orch-disclosure > summary:focus-visible, .orch-panel button:focus-visible, .orch-think input:focus-visible, .orch-approval-reason:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .orch-disclosure > :not(summary) { margin: 0 10px 10px; }
 
-.orch-label { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.orch-label { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.orch-reasoning-tail { min-width: 0; flex: 1; overflow: hidden; font-size: 11px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.orch-reasoning-tail:empty { display: none; }
+.orch-reasoning.is-streaming .orch-label { color: var(--ink); }
 .orch-heading { margin: 8px 10px 4px; color: var(--primary); font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .orch-pre { max-height: 260px; overflow: auto; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; color: #35473e; background: var(--canvas); font-family: var(--mono); font-size: 11px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 .orch-reasoning .orch-pre { font-family: var(--sans); font-style: italic; color: var(--muted); }

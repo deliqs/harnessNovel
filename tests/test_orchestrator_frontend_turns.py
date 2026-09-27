@@ -247,5 +247,50 @@ class ToolDoneTests(NodeCase):
         self.assertEqual(result, ["set_system_panel_mode", "world_set_enabled"])
 
 
+class ReasoningStreamTests(NodeCase):
+    def test_open_reasoning_stays_set_while_deltas_stream_and_clears_when_it_ends(self):
+        result = self.run_js(PRELUDE + """
+          const feed = (state, list) => list.reduce(S.reduce, state);
+          const streaming = feed(S.initialState(), [
+            { type: "RUN_STARTED" },
+            { type: "REASONING_MESSAGE_START", messageId: "r1" },
+            { type: "REASONING_MESSAGE_CONTENT", messageId: "r1", delta: "One" },
+            { type: "REASONING_MESSAGE_CONTENT", messageId: "r1", delta: " two" },
+          ]);
+          const close = (event) => S.reduce(streaming, event).openReasoningId;
+          const thinking = feed(S.initialState(), [
+            { type: "RUN_STARTED" }, { type: "THINKING_TEXT_MESSAGE_START" },
+            { type: "THINKING_TEXT_MESSAGE_CONTENT", delta: "Legacy" },
+          ]);
+          const restored = S.fromHistory({ running: false, messages: [{ id: "r9", role: "reasoning", content: "Saved." }] });
+          const events = ["REASONING_MESSAGE_END", "REASONING_END", "THINKING_TEXT_MESSAGE_END"].map((type) => close({ type, messageId: "r1" }));
+          events.push(close({ type: "TEXT_MESSAGE_START", messageId: "t1" }));
+          events.push(close({ type: "TOOL_CALL_START", toolCallId: "c1", toolCallName: "list_artifacts" }));
+          events.push(close({ type: "RUN_FINISHED", outcome: { type: "success" } }));
+          const body = "x".repeat(6270);
+          const textStart = S.reduce(streaming, { type: "TEXT_MESSAGE_START", messageId: "t1" });
+          const toolStart = S.reduce(streaming, { type: "TOOL_CALL_START", toolCallId: "c1", toolCallName: "list_artifacts" });
+          out({
+            id: streaming.openReasoningId, text: streaming.items[0].text, running: streaming.running, events,
+            textId: textStart.openTextId, kinds: toolStart.items.map((item) => item.kind),
+            thinking: [thinking.openReasoningId, thinking.items[0].id],
+            thinkingEnded: S.reduce(thinking, { type: "THINKING_TEXT_MESSAGE_END" }).openReasoningId,
+            restored: restored.openReasoningId, live: S.reasoningHeader(body, true),
+            one: S.reasoningHeader("One two", true), quiet: S.reasoningHeader(body, false),
+            tail: S.reasoningHeader(body + "\\nhello", true).tail,
+          });
+        """)
+        self.assertEqual((result["id"], result["text"], result["running"]), ("r1", "One two", True))
+        self.assertEqual(result["events"], [None, None, None, None, None, None])
+        self.assertEqual((result["textId"], result["kinds"], result["restored"]), ("t1", ["reasoning", "tool"], None))
+        self.assertEqual(result["thinking"], ["reasoning-0", "reasoning-0"])
+        self.assertIsNone(result["thinkingEnded"])
+        self.assertEqual(result["live"], {"label": "Reasoning… 6,270 characters", "tail": "…" + "x" * 79})
+        self.assertEqual(result["one"], {"label": "Reasoning… 7 characters", "tail": "One two"})
+        self.assertEqual(result["quiet"], {"label": "Reasoning", "tail": ""})
+        self.assertNotIn("\n", result["tail"])
+        self.assertTrue(result["tail"].endswith(" hello"))
+
+
 if __name__ == "__main__":
     unittest.main()

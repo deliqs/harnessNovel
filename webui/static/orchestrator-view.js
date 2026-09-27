@@ -62,8 +62,17 @@
 
   function reasoningItem(item) {
     const node = el("li", "orch-item orch-reasoning");
-    node.append(disclosure("orch-disclosure", [el("span", "orch-label", "Reasoning")], [el("div", "orch-pre", item.text)]));
+    node.append(disclosure("orch-disclosure", [el("span", "orch-label", "Reasoning"), el("span", "orch-reasoning-tail")], [el("div", "orch-pre", item.text)]));
     return node;
+  }
+
+  // Rewriting the <li> restarts its fade-in, so a token stream flashes. Paint the same node.
+  function paintReasoning(node, item, streaming) {
+    const header = chat.state.reasoningHeader(item.text, streaming);
+    node.querySelector(".orch-label").textContent = header.label;
+    node.querySelector(".orch-reasoning-tail").textContent = header.tail;
+    node.querySelector(".orch-pre").textContent = item.text;
+    node.classList.toggle("is-streaming", streaming);
   }
 
   const TOOL_STATES = { started: "job started", done: "done", refused: "refused" };
@@ -227,21 +236,28 @@
       nodes = { container, list, status, toggle: top.toggle, input: box.input, send: box.send, stop: box.stop };
     }
 
-    function itemNode(item, entry) {
+    function itemNode(item, entry, streamingId) {
       const previous = rendered.get(item.id);
+      const streaming = item.kind === "reasoning" && item.id === streamingId;
+      if (previous && item.kind === "reasoning") {
+        if (previous.item !== item || previous.streaming !== streaming) paintReasoning(previous.node, item, streaming);
+        rendered.set(item.id, { item, entry, node: previous.node, streaming });
+        return previous.node;
+      }
       if (previous && previous.item === item && previous.entry === entry) return previous.node;
       const node = ITEM_BUILDERS[item.kind](item, entry, handlers);
       node.dataset.itemId = item.id;
       const details = node.querySelector("details");
       if (details && openIds.has(item.id)) details.open = true;
-      rendered.set(item.id, { item, entry, node });
+      if (streaming) paintReasoning(node, item, true);
+      rendered.set(item.id, { item, entry, node, streaming });
       return node;
     }
 
-    function renderList(items, jobs) {
+    function renderList(items, jobs, streamingId) {
       const list = nodes.list;
       const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
-      const wanted = items.filter((item) => ITEM_BUILDERS[item.kind]).map((item) => itemNode(item, jobs.get(item.id)));
+      const wanted = items.filter((item) => ITEM_BUILDERS[item.kind]).map((item) => itemNode(item, jobs.get(item.id), streamingId));
       if (!wanted.length) wanted.push(el("li", "chat-empty orch-empty", "Ask the orchestrator to plan, check or run this step."));
       wanted.forEach((node, index) => {
         if (list.children[index] !== node) list.insertBefore(node, list.children[index] || null);
@@ -252,7 +268,7 @@
 
     function render(state, jobs, ui) {
       if (!nodes) return;
-      renderList(state.items, jobs);
+      renderList(state.items, jobs, state.running ? state.openReasoningId : null);
       nodes.list.setAttribute("aria-busy", ui.running ? "true" : "false");
       nodes.status.textContent = ui.status || "";
       nodes.status.classList.toggle("is-error", Boolean(ui.statusError));
