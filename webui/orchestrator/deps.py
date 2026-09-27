@@ -61,6 +61,8 @@ class OrchestratorDeps:
     workspace: str
     phase: str
     ui_state: dict[str, Any] = field(default_factory=dict)
+    # Kind plus resolved locators of jobs this run has already reported as still running.
+    seen_live_jobs: set[tuple[Any, ...]] = field(default_factory=set)
 
     @property
     def state(self) -> dict[str, Any]:

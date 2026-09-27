@@ -31,6 +31,10 @@ from webui.orchestrator.transcript import STOP_CODE, TranscriptBuilder, activity
 from webui.orchestrator.turn_input import auto_continue, has_user_message, input_records
 
 REQUEST_LIMIT = 15
+MAX_STEPS = "This reply used its maximum number of steps and stopped. Send a message to continue."
+# The stable sentence of pydantic-ai's UsageLimitExceeded for `request_limit`. The number varies:
+# compaction's nested summary runs with the limit reduced by one.
+_REQUEST_LIMIT_TEXT = "The next request would exceed the request_limit of"
 BUSY = "This chat is still answering. Wait for it to finish first."
 STOPPED = "Stopped by the author"
 AWAITING_APPROVAL = "The chat is waiting for an approval. Answer it before continuing."
@@ -231,10 +235,10 @@ class OrchestratorRuns:
             run.buffer.append(chunk)
 
     async def _tap(self, events: AsyncIterator[Any], turn: Turn, progress: _Progress) -> AsyncIterator[Any]:
-        """Pass events through, redacting errors and writing each completed message to the transcript."""
+        """Pass events through, rewriting run errors and writing each completed message to the transcript."""
         async for event in events:
             if event.type == EventType.RUN_ERROR:
-                event = event.model_copy(update={"message": redact_sensitive_text(event.message)})
+                event = event.model_copy(update={"message": _author_message(event.message)})
             progress.builder.feed(event)
             self._record(turn, progress.builder.take())
             yield event
@@ -267,3 +271,10 @@ class OrchestratorRuns:
         # A completed or cancelled run reports its messages; otherwise keep what the run got to.
         completed = progress.completed
         self._save(turn, completed if completed is not None else settled(progress.live))
+
+
+def _author_message(message: str) -> str:
+    """Plain wording when the run stops at its request limit; other errors stay redacted."""
+    if _REQUEST_LIMIT_TEXT in message:
+        return MAX_STEPS
+    return redact_sensitive_text(message)

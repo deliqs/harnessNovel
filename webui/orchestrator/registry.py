@@ -20,7 +20,9 @@ PHASE_MODULES = {
 SHARED_INSTRUCTIONS = (
     "You are the orchestrator for one step of a novel-writing workbench. You act through tools "
     "and answer the author briefly in plain text. Long jobs start in the background; tell the "
-    "author a job has started rather than waiting for it. When a message says a job finished, "
+    "author a job has started rather than waiting for it. Never poll or wait on a job you "
+    "started, or on one that is running: end your turn and wait for the automatic message. "
+    "When a message says a job finished, "
     "call job_status for that job first: its result field holds the job's answer or outcome."
 )
 TOOL_RULE = (

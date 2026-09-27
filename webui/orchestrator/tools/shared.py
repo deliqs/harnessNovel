@@ -24,6 +24,7 @@ PHASE_DESIGN_SCOPE = {"design": "concept", "stage": "stage"}
 RESULT_CHARS = 1500
 FIELD_CHARS = 300
 _LIVE_STATUSES = {"queued", "running", "pausing", "paused", "stopping"}
+STILL_RUNNING = "Still running. End your turn now; an automatic message will tell you when it finishes."
 
 _JOB_STATUS = {
     "world": lambda runtime, ws, args: runtime.world_chat.job_status(ws),
@@ -168,6 +169,7 @@ def job_status(
 
     Once the job has ended, `result` holds its outcome: the job's latest note (its answer,
     critique or summary, cut to the last 1500 characters) or, for a CLI task, its message.
+    While it is still running, end your turn; a second check of that same running job is refused.
 
     Args:
         kind: Which job: world, design, arcs, chapters, drafts, or a CLI task.
@@ -187,8 +189,27 @@ def job_status(
     if missing:
         raise ModelRetry(f"job_status for {kind} needs {', '.join(missing)}.")
     status = _scalars(_JOB_STATUS[kind](ctx.deps.runtime, ctx.deps.workspace, args))
-    if status.get("status") not in _LIVE_STATUSES:
-        status["result"] = _job_result(ctx.deps.runtime, ctx.deps.workspace, kind, args, status)
+    if status.get("status") in _LIVE_STATUSES:
+        return _running_status(ctx.deps, kind, args, status)
+    status["result"] = _job_result(ctx.deps.runtime, ctx.deps.workspace, kind, args, status)
+    return json.dumps(status, ensure_ascii=False)
+
+
+def _job_key(kind: str, args: dict[str, Any]) -> tuple[Any, ...]:
+    """The identity of one job: its kind and the locators this call resolved."""
+    return (kind, *(args[name] for name in JOB_LOCATORS[kind]))
+
+
+def _running_status(deps: OrchestratorDeps, kind: str, args: dict[str, Any], status: dict[str, Any]) -> str:
+    """A live job's status the first time this run asks; a repeat says to end the turn."""
+    key = _job_key(kind, args)
+    if key in deps.seen_live_jobs:
+        # results.py imports `capped` from this module, so this import stays local.
+        from webui.orchestrator.tools.results import refused
+
+        return refused(STILL_RUNNING)
+    deps.seen_live_jobs.add(key)
+    status["note"] = STILL_RUNNING
     return json.dumps(status, ensure_ascii=False)
 
 

@@ -5,7 +5,8 @@ import unittest
 from unittest.mock import patch
 
 from pydantic_ai import Tool
-from pydantic_ai.messages import UserPromptPart
+from pydantic_ai.messages import ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.models.function import DeltaToolCall, FunctionModel
 
 from tests.orchestrator_fakes import (
     OrchestratorAppCase,
@@ -228,6 +229,41 @@ class OrchestratorRunTests(OrchestratorAppCase):
         self.assertEqual(len(history["pending_interrupts"]), 1)
         self.assertNotIn("auto_continue", [m.get("activityType") for m in history["messages"]])
         self.assertEqual(self.erased, [])
+
+    def test_a_request_limit_ends_with_a_plain_message(self):
+        calls = {"n": 0}
+
+        def summarize(messages, info):
+            return ModelResponse(parts=[TextPart("SUMMARY")])
+
+        async def always_list(messages, info):
+            calls["n"] += 1
+            yield {0: DeltaToolCall(name="list_artifacts", json_args="{}", tool_call_id="call_%d" % calls["n"])}
+
+        self.runtime.orchestrator.model_factory = lambda: FunctionModel(summarize, stream_function=always_list)
+        events = self.post_turn(run_body([user("Keep listing")]))
+
+        message = "This reply used its maximum number of steps and stopped. Send a message to continue."
+        self.assertGreater(calls["n"], 1)
+        self.assertEqual((events[-1]["type"], events[-1]["message"]), ("RUN_ERROR", message))
+        self.assertNotIn("request_limit", json.dumps(events))
+        recorded = [m["content"]["message"] for m in self.history()["messages"] if m.get("activityType") == "run_error"]
+        self.assertEqual(recorded, [message])
+        replay = sse_events(self.client.get(self.url("/stream")).text)
+        self.assertEqual(replay[-1]["message"], message)
+
+    def test_other_run_errors_stay_redacted(self):
+        self.use_model(ScriptedModel([RuntimeError("upstream refused api_key=sk-secretsecret123")]))
+
+        events = self.post_turn(run_body([user("Hi")]))
+
+        self.assertEqual(events[-1]["type"], "RUN_ERROR")
+        self.assertIn("upstream refused", events[-1]["message"])
+        self.assertIn("[REDACTED]", events[-1]["message"])
+        self.assertNotIn("secretsecret", events[-1]["message"])
+        self.assertNotIn("maximum number of steps", events[-1]["message"])
+        self.assertNotIn("secretsecret", json.dumps(self.history()["messages"]))
+
 
 if __name__ == "__main__":
     unittest.main()

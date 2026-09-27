@@ -157,6 +157,58 @@ class SharedToolTests(unittest.TestCase):
         self.assertNotIn("result", report)
         self.runtime.arcs_chat.get.assert_not_called()
 
+    def test_job_status_notes_a_live_job_and_refuses_a_repeat(self):
+        self.runtime.arcs_chat = MagicMock()
+        self.runtime.arcs_chat.job_status.return_value = {"status": "running", "message": "arc 2 of 5"}
+        ctx = self._ctx({"volume": 1})
+        note = "Still running. End your turn now; an automatic message will tell you when it finishes."
+
+        first = json.loads(job_status(ctx, "arcs"))
+        repeat = json.loads(job_status(ctx, "arcs", volume=1))
+        other = json.loads(job_status(ctx, "arcs", volume=2))
+
+        self.assertEqual(first["note"], note)
+        self.assertNotIn("result", first)
+        self.assertEqual(repeat, {"status": "refused", "message": note})
+        self.assertNotIn("arc 2 of 5", json.dumps(repeat))
+        self.assertEqual(other["status"], "running")
+        self.assertEqual(other["note"], note)
+
+    def test_job_status_never_refuses_a_finished_job(self):
+        self.runtime.arcs_chat = MagicMock()
+        self.runtime.arcs_chat.job_status.return_value = {"status": "completed"}
+        self.runtime.arcs_chat.get.return_value.turns = [{"role": "assistant", "content": "Arcs ready."}]
+        ctx = self._ctx({"volume": 1})
+
+        first = json.loads(job_status(ctx, "arcs"))
+        second = json.loads(job_status(ctx, "arcs"))
+
+        self.assertEqual(first["status"], "completed")
+        self.assertEqual(first["result"], "Arcs ready.")
+        self.assertNotIn("note", first)
+        self.assertEqual(second["status"], "completed")
+        self.assertEqual(second["result"], "Arcs ready.")
+
+        live = self._ctx({"volume": 3})
+        self.runtime.arcs_chat.job_status.return_value = {"status": "running"}
+        job_status(live, "arcs")
+        self.runtime.arcs_chat.job_status.return_value = {"status": "completed"}
+        done = json.loads(job_status(live, "arcs"))
+        self.assertEqual(done["status"], "completed")
+        self.assertEqual(done["result"], "Arcs ready.")
+
+    def test_job_status_allows_the_same_live_job_on_fresh_deps(self):
+        self.runtime.world_chat = MagicMock()
+        self.runtime.world_chat.job_status.return_value = {"status": "paused", "message": "waiting"}
+        note = "Still running. End your turn now; an automatic message will tell you when it finishes."
+        job_status(self._ctx({}), "world")
+
+        report = json.loads(job_status(self._ctx({}), "world"))
+
+        self.assertEqual(report["status"], "paused")
+        self.assertEqual(report["note"], note)
+        self.assertNotEqual(report["status"], "refused")
+
     def test_job_status_gives_a_finished_tasks_message(self):
         self.runtime.tasks.get.return_value = TaskRecord(
             id="t1", type="world_build", label="Build", workspace="book", status="failed", message="Run failed (exit code 2)",
@@ -205,7 +257,9 @@ class ContractTests(unittest.TestCase):
 
     def test_instructions_send_the_model_to_job_status_after_a_job(self):
         for phase in PHASE_MODULES:
-            self.assertIn("call job_status", instructions_for(phase))
+            text = instructions_for(phase)
+            self.assertIn("call job_status", text)
+            self.assertIn("Never poll or wait on a job you started", text)
 
     def test_compaction_target_reads_the_environment(self):
         old = os.environ.get(compaction.TARGET_ENV)
