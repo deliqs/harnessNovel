@@ -36,16 +36,21 @@ def _is_stream_unsupported(exc):
 
 def _collect_stream(stream):
     parts = []
+    finish_reason = None
     try:
         for event in stream:
             choices = getattr(event, "choices", None) or []
             if not choices:
                 continue
-            delta = getattr(choices[0], "delta", None)
+            choice = choices[0]
+            reason = getattr(choice, "finish_reason", None)
+            if reason:
+                finish_reason = reason
+            delta = getattr(choice, "delta", None)
             content = getattr(delta, "content", None) if delta is not None else None
             if content:
                 parts.append(content)
-        return "".join(parts)
+        return "".join(parts), finish_reason
     finally:
         close = getattr(stream, "close", None)
         if callable(close):
@@ -53,6 +58,16 @@ def _collect_stream(stream):
                 close()
             except Exception:
                 pass
+
+
+def _warn_if_truncated(finish_reason, max_tokens):
+    if finish_reason != "length":
+        return
+    limit = max_tokens if max_tokens else "server default"
+    print(
+        f"[LLMProvider] Reply hit the max_tokens limit ({limit}) and is truncated. "
+        "Set <SLOT>_MAX_TOKENS to raise the limit."
+    )
 
 
 class LLMProvider:
@@ -95,7 +110,9 @@ class LLMProvider:
         """Stream by default so the timeout is idle time between tokens."""
         try:
             stream = client.chat.completions.create(stream=True, **kwargs)
-            return _collect_stream(stream)
+            text, finish_reason = _collect_stream(stream)
+            _warn_if_truncated(finish_reason, kwargs.get("max_tokens"))
+            return text
         except Exception as exc:
             if not _is_stream_unsupported(exc):
                 raise

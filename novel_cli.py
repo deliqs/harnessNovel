@@ -31,6 +31,8 @@ DATA_BUILDER_API_KEY=local-only
 ADAPTIVE_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
 ADAPTIVE_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
 ADAPTIVE_BUILDER_API_KEY=local-only
+# Book and stage design re-emits whole files.
+ADAPTIVE_BUILDER_MAX_TOKENS=32768
 
 # Story arcs and chapter outlines. This is also the fallback for optional roles below.
 ADAPTIVE_BUILDER_LITE_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored

@@ -1,16 +1,21 @@
+import io
 import os
 import threading
 import unittest
+from contextlib import redirect_stdout
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from openai import Timeout
 
+from core.config import ConfigLoader
 from core.llm_provider import LLMProvider
 
 
-def _delta_event(text):
-    return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text))])
+def _delta_event(text, finish_reason=None):
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content=text), finish_reason=finish_reason)]
+    )
 
 
 def _message_response(text):
@@ -97,6 +102,118 @@ class LLMProviderTimeoutTests(unittest.TestCase):
         )
         kwargs = provider._completion_kwargs("prompt", 0.7, False, None)
         self.assertNotIn("extra_body", kwargs)
+
+    def _generate_captured(self, events, max_tokens=None):
+        client = MagicMock()
+        captured = {}
+
+        def create(**kwargs):
+            captured.update(kwargs)
+            return iter(events)
+
+        client.chat.completions.create.side_effect = create
+        buffer = io.StringIO()
+        with patch("core.llm_provider.OpenAI", return_value=client):
+            provider = LLMProvider(model="m", api_key="k", max_tokens=max_tokens)
+            with redirect_stdout(buffer):
+                text = provider.generate("prompt", max_retries=2)
+        return text, buffer.getvalue(), captured, client
+
+    def test_env_max_tokens_is_sent_on_the_request(self):
+        client = MagicMock()
+        captured = {}
+
+        def create(**kwargs):
+            captured.update(kwargs)
+            return iter([_delta_event("done", "stop")])
+
+        client.chat.completions.create.side_effect = create
+        overrides = {
+            "ADAPTIVE_BUILDER_MODEL": "test-model",
+            "ADAPTIVE_BUILDER_BASE_URL": "http://example.test/v1",
+            "ADAPTIVE_BUILDER_API_KEY": "test-key",
+            "ADAPTIVE_BUILDER_MAX_TOKENS": "32768",
+        }
+        with patch.dict(os.environ, overrides, clear=False), \
+             patch("core.config._load_env", return_value={}), \
+             patch("core.llm_provider.OpenAI", return_value=client):
+            ConfigLoader.reload()
+            config = ConfigLoader.get_adaptive_builder_config()
+            provider = LLMProvider(
+                model="m",
+                api_key="k",
+                max_tokens=config["max_tokens"],
+            )
+            text = provider.generate("prompt", max_retries=0)
+        ConfigLoader.reload()
+        self.assertEqual(config["max_tokens"], 32768)
+        self.assertEqual(text, "done")
+        self.assertEqual(captured["max_tokens"], 32768)
+
+    def test_unset_or_invalid_max_tokens_sends_none(self):
+        for raw in (None, "", "0", "nope"):
+            with self.subTest(raw=raw):
+                overrides = {
+                    "DATA_BUILDER_MODEL": "test-model",
+                    "DATA_BUILDER_BASE_URL": "http://example.test/v1",
+                    "DATA_BUILDER_API_KEY": "test-key",
+                }
+                if raw is not None:
+                    overrides["DATA_BUILDER_MAX_TOKENS"] = raw
+                with patch.dict(os.environ, overrides, clear=False), \
+                     patch("core.config._load_env", return_value={}):
+                    os.environ.pop("DATA_BUILDER_MAX_TOKENS", None)
+                    if raw is not None:
+                        os.environ["DATA_BUILDER_MAX_TOKENS"] = raw
+                    ConfigLoader.reload()
+                    config = ConfigLoader.get_data_builder_config()
+                ConfigLoader.reload()
+                self.assertIsNone(config["max_tokens"])
+                text, output, captured, client = self._generate_captured(
+                    [_delta_event("ok", "stop")],
+                    max_tokens=config["max_tokens"],
+                )
+                self.assertEqual(text, "ok")
+                self.assertIn("max_tokens", captured)
+                self.assertIsNone(captured["max_tokens"])
+                self.assertNotIn("truncated", output)
+                self.assertEqual(client.chat.completions.create.call_count, 1)
+
+    def test_length_finish_warns_and_returns_text(self):
+        text, output, captured, client = self._generate_captured([
+            _delta_event("partial", None),
+            _delta_event(None, "length"),
+        ])
+        self.assertEqual(text, "partial")
+        self.assertIsNone(captured["max_tokens"])
+        self.assertEqual(client.chat.completions.create.call_count, 1)
+        self.assertIn("hit the max_tokens limit (server default)", output)
+        self.assertIn("truncated", output)
+        self.assertIn("<SLOT>_MAX_TOKENS", output)
+
+        text, output, captured, client = self._generate_captured(
+            [_delta_event("partial", "length")],
+            max_tokens=32768,
+        )
+        self.assertEqual(text, "partial")
+        self.assertEqual(captured["max_tokens"], 32768)
+        self.assertEqual(client.chat.completions.create.call_count, 1)
+        self.assertIn("hit the max_tokens limit (32768)", output)
+        self.assertIn("truncated", output)
+        self.assertIn("<SLOT>_MAX_TOKENS", output)
+        self.assertNotIn("server default", output)
+
+    def test_stop_finish_prints_no_truncation_warning(self):
+        text, output, captured, client = self._generate_captured([
+            _delta_event("Hello", None),
+            _delta_event(" world", "stop"),
+        ], max_tokens=128)
+        self.assertEqual(text, "Hello world")
+        self.assertEqual(captured["max_tokens"], 128)
+        self.assertEqual(client.chat.completions.create.call_count, 1)
+        self.assertNotIn("truncated", output)
+        self.assertNotIn("<SLOT>_MAX_TOKENS", output)
+        self.assertNotIn("max_tokens limit", output)
 
 
 if __name__ == "__main__":

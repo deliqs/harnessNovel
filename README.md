@@ -186,6 +186,8 @@ DATA_BUILDER_API_KEY=local-only
 ADAPTIVE_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
 ADAPTIVE_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
 ADAPTIVE_BUILDER_API_KEY=local-only
+# Book and stage design re-emits whole files.
+ADAPTIVE_BUILDER_MAX_TOKENS=32768
 
 # Story arcs and chapter outlines. This is the fallback for optional roles below.
 ADAPTIVE_BUILDER_LITE_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
@@ -212,7 +214,7 @@ HARNESS_NOVEL_PROMPT_TRACE_MODE=metadata
 # HARNESS_NOVEL_HOME=
 ```
 
-You can also override these settings with environment variables of the same names. `DATA_BUILDER` handles reference extraction, `ADAPTIVE_BUILDER` handles book and stage design, and Lite is the exact fallback for each missing optional-role field. `DRAFT` writes chapter prose, `EDITOR` handles refinement and humanization, and `CRITIC` handles story-arc/chapter-outline planning, routing, validation, and lightweight decisions. Each missing `DRAFT`, `EDITOR`, or `CRITIC` model, base URL, or key falls back independently to `ADAPTIVE_BUILDER_LITE`.
+You can also override these settings with environment variables of the same names. `DATA_BUILDER` handles reference extraction, `ADAPTIVE_BUILDER` handles book and stage design, and Lite is the exact fallback for each missing optional-role field. `DRAFT` writes chapter prose, `EDITOR` handles refinement and humanization, and `CRITIC` handles story-arc/chapter-outline planning, routing, validation, and lightweight decisions. Each missing `DRAFT`, `EDITOR`, or `CRITIC` model, base URL, or key falls back independently to `ADAPTIVE_BUILDER_LITE`. `*_MAX_TOKENS` is optional per slot; unset means the provider or server default.
 
 The local Web workbench uses this same global file. Open its Settings panel to edit the same model roles without revealing saved API keys. Clearing an optional role returns it to the Lite fallback.
 

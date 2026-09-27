@@ -53,6 +53,20 @@ def _load_env():
     return {}
 
 
+def _parse_max_tokens(value):
+    """Return a positive int, or None when unset, blank, non-integer, or <= 0."""
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        return None
+    try:
+        parsed = int(text)
+    except ValueError:
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
 class ConfigLoader:
     _env = None
 
@@ -89,6 +103,9 @@ class ConfigLoader:
             "model": os.getenv(f"{prefix}_MODEL") or env.get(f"{prefix}_MODEL", ""),
             "base_url": os.getenv(f"{prefix}_BASE_URL") or env.get(f"{prefix}_BASE_URL", ""),
             "api_key": os.getenv(f"{prefix}_API_KEY") or env.get(f"{prefix}_API_KEY", ""),
+            "max_tokens": _parse_max_tokens(
+                os.getenv(f"{prefix}_MAX_TOKENS") or env.get(f"{prefix}_MAX_TOKENS", "")
+            ),
         }
 
     @classmethod
@@ -121,7 +138,7 @@ class ConfigLoader:
         lite_config = cls.get_adaptive_builder_lite_config()
         return {
             key: role_config.get(key) or lite_config.get(key, "")
-            for key in ("model", "base_url", "api_key")
+            for key in ("model", "base_url", "api_key", "max_tokens")
         }
 
     @classmethod
