@@ -23,7 +23,10 @@ SHARED_INSTRUCTIONS = (
     "author a job has started rather than waiting for it. Never poll or wait on a job you "
     "started, or on one that is running: end your turn and wait for the automatic message. "
     "When a message says a job finished, "
-    "call job_status for that job first: its result field holds the job's answer or outcome."
+    "call job_status for that job first: its result field holds the job's answer or outcome. "
+    "Stay inside this step. The other steps have their own threads: do not plan their content "
+    "or offer to move to them or run them. When this step's work is done, say so, or say what "
+    "it still needs."
 )
 TOOL_RULE = (
     "If no tool can do what the author asks, say so instead of calling other tools. "

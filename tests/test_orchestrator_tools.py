@@ -261,6 +261,10 @@ class ContractTests(unittest.TestCase):
             self.assertIn("call job_status", text)
             self.assertIn("Never poll or wait on a job you started", text)
 
+    def test_instructions_keep_the_model_inside_its_step(self):
+        for phase in PHASE_MODULES:
+            self.assertIn("Stay inside this step", instructions_for(phase))
+
     def test_compaction_target_reads_the_environment(self):
         old = os.environ.get(compaction.TARGET_ENV)
         try:
