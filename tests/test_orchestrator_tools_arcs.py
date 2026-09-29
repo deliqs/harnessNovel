@@ -6,7 +6,7 @@ from unittest.mock import patch
 from pydantic_ai import ModelRetry
 
 from tests.scoped_tool_case import ScopedToolCase
-from webui.orchestrator.tools.arcs import arcs_continue, arcs_generate, arcs_overview, arcs_reset
+from webui.orchestrator.tools.arcs import arcs_continue, arcs_generate, arcs_overview, arcs_refine, arcs_reset
 
 
 class ArcsToolTests(ScopedToolCase):
@@ -23,10 +23,60 @@ class ArcsToolTests(ScopedToolCase):
         arcs_generate(self.ctx({"volume": 2}), "Go", volume=3)
         self.runtime.arcs_chat.start_message.assert_called_once_with("book", 3, "Go")
 
+    def test_generate_on_a_volume_with_arcs_is_refused(self):
+        self.write_arc(1, 1, 1, 10)
+        resume = {"can_resume": False, "completed": 1, "total": 1}
+        with patch("training.adaptive_builder.story_arc_resume_status", return_value=resume):
+            message = self.assert_status(arcs_generate(self.ctx({"volume": 1}), "Five arcs."), "refused")
+        self.assertIn("arcs_refine", message)
+        self.assertIn("arcs_reset", message)
+        self.runtime.arcs_chat.start_message.assert_not_called()
+
+    def test_generate_on_an_unfinished_volume_points_to_continue(self):
+        self.write_arc(1, 1, 1, 10)
+        resume = {"can_resume": True, "completed": 1, "total": 4, "next_arc": 2}
+        with patch("training.adaptive_builder.story_arc_resume_status", return_value=resume):
+            message = self.assert_status(arcs_generate(self.ctx({"volume": 1}), "Five arcs."), "refused")
+        self.assertIn("arcs_continue", message)
+        self.assertNotIn("arcs_reset", message)
+        self.runtime.arcs_chat.start_message.assert_not_called()
+
+    def test_refine_passes_the_arc_mode_and_cascade(self):
+        self.write_arc(1, 1, 1, 10)
+        self.write_arc(1, 2, 11, 20)
+        result = arcs_refine(self.ctx({"volume": 1}), " Darker. ", arc=2, mode="regenerate", cascade=True)
+
+        self.runtime.arcs_chat.start_message.assert_called_once_with(
+            "book", 1, "Darker.", arc=2, mode="regenerate", cascade=True,
+        )
+        self.assertIn("arc 2", self.assert_started(result, "/api/workspaces/book/arcs/1/job")["message"])
+
+    def test_refine_defaults_to_one_routed_change_without_cascade(self):
+        self.write_arc(2, 1, 1, 10)
+        arcs_refine(self.ctx({"volume": 2}), "Tighter pacing")
+        self.runtime.arcs_chat.start_message.assert_called_once_with(
+            "book", 2, "Tighter pacing", arc=None, mode=None, cascade=False,
+        )
+
+    def test_refine_without_arcs_on_disk_is_refused(self):
+        message = self.assert_status(arcs_refine(self.ctx({"volume": 1}), "Darker", arc=1), "refused")
+        self.assertIn("arcs_generate", message)
+        self.runtime.arcs_chat.start_message.assert_not_called()
+
+    def test_refine_of_a_missing_arc_is_refused(self):
+        self.write_arc(1, 1, 1, 10)
+        self.write_arc(1, 2, 11, 20)
+        message = self.assert_status(arcs_refine(self.ctx({"volume": 1}), "Darker", arc=5), "refused")
+        self.assertIn("no arc 5", message)
+        self.assertIn("1, 2", message)
+        self.runtime.arcs_chat.start_message.assert_not_called()
+
     def test_without_a_volume_or_message_the_model_is_asked_to_retry(self):
         for call in (
             lambda: arcs_generate(self.ctx(), "Go"),
             lambda: arcs_generate(self.ctx({"volume": 1}), "   "),
+            lambda: arcs_refine(self.ctx(), "Go"),
+            lambda: arcs_refine(self.ctx({"volume": 1}), "   "),
             lambda: arcs_continue(self.ctx()),
             lambda: arcs_reset(self.ctx({"arc": 1})),
             lambda: arcs_overview(self.ctx()),
@@ -88,6 +138,7 @@ class ArcsToolTests(ScopedToolCase):
     def test_job_and_destructive_tools_need_approval(self):
         approvals = self.approvals()
         self.assertTrue(approvals["arcs_generate"])
+        self.assertTrue(approvals["arcs_refine"])
         self.assertTrue(approvals["arcs_continue"])
         self.assertTrue(approvals["arcs_reset"])
         self.assertFalse(approvals["arcs_overview"])

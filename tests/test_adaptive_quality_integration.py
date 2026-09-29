@@ -306,6 +306,8 @@ class AdaptiveQualityIntegrationTests(unittest.TestCase):
         arc_prompt = PromptLoader.load(
             "novel_story_arc", long_mainline=hostile, previous_stage="previous",
             current_stage="current", reference_story_arcs="reference",
+            prior_arc_ledger=hostile, author_brief="(none)", review_note="",
+            continuity_rule="continuity",
             arc_index=1, start_chapter=1, end_chapter=5,
             target_char_count=1000, target_field_chars=100,
         )
@@ -313,6 +315,12 @@ class AdaptiveQualityIntegrationTests(unittest.TestCase):
             "[BEGIN UNTRUSTED WORKSPACE DATA: LONG MAINLINE]\n"
             + hostile
             + "\n[END UNTRUSTED WORKSPACE DATA: LONG MAINLINE]",
+            arc_prompt,
+        )
+        self.assertIn(
+            "[BEGIN UNTRUSTED WORKSPACE DATA: PRIOR ARC LEDGER]\n"
+            + hostile
+            + "\n[END UNTRUSTED WORKSPACE DATA: PRIOR ARC LEDGER]",
             arc_prompt,
         )
         humanize_prompt = PromptLoader.load(

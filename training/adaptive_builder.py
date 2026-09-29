@@ -56,11 +56,32 @@ from training.story_context import (
     _claims_ledger,
     _scene_types_used,
 )
+from training.story_arc_ledger import arc_record, render_author_brief, render_ledger
+from training.story_arc_review import (
+    outcome,
+    render_outcomes,
+    retry_note,
+    review_against_siblings,
+)
 
 BATCH_SIZE = 20
 STORY_ARC_FILE_RE = re.compile(r'^arc_(\d+)_ch(\d+)_(\d+)\.md$')
 STORY_ARC_TARGET_CHAPTERS = 5
 STORY_ARC_TARGET_CHARS_MAX = 5000
+STORY_ARC_FIRST_CONTINUITY_RULE = (
+    "It must pick up the previous stage's ending state and strictly obey the current stage's "
+    "three-act structure, character roster, and foreshadowing plan."
+)
+STORY_ARC_NEXT_CONTINUITY_RULE = (
+    "Start from the previous arc's next bind: the concrete pending event named in the prior-arc "
+    "ledger is this arc's opening event, and this arc's Boundary reason must name it. Do not "
+    "re-stage any opening event, beat, or boundary listed in the ledger; each arc opens on a "
+    "different event. Still obey the current stage's three-act structure, character roster, "
+    "and foreshadowing plan."
+)
+STORY_ARC_NO_PRIOR_ARCS = "(no prior arcs in this stage)"
+STORY_ARC_NO_AUTHOR_BRIEF = "(none)"
+STORY_ARC_HALT_STATUSES = ("rejected", "no_output")
 STAGE_DESIGN_PIPELINE_VERSION = 2
 OPERATION_ADJUST_LAST_PHASE = "adjust last phase"
 OPERATION_ADD_PHASE = "add phase"
@@ -3792,7 +3813,8 @@ def _story_arc_plans_for_volume(ws, volume, total_chapters):
     return enrich_arc_plans(plans, stage_text)
 
 
-def _story_arc_prompt_context(generation_context, plan, ws=None, stage_number=None):
+def _story_arc_prompt_context(generation_context, plan, ws=None, stage_number=None,
+                              prior_records=(), author_brief="", review_note=""):
     ctx = dict(generation_context)
     sample = str(plan.get("reference_story_arc") or "").strip()
     if sample:
@@ -3808,6 +3830,13 @@ def _story_arc_prompt_context(generation_context, plan, ws=None, stage_number=No
             str(ctx.get("current_stage") or "")
             + "\n\n[Whole-stage arc plan]\n" + story_plan
         )
+    arc_idx = int(plan.get("idx") or 1)
+    ctx["prior_arc_ledger"] = render_ledger(prior_records, arc_idx) or STORY_ARC_NO_PRIOR_ARCS
+    ctx["author_brief"] = render_author_brief(author_brief, arc_idx) or STORY_ARC_NO_AUTHOR_BRIEF
+    ctx["review_note"] = review_note
+    ctx["continuity_rule"] = (
+        STORY_ARC_FIRST_CONTINUITY_RULE if arc_idx <= 1 else STORY_ARC_NEXT_CONTINUITY_RULE
+    )
     return ctx
 
 
@@ -4198,12 +4227,265 @@ def _load_volume_outline_context(ws, volume):
     return vol_outline, vol_worldview, max(int(c) for c in chapter_nums)
 
 
+def _story_arc_run(ws, llm, volume, generation_context, target_char_count, total_arcs,
+                   force=False, author_brief="", progress_callback=None,
+                   pause_event=None, stop_event=None, cancel_event=None):
+    """Shared state for one story-arc run; items collects kept and written units in arc order."""
+    return {
+        "ws": ws, "llm": llm, "volume": volume, "force": force,
+        "generation_context": generation_context, "target_char_count": target_char_count,
+        "author_brief": author_brief, "items": [], "total_arcs": total_arcs,
+        "progress_callback": progress_callback, "pause_event": pause_event,
+        "stop_event": stop_event, "cancel_event": cancel_event,
+    }
+
+
+def _story_arc_progress(run, phase, detail):
+    """Report progress; a refine run counts the units it wrote, generation counts every settled unit."""
+    if run["progress_callback"]:
+        done = run.get("written", run["items"])
+        run["progress_callback"](phase, len(done), run["total_arcs"], detail)
+
+
+def _wait_for_story_arc_turn(run):
+    """Honour stop and pause between units; return False when the run should end."""
+    stop_event = run["stop_event"]
+    if stop_event is not None and stop_event.is_set():
+        return False
+    pause_event = run["pause_event"]
+    if pause_event is not None:
+        if not pause_event.is_set():
+            _story_arc_progress(
+                run, "paused", "Paused; click continue to generate from the next story-arc unit",
+            )
+        pause_event.wait()
+    return not (stop_event is not None and stop_event.is_set())
+
+
+def _append_story_arc_item(run, plan, content):
+    arc_idx, start_ch, end_ch = plan["idx"], plan["start_ch"], plan["end_ch"]
+    run["items"].append({
+        "idx": arc_idx,
+        "start_ch": start_ch,
+        "end_ch": end_ch,
+        "file": _story_arc_file_name(arc_idx, start_ch, end_ch),
+        "path": _story_arc_path(run["ws"], run["volume"], arc_idx, start_ch, end_ch),
+        "content": content,
+    })
+
+
+def _call_story_arc_writer(run, plan, review_note):
+    """Call the arc writer (run["writer"] when set), waiting out pauses; return None when the run was stopped."""
+    stop_event = run["stop_event"]
+    pause_event = run["pause_event"]
+    cancel_event = run["cancel_event"]
+    while True:
+        try:
+            if run.get("writer") is not None:
+                return run["writer"](run, plan, review_note)
+            return _generate_story_arc(
+                ws=run["ws"],
+                llm=run["llm"],
+                volume=run["volume"],
+                arc_idx=plan["idx"],
+                start_ch=plan["start_ch"],
+                end_ch=plan["end_ch"],
+                generation_context=_story_arc_prompt_context(
+                    run["generation_context"], plan, ws=run["ws"], stage_number=run["volume"],
+                    prior_records=[
+                        arc_record(item["idx"], item["start_ch"], item["end_ch"], item["content"])
+                        for item in run["items"]
+                    ],
+                    author_brief=run["author_brief"],
+                    review_note=review_note,
+                ),
+                target_char_count=run["target_char_count"],
+                cancel_event=cancel_event,
+            )
+        except LLMCallCancelled:
+            if stop_event is not None and stop_event.is_set():
+                return None
+            _story_arc_progress(
+                run, "paused", "Model request paused; click continue to regenerate the current story-arc",
+            )
+            if pause_event is not None:
+                pause_event.wait()
+            if cancel_event is not None:
+                cancel_event.clear()
+
+
+def _review_story_arc(run, plan, result):
+    """Validate a candidate and compare it with its siblings; an empty reason means it passed."""
+    arc_idx = plan["idx"]
+    diagnostics = diagnose_story_arc(
+        result, arc_idx, plan["start_ch"], plan["end_ch"],
+        target_chars=run["target_char_count"],
+        required_anchors=extract_critical_anchors("\n".join((plan.get("arc_obligations") or []) + (plan.get("chapter_beats") or []))),
+        reference_text=plan.get("reference_story_arc") or "",
+    )
+    if diagnostics["warnings"]:
+        warn_reasons = "; ".join(item["reason"] for item in diagnostics["warnings"])
+        print(f"  Note: story-arc unit {arc_idx} has soft warnings: {warn_reasons}")
+    if not diagnostics["valid"]:
+        reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
+        print(f"  Warning: story-arc unit {arc_idx} failed deterministic validation: {reasons}")
+        note = (
+            f"Your previous draft failed validation: {reasons}. Fix these problems and keep "
+            "the required first-line heading and all 10 field labels."
+        )
+        return {
+            "diagnostics": diagnostics, "reason": f"failed validation: {reasons}",
+            "note": note, "severity": "block",
+        }
+    siblings = [(item["idx"], item["content"]) for item in run["items"]]
+    review = review_against_siblings(result, siblings)
+    if review["collision"] is None:
+        return {"diagnostics": diagnostics, "reason": "", "note": "", "severity": ""}
+    print(f"  Warning: story-arc unit {arc_idx} {review['reason']}")
+    note = retry_note(review["collision"], dict(siblings)[review["collision"]])
+    return {
+        "diagnostics": diagnostics, "reason": review["reason"],
+        "note": note, "severity": review.get("severity") or "block",
+    }
+
+
+def _checked_story_arc_attempt(run, plan, review_note):
+    """One writer call plus review; None means the run was stopped."""
+    result = _call_story_arc_writer(run, plan, review_note)
+    if result is None:
+        return None
+    if not str(result).strip():
+        print(
+            f"  Warning: story-arc unit {plan['idx']} got no model output; not written. You can retry."
+        )
+        return {"status": "no_output", "reason": "the model returned no output", "result": ""}
+    return dict(_review_story_arc(run, plan, result), status="written", result=result)
+
+
+def _reviewed_story_arc(run, plan):
+    """Generate a unit and retry once with the review reason fed back; None means stopped.
+
+    A retry that still overlaps a sibling only by content words ("warn") is written with its
+    reason; a retry that fails validation or copies a sibling ("block") is rejected.
+    """
+    arc_idx = plan["idx"]
+    first = _checked_story_arc_attempt(run, plan, "")
+    if first is None or first["status"] == "no_output" or not first["reason"]:
+        return first
+    print(f"  Retrying story-arc unit {arc_idx} once: {first['reason']}")
+    _story_arc_progress(run, "generating", f"Retrying story-arc unit {arc_idx}: {first['reason']}")
+    second = _checked_story_arc_attempt(run, plan, first["note"])
+    if second is None:
+        return None
+    if second["status"] == "no_output":
+        return dict(second, reason=f"{first['reason']}; the retry returned no output")
+    if second["reason"] and second["severity"] == "warn" and second["diagnostics"]["valid"]:
+        print(f"  Note: story-arc unit {arc_idx} accepted with warning: {second['reason']}")
+        return dict(second, reason=f"accepted with warning: {second['reason']}")
+    if second["reason"]:
+        print(f"  Warning: story-arc unit {arc_idx} failed review again; not written: {second['reason']}")
+        return dict(second, status="rejected")
+    return dict(second, status="retried", reason=first["reason"])
+
+
+def _write_story_arc(run, plan, arc_file, existing, reviewed):
+    ws, volume = run["ws"], run["volume"]
+    arc_idx, start_ch, end_ch = plan["idx"], plan["start_ch"], plan["end_ch"]
+    result = reviewed["result"]
+    if existing and existing != result:
+        _mark_chapter_dependencies_stale(
+            ws, volume, start_ch, end_ch,
+            f"Story-arc unit {arc_idx} was replaced after validation.",
+        )
+    write_artifact(
+        arc_file, result, "story_arc",
+        dependencies={
+            "canonical_context": run["generation_context"].get("current_stage", ""),
+            "stage_story_plan": plan.get("stage_story_plan", ""),
+            "reference_structure_sample": plan.get("reference_story_arc", ""),
+        },
+        metadata={
+            "stage": volume, "arc": arc_idx,
+            "start_chapter": start_ch, "end_chapter": end_ch,
+            "diagnostics": reviewed["diagnostics"],
+        },
+    )
+    _append_story_arc_item(run, plan, result)
+    _story_arc_progress(run, "generating", f"story-arc unit {arc_idx} complete")
+    print(f"  -> Story-arc unit {arc_idx} saved: {arc_file}")
+
+
+def _story_arc_unit(run, plan):
+    """Keep, write, or reject one planned unit; return its outcome, or None when stopped."""
+    arc_idx, start_ch, end_ch = plan["idx"], plan["start_ch"], plan["end_ch"]
+    _story_arc_progress(
+        run, "generating", f"Generating story-arc unit {arc_idx} (chapters {start_ch}-{end_ch})",
+    )
+    arc_file = _story_arc_path(run["ws"], run["volume"], arc_idx, start_ch, end_ch)
+    existing = _read_file(arc_file)
+    if existing and not run["force"]:
+        print(f"  Story-arc unit {arc_idx} (chapters {start_ch}-{end_ch}) already exists; skipping.")
+        _append_story_arc_item(run, plan, existing)
+        _story_arc_progress(
+            run, "generating", f"story-arc unit {arc_idx} already exists; continuing with the next unit",
+        )
+        return outcome(arc_idx, "kept")
+    print(f"  Generating story-arc unit {arc_idx} (chapters {start_ch}-{end_ch})...")
+    reviewed = _reviewed_story_arc(run, plan)
+    if reviewed is None:
+        return None
+    if reviewed["status"] in STORY_ARC_HALT_STATUSES:
+        if existing:
+            _append_story_arc_item(run, plan, existing)
+        return outcome(arc_idx, reviewed["status"], reviewed["reason"])
+    _write_story_arc(run, plan, arc_file, existing, reviewed)
+    return outcome(arc_idx, reviewed["status"], reviewed["reason"])
+
+
+def _story_arc_halt(outcomes):
+    return next((item for item in outcomes if item["status"] in STORY_ARC_HALT_STATUSES), None)
+
+
+def _story_arc_final_detail(outcomes, stopped):
+    if stopped:
+        return "This round of generation ended; completed content was kept"
+    halt = _story_arc_halt(outcomes)
+    if halt:
+        return f"Story-arc generation stopped at unit {halt['arc']} ({halt['status']}): {halt['reason']}"
+    return "All story-arc units complete"
+
+
+def _story_arc_run_note(volume, generated_items, outcomes, stopped):
+    """Lead with the written count and any halt; the outcome list goes last because callers cap the tail."""
+    written = sum(item["status"] in ("written", "retried") for item in outcomes)
+    halt = _story_arc_halt(outcomes)
+    if stopped:
+        lead = (
+            f"This round of generation ended; kept {len(generated_items)} story-arc units "
+            f"({written} written this run)."
+        )
+    elif halt:
+        lead = (
+            f"Wrote {written} story-arc units for volume {volume}, then stopped at unit {halt['arc']} "
+            f"({halt['status']}): {halt['reason']}. Later units were not generated."
+        )
+    else:
+        lead = (
+            f"Generated volume {volume} story-arc units, {len(generated_items)} total "
+            f"({written} written this run)."
+        )
+    return "\n\n".join(part for part in (lead, render_outcomes(outcomes)) if part)
+
+
 def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_event=None,
-                   stop_event=None, cancel_event=None):
+                   stop_event=None, cancel_event=None, author_brief=""):
     """Generate new-book story-arc units from the current stage design.
 
+    author_brief is the author's direction for the stage, passed to every unit as subordinate guidance.
+    Each unit is checked against its siblings and retried once; a rejected or empty unit ends the run.
+
     Return a result dict:
-    - success: {"artifacts": [...], "adjustment_note": "..."}
+    - success: {"artifacts": [...], "adjustment_note": "...", "stopped": bool, "outcomes": [...]}
     - failure: {"error": "...", "artifacts": []}
     """
     context = _load_volume_outline_context(ws, volume)
@@ -4232,167 +4514,47 @@ def gen_story_arcs(ws, volume=1, force=False, progress_callback=None, pause_even
         f"about {target_char_count} chars each) <<<"
     )
 
-    generated_items = []
+    outcomes = []
+    run = _story_arc_run(
+        ws, llm, volume, generation_context, target_char_count, total_arcs,
+        force=force, author_brief=author_brief, progress_callback=progress_callback,
+        pause_event=pause_event, stop_event=stop_event, cancel_event=cancel_event,
+    )
     for plan in arc_plans:
-        if stop_event is not None and stop_event.is_set():
+        if not _wait_for_story_arc_turn(run):
             break
-        if pause_event is not None:
-            if not pause_event.is_set() and progress_callback:
-                progress_callback(
-                    "paused", len(generated_items), total_arcs,
-                    "Paused; click continue to generate from the next story-arc unit",
-                )
-            pause_event.wait()
-        if stop_event is not None and stop_event.is_set():
+        unit_outcome = _story_arc_unit(run, plan)
+        if unit_outcome is None:
             break
-        arc_idx = plan["idx"]
-        start_ch = plan["start_ch"]
-        end_ch = plan["end_ch"]
-        if progress_callback:
-            progress_callback(
-                "generating", len(generated_items), total_arcs,
-                f"Generating story-arc unit {arc_idx} (chapters {start_ch}-{end_ch})",
-            )
-        arc_file = _story_arc_path(ws, volume, arc_idx, start_ch, end_ch)
-        arc_name = _story_arc_file_name(arc_idx, start_ch, end_ch)
-        existing = _read_file(arc_file)
-        if existing and not force:
-            print(f"  Story-arc unit {arc_idx} (chapters {start_ch}-{end_ch}) already exists; skipping.")
-            generated_items.append({
-                "idx": arc_idx,
-                "start_ch": start_ch,
-                "end_ch": end_ch,
-                "file": arc_name,
-                "path": arc_file,
-                "content": existing,
-            })
-            if progress_callback:
-                progress_callback(
-                    "generating", len(generated_items), total_arcs,
-                    f"story-arc unit {arc_idx} already exists; continuing with the next unit",
-                )
-            continue
+        outcomes.append(unit_outcome)
+        if unit_outcome["status"] in STORY_ARC_HALT_STATUSES:
+            break
 
-        print(f"  Generating story-arc unit {arc_idx} (chapters {start_ch}-{end_ch})...")
-        while True:
-            try:
-                result = _generate_story_arc(
-                    ws=ws,
-                    llm=llm,
-                    volume=volume,
-                    arc_idx=arc_idx,
-                    start_ch=start_ch,
-                    end_ch=end_ch,
-                    generation_context=_story_arc_prompt_context(
-                        generation_context, plan, ws=ws, stage_number=volume,
-                    ),
-                    target_char_count=target_char_count,
-                    cancel_event=cancel_event,
-                )
-                break
-            except LLMCallCancelled:
-                if stop_event is not None and stop_event.is_set():
-                    result = None
-                    break
-                if progress_callback:
-                    progress_callback(
-                        "paused", len(generated_items), total_arcs,
-                        "Model request paused; click continue to regenerate the current story-arc",
-                    )
-                if pause_event is not None:
-                    pause_event.wait()
-                if cancel_event is not None:
-                    cancel_event.clear()
-        if result is None:
-            break
-        if not str(result).strip():
-            print(
-                f"  Warning: story-arc unit {arc_idx} got no model output; not written. You can retry."
-            )
-            if existing:
-                generated_items.append({
-                    "idx": arc_idx, "start_ch": start_ch, "end_ch": end_ch,
-                    "file": arc_name, "path": arc_file, "content": existing,
-                })
-            continue
-        diagnostics = diagnose_story_arc(
-            result, arc_idx, start_ch, end_ch,
-            target_chars=target_char_count,
-            required_anchors=extract_critical_anchors("\n".join((plan.get("arc_obligations") or []) + (plan.get("chapter_beats") or []))),
-            reference_text=plan.get("reference_story_arc") or "",
-        )
-        if diagnostics["warnings"]:
-            warn_reasons = "; ".join(item["reason"] for item in diagnostics["warnings"])
-            print(f"  Note: story-arc unit {arc_idx} has soft warnings: {warn_reasons}")
-        if not diagnostics["valid"]:
-            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
-            print(f"  Warning: story-arc unit {arc_idx} failed deterministic validation; not written: {reasons}")
-            if existing:
-                generated_items.append({
-                    "idx": arc_idx, "start_ch": start_ch, "end_ch": end_ch,
-                    "file": arc_name, "path": arc_file, "content": existing,
-                })
-            continue
-        if existing and existing != result:
-            _mark_chapter_dependencies_stale(
-                ws, volume, start_ch, end_ch,
-                f"Story-arc unit {arc_idx} was replaced after validation.",
-            )
-        write_artifact(
-            arc_file, result, "story_arc",
-            dependencies={
-                "canonical_context": generation_context.get("current_stage", ""),
-                "stage_story_plan": plan.get("stage_story_plan", ""),
-                "reference_structure_sample": plan.get("reference_story_arc", ""),
-            },
-            metadata={
-                "stage": volume, "arc": arc_idx,
-                "start_chapter": start_ch, "end_chapter": end_ch,
-                "diagnostics": diagnostics,
-            },
-        )
-        generated_items.append({
-            "idx": arc_idx,
-            "start_ch": start_ch,
-            "end_ch": end_ch,
-            "file": arc_name,
-            "path": arc_file,
-            "content": result,
-        })
-        if progress_callback:
-            progress_callback(
-                "generating", len(generated_items), total_arcs,
-                f"story-arc unit {arc_idx} complete",
-            )
-        print(f"  -> Story-arc unit {arc_idx} saved: {arc_file}")
-
-    if len(generated_items) == total_arcs:
-        _write_story_arc_index(ws, volume, generated_items)
-    elif generated_items:
+    if len(run["items"]) == total_arcs:
+        _write_story_arc_index(ws, volume, run["items"])
+    elif run["items"]:
         print("  Warning: story-arc plan is incomplete; the previous arc index was kept unchanged.")
     stopped = stop_event is not None and stop_event.is_set()
     if progress_callback:
         progress_callback(
             "stopped" if stopped else "completed",
-            len(generated_items), total_arcs,
-            "This round of generation ended; completed content was kept" if stopped else "All story-arc units complete",
+            len(run["items"]), total_arcs,
+            _story_arc_final_detail(outcomes, stopped),
         )
-    print(f"\n>>> Volume {volume} story-arc units generated, {len(generated_items)} total.<<<")
+    print(f"\n>>> Volume {volume} story-arc units generated, {len(run['items'])} total.<<<")
 
     artifacts = [
         {
             "path": f"file_system/story_arcs/vol_{volume:02d}/{item['file']}",
             "label": f"story-arc unit {item['idx']} (chapters {item['start_ch']}-{item['end_ch']})",
         }
-        for item in generated_items
+        for item in run["items"]
     ]
     return {
         "artifacts": artifacts,
-        "adjustment_note": (
-            f"This round of generation ended; kept {len(generated_items)} story-arc units."
-            if stopped else f"Generated volume {volume} story-arc units, {len(generated_items)} total."
-        ),
+        "adjustment_note": _story_arc_run_note(volume, run["items"], outcomes, stopped),
         "stopped": stopped,
+        "outcomes": outcomes,
     }
 
 
@@ -4550,27 +4712,28 @@ def _serial_refinement_targets(ws, volume, arcs, start_arc):
     return targets
 
 
-def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
-                             pause_event=None, stop_event=None, cancel_event=None):
-    """Route the adjust start, then serially regenerate following story-arcs from that unit."""
-    arcs = _list_novel_story_arcs(ws, volume)
-    if not arcs:
-        return {"error": "This volume has no story-arc units yet.", "artifacts": []}
-    llm = _get_editor_llm()
-    if not llm:
-        return {"error": "No usable model is configured.", "artifacts": []}
+def _story_arc_refine_targets(ws, volume, arcs, start_arc, named, cascade):
+    """Planned units to rewrite from start_arc (only start_arc without cascade); the error says why there are none."""
+    targets = _serial_refinement_targets(ws, volume, arcs, start_arc)
+    if not targets:
+        return [], "Cannot read the full story-arc plan for the current volume."
+    if named and targets[0]["idx"] != start_arc:
+        return [], f"Story-arc unit {start_arc} is not in the story-arc plan for volume {volume}."
+    return (targets if cascade else targets[:1]), ""
 
+
+def _routed_story_arc_start(run, arcs):
+    """Ask the router for (start_arc, mode, reason), waiting out pauses; None means the run was stopped."""
+    progress_callback = run["progress_callback"]
+    stop_event, pause_event, cancel_event = run["stop_event"], run["pause_event"], run["cancel_event"]
     if progress_callback:
         progress_callback("routing", 0, len(arcs), "Analyzing the earliest story-arc unit affected by the user instruction")
     while True:
         try:
-            start_arc, refinement_mode, route_reason = _route_story_arc_refinement(
-                llm, arcs, instruction, cancel_event,
-            )
-            break
+            return _route_story_arc_refinement(run["llm"], arcs, run["instruction"], cancel_event)
         except LLMCallCancelled:
             if stop_event is not None and stop_event.is_set():
-                return {"artifacts": [], "adjustment_note": "This round of adjust ended; existing content was left unchanged.", "stopped": True}
+                return None
             if progress_callback:
                 progress_callback("paused", 0, len(arcs), "Range analysis paused; click continue to analyze again")
             if pause_event is not None:
@@ -4578,149 +4741,214 @@ def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
             if cancel_event is not None:
                 cancel_event.clear()
 
-    targets = _serial_refinement_targets(ws, volume, arcs, start_arc)
-    if not targets:
-        return {"error": "Cannot read the full story-arc plan for the current volume.", "artifacts": []}
-    target_char_count = _reference_story_arc_average_chars(ws, volume)
-    generation_context = _simple_story_arc_context(ws, volume)
-    generated_by_idx = {arc["idx"]: arc["content"] for arc in arcs if arc["idx"] < start_arc}
-    written = []
+
+def _story_arc_refine_start(run, arcs, arc, mode):
+    """Return (start_arc, mode, route_reason); a named arc skips the router. None means the run was stopped."""
+    instruction = run["instruction"]
+    if arc is not None:
+        return int(arc), _normalize_refinement_mode(mode, instruction), ""
+    routed = _routed_story_arc_start(run, arcs)
+    if routed is None:
+        return None
+    start_arc, routed_mode, route_reason = routed
+    return start_arc, (_normalize_refinement_mode(mode, instruction) if mode else routed_mode), route_reason
+
+
+def _story_arc_refine_action(run, target):
+    if not target["existed"]:
+        return "continue generating"
+    return "revise from original content" if run["mode"] == "revise" else "full regenerate"
+
+
+def _previous_story_arc_text(run, arc_idx):
+    """Latest accepted text of the unit before arc_idx: rewritten this run, or as it was before the start unit."""
+    for item in run["items"]:
+        if item["idx"] == arc_idx - 1:
+            return item["content"]
+    return "(this is the first story-arc unit of the current volume)"
+
+
+def _story_arc_refine_prompt(run, target, review_note):
+    return PromptLoader.load(
+        "story_arc_serial_refine",
+        **_story_arc_prompt_context(
+            run["generation_context"], target, ws=run["ws"], stage_number=run["volume"],
+            prior_records=[
+                arc_record(item["idx"], item["start_ch"], item["end_ch"], item["content"])
+                for item in run["items"]
+            ],
+            author_brief=run["author_brief"],
+            review_note=review_note,
+        ),
+        instruction=run["instruction"],
+        previous_story_arc=_previous_story_arc_text(run, target["idx"]),
+        current_story_arc=(
+            target["content"]
+            if run["mode"] == "revise"
+            else "(this round is a full regenerate; do not use the old version of this unit, and do not invent or restore old text.)"
+        ),
+        arc_index=target["idx"],
+        start_chapter=target["start_ch"],
+        end_chapter=target["end_ch"],
+        target_char_count=run["target_char_count"],
+    )
+
+
+def _call_story_arc_refiner(run, target, review_note):
+    """Refine writer for _call_story_arc_writer: the editor rewrites one target, then overlong text is compacted."""
+    llm, cancel_event = run["llm"], run["cancel_event"]
+    prompt = _story_arc_refine_prompt(run, target, review_note)
+    result = normalize_text(_generate_with_cancel(llm, prompt, cancel_event, temperature=0.3))
+    return _compact_story_arc_result(
+        llm, result, target["idx"], target["start_ch"], target["end_ch"],
+        run["target_char_count"], cancel_event,
+    )
+
+
+def _write_refined_story_arc(run, target, reviewed):
+    """Back up the old unit, mark its chapters stale when it changed, and write the reviewed text."""
     import shutil
+    ws, volume, arc_idx = run["ws"], run["volume"], target["idx"]
+    result = reviewed["result"]
+    previous = _previous_story_arc_text(run, arc_idx)
+    backup_path = os.path.join(run["backup_dir"], f"{target['file']}_{run['stamp']}")
+    if target["existed"] and not os.path.exists(backup_path):
+        shutil.copy2(target["path"], backup_path)
+    if target["existed"] and target["content"] != result:
+        _mark_chapter_dependencies_stale(
+            ws, volume, target["start_ch"], target["end_ch"],
+            f"Story-arc unit {arc_idx} was adjusted after validation.",
+        )
+    write_artifact(
+        target["path"], result, "story_arc",
+        dependencies={
+            "previous_story_arc": previous,
+            "instruction": run["instruction"],
+            "stage_story_plan": target.get("stage_story_plan", ""),
+        },
+        metadata={
+            "stage": volume, "arc": arc_idx,
+            "operation": run["mode"], "diagnostics": reviewed["diagnostics"],
+        },
+    )
+    _append_story_arc_item(run, target, result)
+    run["written"].append({
+        "label": f"story-arc unit {arc_idx} (chapters {target['start_ch']}-{target['end_ch']})",
+        "path": f"file_system/story_arcs/vol_{volume:02d}/{target['file']}",
+    })
+    _story_arc_progress(
+        run, "refining", f"story-arc unit {arc_idx} {_story_arc_refine_action(run, target)} complete",
+    )
+
+
+def _refine_story_arc_unit(run, target):
+    """Rewrite one target with review and one retry; return its outcome, or None when stopped."""
+    arc_idx = target["idx"]
+    _story_arc_progress(
+        run, "refining",
+        f"Route: start at story-arc unit {run['start_arc']}; "
+        f"{_story_arc_refine_action(run, target)} story-arc unit {arc_idx}",
+    )
+    reviewed = _reviewed_story_arc(run, target)
+    if reviewed is None:
+        return None
+    if reviewed["status"] not in STORY_ARC_HALT_STATUSES:
+        _write_refined_story_arc(run, target, reviewed)
+    return outcome(arc_idx, reviewed["status"], reviewed["reason"])
+
+
+def _refine_story_arc_targets(run, targets):
+    """Rewrite targets in order; stop at the first rejected or empty unit, or when the run is stopped."""
+    outcomes = []
+    for target in targets:
+        if not _wait_for_story_arc_turn(run):
+            break
+        unit_outcome = _refine_story_arc_unit(run, target)
+        if unit_outcome is None:
+            break
+        outcomes.append(unit_outcome)
+        if unit_outcome["status"] in STORY_ARC_HALT_STATUSES:
+            break
+    return outcomes
+
+
+def _story_arc_refine_note(run, targets, outcomes, stopped):
+    """Lead with the processed units, the mode and any halt; outcomes go last because callers cap the tail."""
+    handling = "full regenerate" if run["mode"] == "regenerate" else "revise from current content"
+    first, last = targets[0]["idx"], targets[-1]["idx"]
+    units = f"unit {first}" if first == last else f"units {first}-{last}"
+    written = len(run["written"])
+    halt = _story_arc_halt(outcomes)
+    if stopped:
+        lead = (
+            f"This round ended; started at story-arc unit {run['start_arc']}, "
+            f"finished {written}/{len(targets)}. Handling: {handling}."
+        )
+    elif halt:
+        lead = (
+            f"Stopped at story-arc unit {halt['arc']} ({halt['status']}): {halt['reason']}. "
+            f"Wrote {written} of story-arc {units} ({handling}); unit {halt['arc']} and every later unit "
+            "were left unchanged."
+        )
+    else:
+        lead = f"Per the instruction, serially processed story-arc {units} and wrote {written}. Handling: {handling}."
+    route = f"Route reason: {run['route_reason']}" if run["route_reason"] else ""
+    return "\n\n".join(part for part in (lead, route, render_outcomes(outcomes)) if part)
+
+
+def refine_story_arcs_serial(ws, volume, instruction, progress_callback=None,
+                             pause_event=None, stop_event=None, cancel_event=None,
+                             arc=None, mode=None, cascade=True, author_brief=""):
+    """Serially rewrite story-arcs from a start unit: the named arc, or the one the router picks.
+
+    mode ("revise" or "regenerate") overrides the mode read from the router or the instruction.
+    cascade=False rewrites only the start unit; True also rewrites every later planned unit.
+    Each unit is reviewed against the arcs before it and retried once; a rejected or empty unit ends the run.
+    """
     import time as _time
-    stamp = _time.strftime("%Y%m%d_%H%M%S")
+    arcs = _list_novel_story_arcs(ws, volume)
+    if not arcs:
+        return {"error": "This volume has no story-arc units yet.", "artifacts": []}
+    llm = _get_editor_llm()
+    if not llm:
+        return {"error": "No usable model is configured.", "artifacts": []}
+
+    run = _story_arc_run(
+        ws, llm, volume, _simple_story_arc_context(ws, volume),
+        _reference_story_arc_average_chars(ws, volume), len(arcs),
+        author_brief=author_brief, progress_callback=progress_callback,
+        pause_event=pause_event, stop_event=stop_event, cancel_event=cancel_event,
+    )
+    run.update(instruction=instruction, writer=_call_story_arc_refiner, written=[])
+    start = _story_arc_refine_start(run, arcs, arc, mode)
+    if start is None:
+        return {"artifacts": [], "adjustment_note": "This round of adjust ended; existing content was left unchanged.", "stopped": True}
+    start_arc, refinement_mode, route_reason = start
+    targets, error = _story_arc_refine_targets(ws, volume, arcs, start_arc, arc is not None, cascade)
+    if error:
+        return {"error": error, "artifacts": []}
     backup_dir = os.path.join(_volume_story_arc_dir(ws, volume), "versions")
     os.makedirs(backup_dir, exist_ok=True)
+    run.update(
+        start_arc=start_arc, mode=refinement_mode, route_reason=route_reason,
+        total_arcs=len(targets), backup_dir=backup_dir, stamp=_time.strftime("%Y%m%d_%H%M%S"),
+    )
+    # Arcs before the start unit are the accepted prior state; later units on disk are never siblings.
+    run["items"].extend(item for item in arcs if item["idx"] < start_arc)
 
-    for target in targets:
-        if stop_event is not None and stop_event.is_set():
-            break
-        if pause_event is not None:
-            if not pause_event.is_set() and progress_callback:
-                progress_callback("paused", len(written), len(targets), "Serial adjustment paused")
-            pause_event.wait()
-        if stop_event is not None and stop_event.is_set():
-            break
-
-        previous = generated_by_idx.get(target["idx"] - 1) or "(this is the first story-arc unit of the current volume)"
-        action_label = (
-            "revise from original content"
-            if target["existed"] and refinement_mode == "revise"
-            else "full regenerate"
-            if target["existed"]
-            else "continue generating"
-        )
-        if progress_callback:
-            progress_callback(
-                "refining", len(written), len(targets),
-                f"Route: start at story-arc unit {start_arc}; {action_label} story-arc unit {target['idx']}",
-            )
-        prompt = PromptLoader.load(
-            "story_arc_serial_refine",
-            **_story_arc_prompt_context(
-                generation_context, target, ws=ws, stage_number=volume,
-            ),
-            instruction=instruction,
-            previous_story_arc=previous,
-            current_story_arc=(
-                target["content"]
-                if refinement_mode == "revise"
-                else "(this round is a full regenerate; do not use the old version of this unit, and do not invent or restore old text.)"
-            ),
-            arc_index=target["idx"],
-            start_chapter=target["start_ch"],
-            end_chapter=target["end_ch"],
-            target_char_count=target_char_count,
-        )
-        while True:
-            try:
-                result = normalize_text(_generate_with_cancel(llm, prompt, cancel_event, temperature=0.3))
-                result = _compact_story_arc_result(
-                    llm, result, target["idx"], target["start_ch"], target["end_ch"],
-                    target_char_count, cancel_event,
-                )
-                break
-            except LLMCallCancelled:
-                if stop_event is not None and stop_event.is_set():
-                    result = None
-                    break
-                if progress_callback:
-                    progress_callback(
-                        "paused", len(written), len(targets),
-                        f"story-arc unit {target['idx']} adjustment paused; continue to regenerate this unit",
-                    )
-                if pause_event is not None:
-                    pause_event.wait()
-                if cancel_event is not None:
-                    cancel_event.clear()
-        if result is None:
-            break
-        if not str(result).strip():
-            print(
-                f"  Warning: story-arc unit {target['idx']} got no model output; not written. You can retry."
-            )
-            continue
-        diagnostics = diagnose_story_arc(
-            result, target["idx"], target["start_ch"], target["end_ch"],
-            target_chars=target_char_count,
-            required_anchors=extract_critical_anchors("\n".join((target.get("arc_obligations") or []) + (target.get("chapter_beats") or []))),
-            reference_text=target.get("reference_story_arc") or "",
-        )
-        if not diagnostics["valid"]:
-            reasons = "; ".join(item["reason"] for item in diagnostics["errors"])
-            print(f"  Warning: story-arc unit {target['idx']} adjustment failed validation; existing content kept: {reasons}")
-            continue
-
-        backup_path = os.path.join(backup_dir, f"{target['file']}_{stamp}")
-        if target["existed"] and not os.path.exists(backup_path):
-            shutil.copy2(target["path"], backup_path)
-        if target["existed"] and target["content"] != result:
-            _mark_chapter_dependencies_stale(
-                ws, volume, target["start_ch"], target["end_ch"],
-                f"Story-arc unit {target['idx']} was adjusted after validation.",
-            )
-        write_artifact(
-            target["path"], result, "story_arc",
-            dependencies={
-                "previous_story_arc": previous,
-                "instruction": instruction,
-                "stage_story_plan": target.get("stage_story_plan", ""),
-            },
-            metadata={
-                "stage": volume, "arc": target["idx"],
-                "operation": refinement_mode, "diagnostics": diagnostics,
-            },
-        )
-        generated_by_idx[target["idx"]] = result
-        written.append({
-            "label": f"story-arc unit {target['idx']} (chapters {target['start_ch']}-{target['end_ch']})",
-            "path": f"file_system/story_arcs/vol_{volume:02d}/{target['file']}",
-        })
-        if progress_callback:
-            progress_callback(
-                "refining", len(written), len(targets),
-                f"story-arc unit {target['idx']} {action_label} complete",
-            )
-
+    outcomes = _refine_story_arc_targets(run, targets)
     stopped = stop_event is not None and stop_event.is_set()
     current_items = _list_novel_story_arcs(ws, volume)
     if current_items:
         _write_story_arc_index(ws, volume, current_items)
     return {
-        "adjustment_note": (
-            f"This round ended; started at story-arc unit {start_arc}, finished {len(written)}/{len(targets)}."
-            if stopped
-            else (
-                f"Per the instruction, serially processed {len(written)} story-arc units starting at unit {start_arc}, "
-                f"and filled later units that had not been generated. Handling: "
-                f"{'full regenerate' if refinement_mode == 'regenerate' else 'revise from current content'}."
-                f"Route reason: {route_reason}"
-            )
-        ),
-        "artifacts": written,
+        "adjustment_note": _story_arc_refine_note(run, targets, outcomes, stopped),
+        "artifacts": run["written"],
         "stopped": stopped,
         "start_arc": start_arc,
         "mode": refinement_mode,
         "total_adjusted": len(targets),
+        "outcomes": outcomes,
     }
 
 

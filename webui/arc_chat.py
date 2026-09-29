@@ -40,6 +40,14 @@ def _conversation_path(root: Path, workspace: str, volume: int) -> Path:
     return root / workspace / "file_system" / "story_arcs" / f"vol_{volume:02d}" / "conversation.json"
 
 
+def _first_user_turn(conv: "ArcsConversation") -> str:
+    """Return the author's opening message, which carries the brief for the whole stage."""
+    for turn in conv.turns:
+        if turn.get("role") == "user":
+            return str(turn.get("content") or "").strip()
+    return ""
+
+
 class ArcsConversation:
     def __init__(self, volume: int, path: Path):
         self.volume = volume
@@ -162,12 +170,18 @@ class ArcsChatManager:
         conv.save()
         return {"mode": mode, "result": result, "conversation": conv.history()}
 
-    def start_message(self, workspace: str, volume: int, message: str, resume_incomplete: bool = False) -> dict[str, Any]:
-        """Run chat generation in the background so the UI can read progress and pause."""
+    def start_message(self, workspace: str, volume: int, message: str, resume_incomplete: bool = False,
+                      arc: int | None = None, mode: str | None = None, cascade: bool = True) -> dict[str, Any]:
+        """Run chat generation in the background so the UI can read progress and pause.
+
+        arc, mode and cascade steer a refine: arc names the unit to change, and cascade=False leaves later units alone.
+        """
         key = (workspace, volume)
         display_text = message.strip()
         if not display_text:
             raise ValueError("Enter content before sending.")
+        if arc is not None and not _arc_files_exist(init_workspace(workspace), volume):
+            raise ValueError(f"Volume {volume} has no story arcs yet, so arc {arc} cannot be refined. Generate the arcs first.")
         with self._jobs_lock:
             current = self._jobs.get(key)
             if current and current["status"] in {"running", "pausing", "paused", "stopping"}:
@@ -227,50 +241,10 @@ class ArcsChatManager:
             trace_context = capture_prompts(trace_prompt)
             trace_context.__enter__()
             try:
-                ws = init_workspace(workspace)
-                conv = self.get(workspace, volume)
-                from training.adaptive_builder import gen_story_arcs, refine_story_arcs_serial
-                is_initial = resume_incomplete or not _arc_files_exist(ws, volume)
-                if is_initial:
-                    result = gen_story_arcs(
-                        ws, volume=volume, progress_callback=update,
-                        pause_event=pause_event, stop_event=stop_event,
-                        cancel_event=cancel_event,
-                    )
-                    mode = "resume" if resume_incomplete else "initial"
-                else:
-                    with self._jobs_lock:
-                        active = self._jobs.get(key)
-                        if active and active["id"] == job["id"]:
-                            active["progress_kind"] = "serial_refine"
-                    result = refine_story_arcs_serial(
-                        ws, volume, instruction=display_text,
-                        progress_callback=update,
-                        pause_event=pause_event,
-                        stop_event=stop_event,
-                        cancel_event=cancel_event,
-                    )
-                    mode = "refine"
-                if isinstance(result, dict) and result.get("error"):
-                    raise RuntimeError(str(result["error"]))
-                if not result:
-                    raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
-                artifacts = result.get("artifacts") or []
-                note = str(result.get("adjustment_note") or "").strip()
-                if not note:
-                    note = f"Generated story arcs for volume {volume}." if mode == "initial" else "Adjusted from the instruction."
-                conv.append_assistant(note, artifacts)
-                conv.save()
-                with self._jobs_lock:
-                    active = self._jobs.get(key)
-                    if active and active["id"] == job["id"]:
-                        stopped = bool(result.get("stopped"))
-                        active.update(
-                            status="stopped" if stopped else "completed",
-                            phase="stopped" if stopped else "completed",
-                            message=note,
-                            result={"mode": mode},
-                        )
+                self._run_arcs_job(
+                    job, workspace, volume, display_text, resume_incomplete, update,
+                    {"arc": arc, "mode": mode, "cascade": cascade},
+                )
             except Exception as exc:
                 with self._jobs_lock:
                     active = self._jobs.get(key)
@@ -281,6 +255,59 @@ class ArcsChatManager:
 
         threading.Thread(target=worker, name=f"arcs-chat-{volume}", daemon=True).start()
         return self.job_status(workspace, volume)
+
+    def _run_arcs_job(self, job: dict[str, Any], workspace: str, volume: int, display_text: str,
+                      resume_incomplete: bool, update, refine_options: dict[str, Any]) -> None:
+        """Generate or refine a volume's arcs for one background job and record the result on the job."""
+        key = (workspace, volume)
+        pause_event, stop_event, cancel_event = job["pause_event"], job["stop_event"], job["cancel_event"]
+        ws = init_workspace(workspace)
+        conv = self.get(workspace, volume)
+        from training.adaptive_builder import gen_story_arcs, refine_story_arcs_serial
+        is_initial = resume_incomplete or not _arc_files_exist(ws, volume)
+        if is_initial:
+            result = gen_story_arcs(
+                ws, volume=volume, progress_callback=update,
+                pause_event=pause_event, stop_event=stop_event,
+                cancel_event=cancel_event,
+                author_brief=_first_user_turn(conv),
+            )
+            mode = "resume" if resume_incomplete else "initial"
+        else:
+            with self._jobs_lock:
+                active = self._jobs.get(key)
+                if active and active["id"] == job["id"]:
+                    active["progress_kind"] = "serial_refine"
+            result = refine_story_arcs_serial(
+                ws, volume, instruction=display_text,
+                progress_callback=update,
+                pause_event=pause_event,
+                stop_event=stop_event,
+                cancel_event=cancel_event,
+                author_brief=_first_user_turn(conv),
+                **refine_options,
+            )
+            mode = "refine"
+        if isinstance(result, dict) and result.get("error"):
+            raise RuntimeError(str(result["error"]))
+        if not result:
+            raise RuntimeError("No usable model is configured. Set the LLM API in the top-right first.")
+        artifacts = result.get("artifacts") or []
+        note = str(result.get("adjustment_note") or "").strip()
+        if not note:
+            note = f"Generated story arcs for volume {volume}." if mode == "initial" else "Adjusted from the instruction."
+        conv.append_assistant(note, artifacts)
+        conv.save()
+        with self._jobs_lock:
+            active = self._jobs.get(key)
+            if active and active["id"] == job["id"]:
+                stopped = bool(result.get("stopped"))
+                active.update(
+                    status="stopped" if stopped else "completed",
+                    phase="stopped" if stopped else "completed",
+                    message=note,
+                    result={"mode": mode},
+                )
 
     def job_status(self, workspace: str, volume: int) -> dict[str, Any]:
         with self._jobs_lock:

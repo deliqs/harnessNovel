@@ -287,6 +287,25 @@ def _http_error(exc: Exception, status_code: int = 400) -> HTTPException:
     return HTTPException(status_code=status_code, detail=str(exc))
 
 
+ARC_REFINE_MODES = ("revise", "regenerate")
+
+
+def _arc_refine_options(payload: dict[str, Any]) -> dict[str, Any]:
+    """Read the optional arc, mode and cascade fields of an arcs chat request; null counts as absent."""
+    arc = payload.get("arc")
+    if arc is not None and (isinstance(arc, bool) or not isinstance(arc, int) or arc < 1):
+        raise ValueError("arc must be a positive whole number.")
+    mode = payload.get("mode")
+    if mode is not None and mode not in ARC_REFINE_MODES:
+        raise ValueError("mode must be revise or regenerate.")
+    cascade = payload.get("cascade")
+    if cascade is None:
+        cascade = True
+    if not isinstance(cascade, bool):
+        raise ValueError("cascade must be true or false.")
+    return {"arc": arc, "mode": mode, "cascade": cascade}
+
+
 def create_app(workspace_root: str | None = None) -> FastAPI:
     runtime = WebRuntime(workspace_root)
     app = FastAPI(title="HarnessNovel Web", version="1.0.0", docs_url=None, redoc_url=None)
@@ -504,7 +523,7 @@ def create_app(workspace_root: str | None = None) -> FastAPI:
         if not message:
             raise _http_error(ValueError("Enter content before sending."))
         try:
-            return runtime.arcs_chat.start_message(name, volume, message)
+            return runtime.arcs_chat.start_message(name, volume, message, **_arc_refine_options(payload))
         except Exception as exc:
             raise _http_error(exc) from exc
 

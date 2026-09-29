@@ -276,6 +276,8 @@ At this stage, the reference novel does not provide plots to rename. It provides
 
 The system selects one reference story arc by default as the narrative sample, abstracts its plot function, conflict structure, information gap, emotion curve, payoff mechanism, key turn, and ending hook, then regenerates a new story-arc unit against the current stage.
 
+Once a stage has arcs, a Web story-arc chat message refines them. The chat request (`POST /api/workspaces/{name}/arcs/{volume}/chat`) may target one arc with `arc` and an optional `mode` (`revise` or `regenerate`); `cascade` (default `true`) also rewrites every later arc, while `false` rewrites only that arc. Each run reports a per-arc outcome. An arc that fails its checks twice is rejected: its file is kept, and later arcs are left untouched.
+
 ## Chapter Humanization Post-processing
 
 `novel write` adds a humanization refinement step. The rules are sourced from [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh).

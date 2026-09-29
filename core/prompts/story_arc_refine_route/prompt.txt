@@ -17,7 +17,7 @@ Write the entire response in English. Do not use Chinese except in proper nouns 
 【Judgment rules】
 1. Find the earliest arc unit the adjustment instruction directly affects.
 2. If the instruction changes a character's initial state, a core setting, a mainline goal, or early foreshadowing, start from the unit where those changes first occur.
-3. If the user explicitly names arc units, take the earliest unit in the named range as the start.
+3. The start is the unit the user asks to change. A unit mentioned only as comparison or context is not the start: "rewrite Arc 2, it duplicates Arc 1" starts at Arc 2, not Arc 1. If the user names a range of units to change, take the earliest unit of that range.
 4. Later units will be regenerated serially for state continuity, so here you only judge the earliest start.
 5. start_arc must be an arc number that actually exists in the current volume.
 6. mode may only be regenerate or revise:

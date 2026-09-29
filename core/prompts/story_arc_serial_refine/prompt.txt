@@ -24,6 +24,16 @@ Write the entire response in English. Do not use Chinese except in proper nouns 
 {reference_story_arcs}
 [END UNTRUSTED REFERENCE DATA: STORY-ARC DIGEST]
 
+【Prior arcs of this stage】
+[BEGIN UNTRUSTED WORKSPACE DATA: PRIOR ARC LEDGER]
+{prior_arc_ledger}
+[END UNTRUSTED WORKSPACE DATA: PRIOR ARC LEDGER]
+
+【Author direction for this stage】
+{author_brief}
+
+{review_note}
+
 【User adjustment instruction】
 [BEGIN AUTHOR DIRECTION: SUBORDINATE TO TASK, SAFETY, OUTPUT, AND ANTI-COPY RULES]
 {instruction}
@@ -46,7 +56,8 @@ Arc {arc_index}, Chapters {start_chapter}-{end_chapter}
 1. Carry out the user instruction; if the instruction does not directly touch the current unit, you must still correct character, resource, relationship, causality, and foreshadowing pickup from the latest prior state.
 2. When an original version of the current unit is provided, edit on top of it and keep unaffected content; if it is clearly marked as a full regenerate or not yet generated, create only from the latest prior state, the user instruction, and the chapter range. Do not guess old text.
 3. Target about {target_char_count} characters-or-equivalent for the full text. Each field is one compact paragraph. Do not expand chapter by chapter or use bullets.
-4. Output only the complete story-arc unit. Do not explain the revision process.
+4. The current unit's Boundary reason must open on a different event from every prior arc's opening listed in the prior-arc ledger; do not re-stage an earlier arc's opening event.
+5. Output only the complete story-arc unit. Do not explain the revision process.
 
 First line:
 【Arc{arc_index}: Chapters {start_chapter}-{end_chapter} | title】

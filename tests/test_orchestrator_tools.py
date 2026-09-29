@@ -148,6 +148,15 @@ class SharedToolTests(unittest.TestCase):
         self.assertTrue(result.startswith("[%d earlier characters left out]" % (len(critique) - RESULT_CHARS)))
         self.assertEqual(len(result.split("\n", 1)[1]), RESULT_CHARS)
 
+    def test_job_status_gives_a_failed_jobs_error_not_an_older_note(self):
+        self.runtime.arcs_chat = MagicMock()
+        self.runtime.arcs_chat.job_status.return_value = {"status": "failed", "error": "Arc 2 rejected: too short"}
+        self.runtime.arcs_chat.get.return_value.turns = [{"role": "assistant", "content": "Old success"}]
+
+        report = json.loads(job_status(self._ctx({"volume": 1}), "arcs"))
+
+        self.assertEqual(report["result"], "Arc 2 rejected: too short")
+
     def test_job_status_leaves_the_result_out_while_the_job_runs(self):
         self.runtime.arcs_chat = MagicMock()
         self.runtime.arcs_chat.job_status.return_value = {"status": "running", "message": "arc 2 of 5"}

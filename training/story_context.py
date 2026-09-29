@@ -83,16 +83,35 @@ def extract_stage_obligations(stage_text):
     return [item for item in obligations if item][:18]
 
 
+def _label_shared_obligations(assignments):
+    """Mark an obligation spread over several plans as "(part k of m)" so siblings differ."""
+    totals = {}
+    for assigned in assignments:
+        for item in assigned:
+            totals[item] = totals.get(item, 0) + 1
+    seen = {}
+    labeled = []
+    for assigned in assignments:
+        items = []
+        for item in assigned:
+            seen[item] = seen.get(item, 0) + 1
+            items.append(item if totals[item] < 2 else "%s (part %d of %d)" % (item, seen[item], totals[item]))
+        labeled.append(items)
+    return labeled
+
+
 def enrich_arc_plans(plans, stage_text):
     """Attach whole-stage obligations and per-chapter beat slots before calls fan out."""
     source = [dict(plan) for plan in (plans or [])]
     obligations = extract_stage_obligations(stage_text)
     if not obligations:
         obligations = ["Advance the current stage conflict while preserving established character and world state."]
-    for position, plan in enumerate(source):
+    assignments = []
+    for position in range(len(source)):
         start = round(position * len(obligations) / len(source))
         end = round((position + 1) * len(obligations) / len(source))
-        assigned = obligations[start:end] or [obligations[min(start, len(obligations) - 1)]]
+        assignments.append(obligations[start:end] or [obligations[min(start, len(obligations) - 1)]])
+    for plan, assigned in zip(source, _label_shared_obligations(assignments)):
         chapters = list(range(int(plan["start_ch"]), int(plan["end_ch"]) + 1))
         plan["arc_obligations"] = assigned
         plan["chapter_beats"] = [

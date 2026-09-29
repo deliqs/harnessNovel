@@ -214,9 +214,11 @@ def _running_status(deps: OrchestratorDeps, kind: str, args: dict[str, Any], sta
 
 
 def _job_result(runtime: Any, workspace: str, kind: str, args: dict[str, Any], status: dict[str, Any]) -> str:
-    """A finished job's outcome: a task's message, or the manager's latest assistant note."""
+    """A finished job's outcome: a task's message, a failed job's error, or the manager's latest assistant note."""
     if kind == "task":
         return str(status.get("message") or "")
+    if status.get("status") == "failed":
+        return tail_capped(str(status.get("error") or ""))
     turns = getattr(_CONVERSATIONS[kind](runtime, workspace, args), "turns", None)
     if not isinstance(turns, list):
         return ""
