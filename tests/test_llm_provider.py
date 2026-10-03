@@ -94,6 +94,26 @@ class LLMProviderTimeoutTests(unittest.TestCase):
         self.assertEqual(extra["enable_thinking"], False)
         self.assertEqual(extra["chat_template_kwargs"]["enable_thinking"], False)
 
+    def test_lm_studio_json_kwargs_use_object_schema(self):
+        provider = LLMProvider(
+            model="8-bit",
+            base_url="http://127.0.0.1:1234/v1",
+            api_key="lm-studio",
+        )
+        kwargs = provider._completion_kwargs("prompt", 0.7, True, None)
+        response_format = kwargs["response_format"]
+        self.assertEqual(response_format["type"], "json_schema")
+        self.assertEqual(response_format["json_schema"]["schema"], {"type": "object"})
+
+    def test_non_lm_studio_json_kwargs_use_json_object(self):
+        provider = LLMProvider(
+            model="grok-4.6",
+            base_url="http://127.0.0.1:8788/v1",
+            api_key="grok-cli",
+        )
+        kwargs = provider._completion_kwargs("prompt", 0.7, True, None)
+        self.assertEqual(kwargs["response_format"], {"type": "json_object"})
+
     def test_non_lm_studio_kwargs_omit_thinking(self):
         provider = LLMProvider(
             model="grok-4.6",

@@ -131,7 +131,7 @@ class LLMProvider:
             "max_tokens": max_tokens or self.max_tokens,
         }
         if is_json:
-            kwargs["response_format"] = {"type": "json_object"}
+            kwargs["response_format"] = self._json_response_format()
         # Qwen 3.8 defaults thinking to xhigh when this is omitted. LM Studio
         # chat presets do not apply to /v1, so chapter writes must set it here.
         if self._is_lm_studio():
@@ -140,6 +140,15 @@ class LLMProvider:
                 "chat_template_kwargs": {"enable_thinking": False},
             }
         return kwargs
+
+    def _json_response_format(self):
+        # LM Studio rejects json_object; a bare object schema constrains output the same way.
+        if self._is_lm_studio():
+            return {
+                "type": "json_schema",
+                "json_schema": {"name": "response", "schema": {"type": "object"}},
+            }
+        return {"type": "json_object"}
 
     def _metadata_base_url(self):
         """Return a reproducible provider endpoint without embedded credentials."""
