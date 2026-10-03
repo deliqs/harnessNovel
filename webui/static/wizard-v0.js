@@ -107,8 +107,8 @@ function modelConfigFields(groupId, group) {
   const optional = ["draft", "editor", "critic"].includes(groupId);
   return `<section class="model-config-group">
     <header><h3>${escapeHtml(group.label)}</h3><span class="config-status ${group.api_key_configured ? "ready" : "missing"}">${configured}</span></header>
-    <label>Model name<input name="${prefix}_MODEL" data-role-prefix="${optional ? prefix : ""}" value="${escapeHtml(group.model || "")}" placeholder="e.g. orcarouter/ternary-bonsai-2-27b-uncensored" autocomplete="off" /></label>
-    <label>Base URL<input name="${prefix}_BASE_URL" data-role-prefix="${optional ? prefix : ""}" value="${escapeHtml(group.base_url || "")}" placeholder="http://127.0.0.1:8091/v1" autocomplete="off" /></label>
+    <label>Model name<input name="${prefix}_MODEL" data-role-prefix="${optional ? prefix : ""}" value="${escapeHtml(group.model || "")}" placeholder="e.g. llama-3.3-70b-instruct-abliterated" autocomplete="off" /></label>
+    <label>Base URL<input name="${prefix}_BASE_URL" data-role-prefix="${optional ? prefix : ""}" value="${escapeHtml(group.base_url || "")}" placeholder="http://127.0.0.1:1234/v1" autocomplete="off" /></label>
     <label>API Key<input name="${prefix}_API_KEY" data-role-prefix="${optional ? prefix : ""}" type="password" placeholder="${group.api_key_configured ? "Configured; leave blank to keep it" : "Enter API key"}" autocomplete="new-password" /></label>
     ${optional ? `<button class="secondary-button role-clear-button" type="button" data-clear-role="${prefix}">Clear role and use Lite fallback</button>` : ""}
   </section>`;

@@ -23,20 +23,20 @@ def cmd_config(args):
 # Any OpenAI-compatible provider works: change MODEL, BASE_URL and API_KEY per slot.
 
 # Reference novel extraction (init flow)
-DATA_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
-DATA_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
+DATA_BUILDER_MODEL=llama-3.3-70b-instruct-abliterated
+DATA_BUILDER_BASE_URL=http://127.0.0.1:1234/v1
 DATA_BUILDER_API_KEY=local-only
 
 # Book and stage design
-ADAPTIVE_BUILDER_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
-ADAPTIVE_BUILDER_BASE_URL=http://127.0.0.1:8091/v1
+ADAPTIVE_BUILDER_MODEL=llama-3.3-70b-instruct-abliterated
+ADAPTIVE_BUILDER_BASE_URL=http://127.0.0.1:1234/v1
 ADAPTIVE_BUILDER_API_KEY=local-only
 # Book and stage design re-emits whole files.
 ADAPTIVE_BUILDER_MAX_TOKENS=32768
 
 # Story arcs and chapter outlines. This is also the fallback for optional roles below.
-ADAPTIVE_BUILDER_LITE_MODEL=orcarouter/ternary-bonsai-2-27b-uncensored
-ADAPTIVE_BUILDER_LITE_BASE_URL=http://127.0.0.1:8091/v1
+ADAPTIVE_BUILDER_LITE_MODEL=llama-3.3-70b-instruct-abliterated
+ADAPTIVE_BUILDER_LITE_BASE_URL=http://127.0.0.1:1234/v1
 ADAPTIVE_BUILDER_LITE_API_KEY=local-only
 
 # Optional production roles. Leave a role unset to inherit each missing value from Lite.
